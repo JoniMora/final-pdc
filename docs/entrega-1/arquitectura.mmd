@@ -1,0 +1,58 @@
+%%{init: {"theme":"base","themeVariables":{"fontSize":"14px","primaryTextColor":"#F4F4F5","lineColor":"#52525B","titleColor":"#334155","clusterBkg":"#FAFAFA","clusterBorder":"#334155","edgeLabelBackground":"#4B4B4B"},"flowchart":{"curve":"basis","nodeSpacing":40,"rankSpacing":70}}}%%
+flowchart LR
+    %% ============================================================
+    %%  Motor Transaccional de E-learning de Alta Concurrencia
+    %%  Patrón: Queue-Based Load Leveling (absorción de picos de carga)
+    %% ============================================================
+
+    Cliente["Cliente / Alumno<br/>(Navegador / App móvil)"]
+
+    subgraph Docker["Red Interna de Docker Compose"]
+
+        subgraph Compute["Capa de Cómputo (Node.js)"]
+            API["API Node.js<br/>Servicio Síncrono<br/>Registra la intención (status = pending)<br/>GET /catalogo · POST /inscripciones · GET /inscripciones/:id"]
+            Worker["Worker Asíncrono Node.js<br/>Proceso aislado · prefetch(1)<br/>No inserta: transiciona estados<br/>1 conexión por transacción"]
+        end
+
+        subgraph Queue["Capa de Mensajería (RabbitMQ)"]
+            MQ["Cola: enrollment.requests<br/>durable · mensajes persistentes<br/>publisher confirms"]
+            DLQ["Dead-Letter Queue<br/>enrollment.dlq<br/>(mensajes venenosos / reintentos agotados)"]
+        end
+
+        subgraph Persist["Capa de Persistencia"]
+            DB[("MySQL 8 · InnoDB<br/>inscripciones: UNIQUE(alumno_id, curso_id)<br/>cursos: cupos INT · contenedor propio · volumen persistente")]
+        end
+
+    end
+
+    %% ----------------------- Flujos -----------------------------
+    Cliente -->|"SÍNCRONO · POST /inscripciones<br/>← 202 Accepted + Location + Retry-After<br/>← 200 con estado actual si ya existía"| API
+    Cliente -->|"SÍNCRONO · GET /inscripciones/:id (polling)<br/>← pending / confirmed / rejected / failed"| API
+    API -->|"SÍNCRONO · INSERT inscripción (status = pending)<br/>1062 → devolver estado existente, no publicar<br/>SELECT catálogo / estado"| DB
+    API -.->|"ASÍNCRONO · publish {enrollmentId}<br/>solo tras INSERT exitoso<br/>si el publish falla → status = failed + 503"| MQ
+    MQ -.->|"ASÍNCRONO · consume a ritmo propio<br/>noAck:false · ack solo tras COMMIT"| Worker
+    Worker -->|"SÍNCRONO interno · transacción InnoDB<br/>1. SELECT status FOR UPDATE (≠ pending → ack, salir)<br/>2. UPDATE cursos SET cupos = cupos - 1 WHERE cupos > 0<br/>3. UPDATE status = confirmed / rejected"| DB
+    Worker -.->|"ASÍNCRONO · nack sin requeue<br/>tras 3 reintentos (1213 / 1205) o error fatal"| DLQ
+
+    %% ----------------------- Estilos ----------------------------
+    classDef actor   fill:#F4F4F5,stroke:#52525B,stroke-width:2px,color:#18181B
+    classDef compute fill:#DBEAFE,stroke:#1D4ED8,stroke-width:2px,color:#1E3A8A
+    classDef queue   fill:#FEF3C7,stroke:#B45309,stroke-width:2px,color:#78350F
+    classDef dlq     fill:#FEE2E2,stroke:#B91C1C,stroke-width:2px,color:#7F1D1D
+    classDef persist fill:#DCFCE7,stroke:#15803D,stroke-width:2px,color:#14532D
+
+    class Cliente actor
+    class API,Worker compute
+    class MQ queue
+    class DLQ dlq
+    class DB persist
+
+    style Docker  fill:#FAFAFA,stroke:#334155,stroke-width:2px,stroke-dasharray: 8 4
+    style Compute fill:#EFF6FF,stroke:#1D4ED8,stroke-width:1px,stroke-dasharray: 4 3
+    style Queue   fill:#FFFBEB,stroke:#B45309,stroke-width:1px,stroke-dasharray: 4 3
+    style Persist fill:#F0FDF4,stroke:#15803D,stroke-width:1px,stroke-dasharray: 4 3
+
+    %% Flechas síncronas (azul) vs asíncronas (ámbar) vs DLQ (rojo)
+    linkStyle 0,1,2,5 stroke:#1D4ED8,stroke-width:2px
+    linkStyle 3,4     stroke:#B45309,stroke-width:2px
+    linkStyle 6       stroke:#B91C1C,stroke-width:2px

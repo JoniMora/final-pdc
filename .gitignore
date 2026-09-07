@@ -1,0 +1,55 @@
+# ---- Node.js ----
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+.pnpm-store/
+
+# ---- Variables de entorno (credenciales de MySQL / RabbitMQ) ----
+.env
+.env.*
+!.env.example
+
+# ---- Build / salida ----
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# ---- Tests y cobertura ----
+coverage/
+.nyc_output/
+*.lcov
+
+# ---- Datos locales de contenedores ----
+# Volúmenes bind-mounteados de MySQL / RabbitMQ y dumps de la prueba de carga
+data/
+mysql-data/
+rabbitmq-data/
+*.sqlite
+*.db
+
+# ---- Logs ----
+logs/
+*.log
+
+# ---- macOS ----
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# ---- Windows ----
+Thumbs.db
+Desktop.ini
+
+# ---- Editores / IDE ----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
