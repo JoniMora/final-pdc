@@ -1,63 +1,71 @@
 %%{init: {"theme":"base","themeVariables":{"fontSize":"14px","primaryTextColor":"#F4F4F5","lineColor":"#52525B","titleColor":"#334155","clusterBkg":"#FAFAFA","clusterBorder":"#334155","edgeLabelBackground":"#4B4B4B"},"flowchart":{"curve":"basis","nodeSpacing":40,"rankSpacing":70}}}%%
 flowchart LR
     %% ============================================================
-    %%  Motor Transaccional de E-learning de Alta Concurrencia
-    %%  Patrón: Queue-Based Load Leveling + Persistencia Primario-Réplica
+    %%  Servicio multi-tenant de reserva de cupos
+    %%  Queue-Based Load Leveling · Transactional Outbox · Primario-Réplica
+    %%  Revisión 2 · 22/09/2026
     %% ============================================================
 
-    Cliente["Cliente / Alumno<br/>(Navegador / App móvil)"]
+    subgraph Tenant["Tenant de referencia · red propia"]
+        Aula["Aula · e-learning (Node.js)<br/>usa su propia base (aula-db)<br/>modo contingencia · receptor de webhooks<br/>reconciliación por feed"]
+        AulaDB[("aula-db · PostgreSQL<br/>base propia del tenant")]
+    end
 
-    subgraph Docker["Red Interna de Docker Compose · 1 host · 5 contenedores"]
+    Otros["Otros tenants<br/>liga de fútbol · asado · pruebas k6"]
 
-        subgraph Compute["Capa de Cómputo (Node.js)"]
-            API["API Node.js<br/>Servicio Síncrono<br/>Registra la intención (status = pending)<br/>GET /catalogo · POST /inscripciones · GET /inscripciones/:id"]
-            Worker["Worker Asíncrono Node.js<br/>Proceso aislado · prefetch(1)<br/>No inserta: transiciona estados<br/>1 conexión por transacción"]
+    subgraph Servicio["Servicio · Docker Compose · 7 contenedores · red interna"]
+
+        API["API pública v1 (Node.js)<br/>Bearer · aislamiento por tenant · límite de tasa<br/>Idempotency-Key · 202 + Location<br/>listado paginado · feed /v1/cambios"]
+        Relay["Relay (Node.js)<br/>secuenciador del feed · publicador<br/>barredor de pendientes"]
+        Cmd["RabbitMQ · reservas.comandos<br/>durable · hash por actividad"]
+        Ent["RabbitMQ · webhooks.entregas<br/>esperas TTL: 10 s · 1 min · 5 min"]
+        Worker["Worker (Node.js)<br/>prefetch(1) · cupo atómico<br/>idempotente · clasifica errores"]
+        Notif["Notificador (Node.js)<br/>webhooks HMAC-SHA256<br/>reintentos escalonados"]
+        DLQ["RabbitMQ · reservas.dlq · webhooks.dlq"]
+
+        subgraph Persistencia["Persistencia (primario-réplica)"]
+            DBP[("mysql-primary · MySQL 8 · InnoDB<br/>tenants · actividades · reservas<br/>cambios = outbox + feed + auditoría")]
+            DBR[("mysql-replica · MySQL 8<br/>super_read_only · contingencia")]
         end
-
-        subgraph Queue["Capa de Mensajería (RabbitMQ)"]
-            MQ["Cola: enrollment.requests<br/>durable · mensajes persistentes<br/>publisher confirms"]
-            DLQ["Dead-Letter Queue<br/>enrollment.dlq<br/>(mensajes venenosos / reintentos agotados)"]
-        end
-
-        subgraph Persist["Capa de Persistencia (Primario-Réplica)"]
-            DBP[("mysql-primary · MySQL 8 · InnoDB<br/>escrituras y lecturas · binlog + GTID<br/>inscripciones: UNIQUE(alumno_id, curso_id)<br/>volumen persistente propio")]
-            DBR[("mysql-replica · MySQL 8<br/>super_read_only · nodo de contingencia<br/>promoción manual ante caída del primario<br/>volumen persistente propio")]
-        end
-
     end
 
     %% ----------------------- Flujos -----------------------------
-    Cliente -->|"SÍNCRONO · POST /inscripciones<br/>← 202 Accepted + Location + Retry-After<br/>← 200 con estado actual si ya existía<br/>← 503 + Retry-After si el primario no responde"| API
-    Cliente -->|"SÍNCRONO · GET /inscripciones/:id (polling)<br/>← pending / confirmed / rejected / failed"| API
-    API -->|"SÍNCRONO · INSERT inscripción (status = pending)<br/>1062 → devolver estado existente, no publicar<br/>SELECT catálogo / estado<br/>pool mysql2: destino por variable de entorno<br/>(redirección al nodo promovido en failover)"| DBP
-    API -.->|"ASÍNCRONO · publish {enrollmentId}<br/>solo tras INSERT exitoso<br/>si el publish falla → status = failed + 503"| MQ
-    MQ -.->|"ASÍNCRONO · consume a ritmo propio<br/>noAck:false · ack solo tras COMMIT<br/>si la BD no responde: nack + requeue<br/>y pausa del consumo (la cola retiene)"| Worker
-    Worker -->|"SÍNCRONO interno · transacción InnoDB<br/>1. SELECT status FOR UPDATE (≠ pending → ack, salir)<br/>2. UPDATE cursos SET cupos = cupos - 1 WHERE cupos > 0<br/>3. UPDATE status = confirmed / rejected<br/>COMMIT confirmado solo tras ack de la réplica"| DBP
-    Worker -.->|"ASÍNCRONO · nack sin requeue<br/>tras 3 reintentos (1213 / 1205) o error de datos<br/>(nunca por caída de la BD)"| DLQ
-    DBP -.->|"Replicación semi-sincrónica (binlog · GTID)<br/>modo AFTER_SYNC · RPO = 0 para lo confirmado<br/>degrada a asíncrona si vence rpl_semi_sync_source_timeout"| DBR
+    Aula -->|"SÍNCRONO · HTTP · Bearer<br/>reservas · listado · GET /v1/cambios?desde="| API
+    Otros -->|"SÍNCRONO · HTTP · Bearer<br/>POST reservas (Idempotency-Key)"| API
+    API -->|"SÍNCRONO · TX: INSERT reserva (pendiente)<br/>+ INSERT cambio → 202<br/>503 + Retry-After si el primario no responde"| DBP
+    DBP -->|"SÍNCRONO · el relay sondea cambios nuevos<br/>asigna secuencia · marca publicados"| Relay
+    Relay -.->|"ASÍNCRONO · comandos<br/>publisher confirms"| Cmd
+    Relay -.->|"ASÍNCRONO · notificaciones"| Ent
+    Cmd -.->|"ASÍNCRONO · ack tras COMMIT<br/>BD caída: requeue + pausa"| Worker
+    Worker -->|"SÍNCRONO · TX: SELECT … FOR UPDATE<br/>UPDATE cupos WHERE cupos > 0<br/>estado + versión + cambio"| DBP
+    Worker -.->|"errores de datos"| DLQ
+    Ent -.->|"ASÍNCRONO · consume"| Notif
+    Notif -.->|"reintentos agotados"| DLQ
+    Notif -.->|"POST webhook firmado<br/>al-menos-una-vez"| Aula
+    DBP -.->|"semi-sincrónica AFTER_SYNC<br/>RPO = 0 para lo confirmado"| DBR
+    Aula -->|"SÍNCRONO · su propio esquema"| AulaDB
 
     %% ----------------------- Estilos ----------------------------
-    classDef actor   fill:#F4F4F5,stroke:#52525B,stroke-width:2px,color:#18181B
+    classDef tenant  fill:#F4F4F5,stroke:#52525B,stroke-width:2px,color:#18181B
     classDef compute fill:#DBEAFE,stroke:#1D4ED8,stroke-width:2px,color:#1E3A8A
     classDef queue   fill:#FEF3C7,stroke:#B45309,stroke-width:2px,color:#78350F
     classDef dlq     fill:#FEE2E2,stroke:#B91C1C,stroke-width:2px,color:#7F1D1D
     classDef primary fill:#DCFCE7,stroke:#15803D,stroke-width:2px,color:#14532D
     classDef replica fill:#F0FDF4,stroke:#15803D,stroke-width:2px,stroke-dasharray: 5 3,color:#14532D
 
-    class Cliente actor
-    class API,Worker compute
-    class MQ queue
+    class Otros,Aula,AulaDB tenant
+    class API,Relay,Worker,Notif compute
+    class Cmd,Ent queue
     class DLQ dlq
     class DBP primary
     class DBR replica
 
-    style Docker  fill:#FAFAFA,stroke:#334155,stroke-width:2px,stroke-dasharray: 8 4
-    style Compute fill:#EFF6FF,stroke:#1D4ED8,stroke-width:1px,stroke-dasharray: 4 3
-    style Queue   fill:#FFFBEB,stroke:#B45309,stroke-width:1px,stroke-dasharray: 4 3
-    style Persist fill:#F0FDF4,stroke:#15803D,stroke-width:1px,stroke-dasharray: 4 3
+    style Servicio     fill:#FAFAFA,stroke:#334155,stroke-width:2px,stroke-dasharray: 8 4
+    style Tenant       fill:#FAFAFA,stroke:#52525B,stroke-width:2px,stroke-dasharray: 8 4
+    style Persistencia fill:#F0FDF4,stroke:#15803D,stroke-width:1px,stroke-dasharray: 4 3
 
     %% Síncrono (azul) · asíncrono (ámbar) · DLQ (rojo) · replicación (verde)
-    linkStyle 0,1,2,5 stroke:#1D4ED8,stroke-width:2px
-    linkStyle 3,4     stroke:#B45309,stroke-width:2px
-    linkStyle 6       stroke:#B91C1C,stroke-width:2px
-    linkStyle 7       stroke:#15803D,stroke-width:2px
+    linkStyle 0,1,2,3,7,13 stroke:#1D4ED8,stroke-width:2px
+    linkStyle 4,5,6,9,11  stroke:#B45309,stroke-width:2px
+    linkStyle 8,10        stroke:#B91C1C,stroke-width:2px
+    linkStyle 12          stroke:#15803D,stroke-width:2px
