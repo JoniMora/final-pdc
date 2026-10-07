@@ -8,7 +8,7 @@ Temática 7 — Plataforma de e-learning de alta concurrencia, generalizada a un
 | **Grupo N°** | 15 |
 | **Integrantes** | Jonathan Mora Colodrero · María Constanza Gigli |
 | **Repositorio** | https://github.com/JoniMora/final-pdc |
-| **Estado actual** | Entrega 1 — Propuesta de arquitectura, revisión 2 del 22/09/2026 |
+| **Estado actual** | Entrega 2 — Infraestructura local verificada el 07/10/2026; publicación pendiente |
 
 | Entrega | Contenido | Tag |
 |---|---|---|
@@ -19,6 +19,19 @@ Temática 7 — Plataforma de e-learning de alta concurrencia, generalizada a un
 > **Revisión 2 (22/09/2026)** — ampliación de alcance a pedido de la cátedra: API pública multi-tenant para cualquier dominio con cupo y continuidad operativa de los sistemas consumidores ante la caída de su propia base de datos.
 
 ---
+
+
+## Entrega 2: implementación actual
+
+La aplicación está en [`reserva-cupos`](reserva-cupos/README.md), separada de la documentación de las entregas. Ejecuta nueve contenedores en tres redes: API, worker, relay, notificador, RabbitMQ, MySQL primario y réplica, Aula y PostgreSQL.
+
+- [Inicio local y pruebas](reserva-cupos/README.md).
+- [Informe técnico de entrega 2](docs/entrega-2/informe.md).
+- [Evidencias de ejecución](docs/entrega-2/evidencias/README.md).
+
+Se verificaron comunicación HTTP y AMQP, persistencia, permisos, replicación semisíncrona y espera TTL de diez segundos. La interfaz de Aula permite probar conexiones, registros propios y mensajes.
+
+**Alcance:** todavía no se implementan reservas reales, autenticación multi-tenant, procesamiento del outbox, feed ni envío de webhooks. Las secciones siguientes describen la arquitectura objetivo y deben leerse como propuesta; sus garantías de negocio aún no están implementadas. Tag previsto de esta etapa: `v2-infraestructura`, pendiente de publicación.
 
 ## El problema
 

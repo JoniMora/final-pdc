@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Aula - Prueba de infraestructura</title>
+
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            background: #f3f5f9;
+            color: #172033;
+            margin: 0;
+        }
+
+        main {
+            max-width: 760px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        section {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            margin: 20px 0;
+        }
+
+        button {
+            background: #2447a7;
+            color: white;
+            border: 0;
+            padding: 12px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        input {
+            box-sizing: border-box;
+            padding: 12px;
+            width: 100%;
+            margin: 12px 0;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            background: #eef1f6;
+            padding: 14px;
+        }
+    </style>
+</head>
+
+<body>
+<main>
+    <h1>Aula</h1>
+    <p>Cliente de referencia: prueba de infraestructura de la entrega 2.</p>
+
+    <section>
+        <h2>Estado de las conexiones</h2>
+        <button id="actualizar">Actualizar estado</button>
+        <pre id="estado">Consultando...</pre>
+    </section>
+
+    <section>
+        <h2>Base propia de Aula</h2>
+        <p>
+            Guarda un registro de prueba en PostgreSQL
+            y consulta los últimos diez.
+        </p>
+
+        <button id="guardar">Guardar prueba</button>
+        <button id="listar">Ver registros</button>
+
+        <pre id="base">Todavía no se consultaron registros.</pre>
+    </section>
+
+    <section>
+        <h2>Mensaje al servicio</h2>
+        <p>
+            Aula envía por HTTP; la API publica en RabbitMQ
+            y el worker procesa.
+        </p>
+
+        <form id="formulario">
+            <label for="texto">Texto del mensaje</label>
+            <input
+                    id="texto"
+                    required
+                    maxlength="1000"
+                    value="Hola desde Aula"
+            >
+            <button type="submit">Enviar mensaje</button>
+        </form>
+
+        <pre id="mensaje">Todavía no se envió un mensaje.</pre>
+    </section>
+
+    <p>
+        Esta pantalla verifica conexiones y mensajes.
+        Todavía no permite reservar cupos.
+    </p>
+</main>
+
+<script>
+    async function consultar(url, destino, opciones = {}) {
+        const panel = document.getElementById(destino);
+        panel.textContent = "Procesando...";
+
+        try {
+            const response = await fetch(url, opciones);
+            const data = await response.json();
+
+            panel.textContent =
+                `HTTP ${response.status}\n${JSON.stringify(data, null, 2)}`;
+        } catch (error) {
+            panel.textContent =
+                `No se pudo completar la consulta: ${error.message}`;
+        }
+    }
+
+    document.getElementById("actualizar").onclick = () => {
+        consultar("/estado", "estado");
+    };
+
+    document.getElementById("guardar").onclick = () => {
+        consultar("/pruebas/base", "base", {
+            method: "POST"
+        });
+    };
+
+    document.getElementById("listar").onclick = () => {
+        consultar("/pruebas/base", "base");
+    };
+
+    document.getElementById("formulario").onsubmit = event => {
+        event.preventDefault();
+
+        consultar("/pruebas/mensajes", "mensaje", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                texto: document.getElementById("texto").value
+            })
+        });
+    };
+
+    consultar("/estado", "estado");
+</script>
+</body>
+</html>

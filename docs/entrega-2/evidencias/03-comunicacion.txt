@@ -1,0 +1,23 @@
+Resumen transcrito de resultados y capturas compartidos el 07/10/2026.
+No es una nueva ejecución automática.
+
+Envío desde Aula: HTTP 202, estado aceptado.
+id: 30ce99dd-15bb-467f-b3a6-1c9371d96a28
+texto: Hola desde el Aula
+creadoEn: 2026-10-07T19:40:04.363Z
+El worker mostró el mismo id y texto en Mensaje procesado.
+
+docker compose stop aula-db
+Contenedor aula-db detenido.
+Envío desde Aula: HTTP 202, estado aceptado.
+id: 64866e2e-74cd-475b-b4a4-08eefc8d746d
+texto: Mensaje con PostgreSQL detenido
+creadoEn: 2026-10-07T19:48:20.507Z
+El worker mostró el mismo id, texto y fecha en Mensaje procesado.
+
+docker compose start aula-db
+Contenedor aula-db iniciado.
+Captura posterior: aula ok, postgresql conectado, api conectada.
+Se volvieron a consultar los tres registros previos de PostgreSQL.
+Esto verifica independencia del transporte de mensajes y persistencia;
+no verifica reservas ni reconciliación.

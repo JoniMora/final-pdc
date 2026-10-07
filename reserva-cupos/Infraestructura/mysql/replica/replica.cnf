@@ -1,0 +1,16 @@
+[mysqld]
+server-id=2
+
+log-bin=mysql-bin
+relay-log=mysql-relay-bin
+log-replica-updates=ON
+
+gtid-mode=ON
+enforce-gtid-consistency=ON
+
+sync-binlog=1
+sync-relay-log=1
+innodb-flush-log-at-trx-commit=1
+
+character-set-server=utf8mb4
+collation-server=utf8mb4_bin

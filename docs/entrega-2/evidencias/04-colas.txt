@@ -1,0 +1,12 @@
+Transcripción de la salida compartida de:
+docker compose exec rabbitmq rabbitmqctl list_queues name messages consumers
+
+name                      messages consumers
+webhooks.espera.1m         0        0
+webhooks.espera.5m         0        0
+webhooks.espera.10s        0        0
+reservas.comandos.0        0        0
+reservas.dlq               0        0
+infraestructura.pruebas   0        1
+webhooks.entregas          0        0
+webhooks.dlq               0        0

@@ -1,0 +1,78 @@
+PS C:\Users\mcons\Documents\final-pdc\reserva-cupos> docker compose up --build -d relay
+[+] Building 3.8s (31/31) FINISHED
+ => [internal] load local bake definitions                                               0.0s
+ => => reading from stdin 1.76kB                                                         0.0s
+ => [rabbitmq internal] load build definition from Dockerfile                            0.1s
+ => => transferring dockerfile: 146B                                                     0.0s 
+ => [mysql-primary internal] load build definition from Dockerfile                       0.1s 
+ => => transferring dockerfile: 193B                                                     0.0s 
+ => [relay internal] load build definition from Dockerfile                               0.1s 
+ => => transferring dockerfile: 181B                                                     0.0s 
+ => [rabbitmq internal] load metadata for docker.io/library/rabbitmq:4-management        0.1s 
+ => [mysql-primary internal] load metadata for docker.io/library/mysql:8.4               1.1s
+ => [relay internal] load metadata for docker.io/library/node:22-alpine                  1.1s 
+ => [rabbitmq internal] load .dockerignore                                               0.0s 
+ => => transferring context: 2B                                                          0.0s 
+ => [rabbitmq 1/2] FROM docker.io/library/rabbitmq:4-management@sha256:8dd6e3570ddaa2ef  0.1s 
+ => => resolve docker.io/library/rabbitmq:4-management@sha256:8dd6e3570ddaa2ef82a6c3a89  0.1s 
+ => [auth] library/mysql:pull token for registry-1.docker.io                             0.0s 
+ => [auth] library/node:pull token for registry-1.docker.io                              0.0s 
+ => CACHED [rabbitmq 2/2] RUN rabbitmq-plugins enable --offline      rabbitmq_consisten  0.0s 
+ => [rabbitmq] exporting to image                                                        0.3s 
+ => => exporting layers                                                                  0.0s 
+ => => exporting manifest sha256:c8d939c8eeed8c9bcacbd13a0a61087983cae12820f6e322235c67  0.0s 
+ => => exporting config sha256:4d56511e1e0efc8a661b11726b3a31dd7585140c05f31b875e459249  0.0s 
+ => => exporting attestation manifest sha256:d8c64d40307f39984e35754ffe5a71a649d930fcea  0.0s 
+ => => exporting manifest list sha256:7b382280f68be63985ff8d314204757fbaf172732d51d7b8e  0.0s 
+ => => naming to docker.io/library/reserva-cupos-infra-rabbitmq:latest                   0.0s 
+ => => unpacking to docker.io/library/reserva-cupos-infra-rabbitmq:latest                0.0s 
+ => [rabbitmq] resolving provenance for metadata file                                    0.0s 
+ => [relay internal] load .dockerignore                                                  0.0s 
+ => => transferring context: 85B                                                         0.0s 
+ => [mysql-primary internal] load .dockerignore                                          0.0s 
+ => => transferring context: 2B                                                          0.0s 
+ => [relay 1/5] FROM docker.io/library/node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3e  0.1s 
+ => => resolve docker.io/library/node:22-alpine@sha256:0a7108bf6c7bf5de370ffb1a3ed6be93  0.1s 
+ => [relay internal] load build context                                                  0.1s 
+ => => transferring context: 3.74kB                                                      0.0s 
+ => [mysql-primary 1/4] FROM docker.io/library/mysql:8.4@sha256:6ea90827b1100f8f2ae306a  0.1s 
+ => => resolve docker.io/library/mysql:8.4@sha256:6ea90827b1100f8f2ae306a539f86d2c264a2  0.1s 
+ => [mysql-primary internal] load build context                                          0.0s 
+ => => transferring context: 173B                                                        0.0s 
+ => CACHED [mysql-primary 2/4] COPY primary.cnf /etc/mysql/conf.d/primary.cnf            0.0s 
+ => CACHED [mysql-primary 3/4] RUN chmod 644 /etc/mysql/conf.d/primary.cnf               0.0s 
+ => CACHED [mysql-primary 4/4] COPY init/ /docker-entrypoint-initdb.d/                   0.0s 
+ => CACHED [relay 2/5] WORKDIR /app                                                      0.0s 
+ => CACHED [relay 3/5] COPY package.json ./                                              0.0s 
+ => CACHED [relay 4/5] RUN npm install --omit=dev                                        0.0s 
+ => [relay 5/5] COPY src ./src                                                           0.1s 
+ => [mysql-primary] exporting to image                                                   0.3s 
+ => => exporting layers                                                                  0.0s 
+ => => exporting manifest sha256:2bceff4279ad2a272286d9f7c9f6b881b16801e058683f900a2298  0.0s 
+ => => exporting config sha256:bce4ee3be2e6c4adf5d8b0a07ca08fff045253674e7ff27b6fca6f07  0.0s 
+ => => exporting attestation manifest sha256:0192bc2a8ecc1c91c038fdce04b5cd34a3d6d3876f  0.1s 
+ => => exporting manifest list sha256:8f99158e2236935d57af7475a8f71e5fcd2c5f93a5d5dc4ac  0.1s 
+ => => naming to docker.io/library/reserva-cupos-infra-mysql-primary:latest              0.0s 
+ => => unpacking to docker.io/library/reserva-cupos-infra-mysql-primary:latest           0.0s 
+ => [relay] exporting to image                                                           0.7s 
+ => => exporting layers                                                                  0.3s 
+ => => exporting manifest sha256:78273c68de767f3507666310eda4df2d972a40a850fdbcb8a5310a  0.0s 
+ => => exporting config sha256:38a51bf0c2890ed5c5ce3b8401e621bf2c0d47d51358ef75a80a2b90  0.1s 
+ => => exporting attestation manifest sha256:2d55138112d03cf99c00e6f0328a04b6c672fd6619  0.1s 
+ => => exporting manifest list sha256:ce6d9e5b3fab3d4fe47ebe3598847f0d181b5787edced2580  0.0s 
+ => => naming to docker.io/library/reserva-cupos-infra-relay:latest                      0.0s 
+ => => unpacking to docker.io/library/reserva-cupos-infra-relay:latest                   0.1s 
+ => [mysql-primary] resolving provenance for metadata file                               0.0s 
+ => [relay] resolving provenance for metadata file                                       0.0s 
+[+] up 6/6
+ ✔ Image reserva-cupos-infra-mysql-primary       Built                                    4.2s
+ ✔ Image reserva-cupos-infra-relay               Built                                    4.3s
+ ✔ Image reserva-cupos-infra-rabbitmq            Built                                    4.2s
+ ✔ Container reserva-cupos-infra-rabbitmq-1      Healthy                                  1.8s
+ ✔ Container reserva-cupos-infra-mysql-primary-1 Healthy                                  1.8s
+ ✔ Container reserva-cupos-infra-relay-1         Started                                  2.2s
+PS C:\Users\mcons\Documents\final-pdc\reserva-cupos> docker compose exec relay node src/probar-espera.js
+[prueba] Publicado en webhooks.espera.10s: 6176fd04-1205-4f16-8065-da14b3c959b6
+[prueba] Recibido en webhooks.entregas: {"id":"6176fd04-1205-4f16-8065-da14b3c959b6","texto":"Prueba de espera de diez segundos"}
+[prueba] Tiempo transcurrido: 10.09 segundos
+[prueba] OK: espera y enrutamiento comprobados

@@ -1,0 +1,23 @@
+Evidencia transcrita de resultados compartidos por la integrante el 07/10/2026.
+No es una nueva ejecución automática.
+
+docker compose ps -a
+api: Up (healthy)
+aula: Up (healthy)
+aula-db: Up (healthy)
+mysql-primary: Up (healthy)
+mysql-replica: Up (healthy)
+rabbitmq: Up (healthy)
+worker: Up
+relay: Up
+notificador: Up
+
+docker network ls --filter name=reserva-cupos-infra
+reserva-cupos-infra_interna: bridge, local
+reserva-cupos-infra_publica: bridge, local
+reserva-cupos-infra_tenant: bridge, local
+
+SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_status';
+Rpl_semi_sync_source_status: ON
+SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_clients';
+Rpl_semi_sync_source_clients: 1

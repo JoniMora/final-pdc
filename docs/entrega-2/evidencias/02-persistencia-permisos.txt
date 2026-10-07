@@ -1,0 +1,23 @@
+Resumen transcrito de resultados compartidos durante la sesión.
+No es una nueva ejecución automática.
+
+SHOW REPLICA STATUS:
+Replica_IO_Running: Yes
+Replica_SQL_Running: Yes
+Seconds_Behind_Source: 0
+Last_IO_Error: vacío
+Last_SQL_Error: vacío
+GTID del primario aplicado: 2445583a-c1f9-11f1-8d7a-52bda4d821af:1-30
+
+SHOW TABLES FROM reservas:
+actividades, cambios, reservas, tenants
+@@global.read_only: 1
+@@global.super_read_only: 1
+
+Prueba API:
+UPDATE reservas.actividades SET cupos_disponibles = cupos_disponibles WHERE 1 = 0;
+ERROR 1143: UPDATE command denied to user 'api_app'@'localhost'
+for column 'cupos_disponibles' in table 'actividades'.
+
+Misma prueba con worker_app:
+Terminó sin error; WHERE 1 = 0 no modifica filas.
