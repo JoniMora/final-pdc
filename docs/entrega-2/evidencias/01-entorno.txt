@@ -1,23 +1,44 @@
-Evidencia transcrita de resultados compartidos por la integrante el 07/10/2026.
-No es una nueva ejecución automática.
+# 01 · Entorno: contenedores, redes y volúmenes
+# Ejecución: 08/10/2026 11:33 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
 
-docker compose ps -a
-api: Up (healthy)
-aula: Up (healthy)
-aula-db: Up (healthy)
-mysql-primary: Up (healthy)
-mysql-replica: Up (healthy)
-rabbitmq: Up (healthy)
-worker: Up
-relay: Up
-notificador: Up
+$ docker compose ps -a
+NAME                                  IMAGE                               COMMAND                  SERVICE             CREATED             STATUS                    PORTS
+reserva-cupos-infra-api-1             reserva-cupos-infra-api             "docker-entrypoint.s…"   api                 50 seconds ago      Up 34 seconds (healthy)   127.0.0.1:3000->3000/tcp
+reserva-cupos-infra-aula-1            reserva-cupos-infra-aula            "docker-entrypoint.s…"   aula                50 seconds ago      Up 23 seconds (healthy)   127.0.0.1:3001->3001/tcp
+reserva-cupos-infra-aula-db-1         postgres:16-alpine                  "docker-entrypoint.s…"   aula-db             51 seconds ago      Up 48 seconds (healthy)   5432/tcp
+reserva-cupos-infra-mysql-primary-1   reserva-cupos-infra-mysql-primary   "docker-entrypoint.s…"   mysql-primary       51 seconds ago      Up 48 seconds (healthy)   3306/tcp, 33060/tcp
+reserva-cupos-infra-mysql-replica-1   reserva-cupos-infra-mysql-replica   "docker-entrypoint.s…"   mysql-replica       50 seconds ago      Up 27 seconds (healthy)   3306/tcp, 33060/tcp
+reserva-cupos-infra-notificador-1     reserva-cupos-infra-notificador     "docker-entrypoint.s…"   notificador         50 seconds ago      Up 27 seconds             
+reserva-cupos-infra-rabbitmq-1        reserva-cupos-infra-rabbitmq        "docker-entrypoint.s…"   rabbitmq            51 seconds ago      Up 48 seconds (healthy)   4369/tcp, 5671-5672/tcp, 15671/tcp, 15691-15692/tcp, 25672/tcp, 127.0.0.1:15672->15672/tcp
+reserva-cupos-infra-relay-1           reserva-cupos-infra-relay           "docker-entrypoint.s…"   relay               50 seconds ago      Up 27 seconds             
+reserva-cupos-infra-worker-1          reserva-cupos-infra-worker          "docker-entrypoint.s…"   worker              50 seconds ago      Up 34 seconds             
+[código de salida: 0]
 
-docker network ls --filter name=reserva-cupos-infra
-reserva-cupos-infra_interna: bridge, local
-reserva-cupos-infra_publica: bridge, local
-reserva-cupos-infra_tenant: bridge, local
+$ docker network ls --filter name=reserva-cupos-infra
+NETWORK ID     NAME                          DRIVER    SCOPE
+161fdf65b47c   reserva-cupos-infra_interna   bridge    local
+a47cbcf62612   reserva-cupos-infra_publica   bridge    local
+f9994fa19c47   reserva-cupos-infra_tenant    bridge    local
+[código de salida: 0]
 
-SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_status';
-Rpl_semi_sync_source_status: ON
-SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_clients';
-Rpl_semi_sync_source_clients: 1
+$ docker network inspect reserva-cupos-infra_publica --format '{{range .Containers}}{{.Name}} {{end}}'
+reserva-cupos-infra-notificador-1 reserva-cupos-infra-aula-1 reserva-cupos-infra-api-1 
+[código de salida: 0]
+
+$ docker network inspect reserva-cupos-infra_interna --format '{{range .Containers}}{{.Name}} {{end}}'
+reserva-cupos-infra-notificador-1 reserva-cupos-infra-mysql-replica-1 reserva-cupos-infra-api-1 reserva-cupos-infra-worker-1 reserva-cupos-infra-rabbitmq-1 reserva-cupos-infra-relay-1 reserva-cupos-infra-mysql-primary-1 
+[código de salida: 0]
+
+$ docker network inspect reserva-cupos-infra_tenant --format '{{range .Containers}}{{.Name}} {{end}}'
+reserva-cupos-infra-aula-db-1 reserva-cupos-infra-aula-1 
+[código de salida: 0]
+
+$ docker volume ls --filter name=reserva-cupos-infra
+DRIVER    VOLUME NAME
+local     reserva-cupos-infra_aula-db-data
+local     reserva-cupos-infra_mysql-primary-data
+local     reserva-cupos-infra_mysql-replica-data
+local     reserva-cupos-infra_rabbitmq-data
+[código de salida: 0]
+

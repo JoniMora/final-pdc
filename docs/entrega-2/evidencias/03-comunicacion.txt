@@ -1,23 +1,82 @@
-Resumen transcrito de resultados y capturas compartidos el 07/10/2026.
-No es una nueva ejecución automática.
+# 03 · Comunicación e independencia de PostgreSQL
+# Ejecución: 08/10/2026 11:34 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
 
-Envío desde Aula: HTTP 202, estado aceptado.
-id: 30ce99dd-15bb-467f-b3a6-1c9371d96a28
-texto: Hola desde el Aula
-creadoEn: 2026-10-07T19:40:04.363Z
-El worker mostró el mismo id y texto en Mensaje procesado.
+## Aula → HTTP → API → RabbitMQ → worker
 
-docker compose stop aula-db
-Contenedor aula-db detenido.
-Envío desde Aula: HTTP 202, estado aceptado.
-id: 64866e2e-74cd-475b-b4a4-08eefc8d746d
-texto: Mensaje con PostgreSQL detenido
-creadoEn: 2026-10-07T19:48:20.507Z
-El worker mostró el mismo id, texto y fecha en Mensaje procesado.
+$ curl -s -w '\n' http://localhost:3000/health
+{"servicio":"api","estado":"ok","rabbitmq":"conectado"}
+[código de salida: 0]
 
-docker compose start aula-db
-Contenedor aula-db iniciado.
-Captura posterior: aula ok, postgresql conectado, api conectada.
-Se volvieron a consultar los tres registros previos de PostgreSQL.
-Esto verifica independencia del transporte de mensajes y persistencia;
-no verifica reservas ni reconciliación.
+$ curl -s -w '\n' http://localhost:3001/estado
+{"aula":"ok","postgresql":"conectado","api":"conectada"}
+[código de salida: 0]
+
+$ curl -s -w '\n' http://localhost:3001/pruebas/base
+[{"id":"ac37a8f3-7a0f-46cd-8d4f-271b1f56b10d","texto":"Prueba guardada desde Aula","creado_en":"2026-10-08T14:34:02.136Z"},{"id":"5cca3404-6ba3-4493-93c5-696d414a471c","texto":"Prueba guardada desde Aula","creado_en":"2026-10-08T14:34:02.090Z"},{"id":"6052f5f3-7045-4087-8bbb-c03b0793056c","texto":"Prueba guardada desde Aula","creado_en":"2026-10-08T14:34:02.047Z"}]
+[código de salida: 0]
+
+$ curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3001/pruebas/mensajes -H 'Content-Type: application/json' -d '{"texto":"Hola desde Aula"}'
+{"estado":"aceptado","id":"ba294ea2-c3bf-4384-9114-c24e9a296233","texto":"Hola desde Aula","creadoEn":"2026-10-08T14:34:02.919Z"}
+HTTP 202
+[código de salida: 0]
+
+## Aula con PostgreSQL detenido
+
+$ docker compose stop aula-db
+ Container reserva-cupos-infra-aula-db-1  Stopping
+ Container reserva-cupos-infra-aula-db-1  Stopped
+[código de salida: 0]
+
+$ curl -s -w '\n' http://localhost:3001/estado
+{"aula":"ok","postgresql":"no disponible","api":"conectada"}
+[código de salida: 0]
+
+$ curl -s -w '\nHTTP %{http_code}\n' http://localhost:3001/pruebas/base
+{"error":"La base de Aula no esta disponible"}
+HTTP 503
+[código de salida: 0]
+
+$ curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3001/pruebas/mensajes -H 'Content-Type: application/json' -d '{"texto":"Mensaje con PostgreSQL detenido"}'
+{"estado":"aceptado","id":"35e74c91-4941-4eac-9f86-9c475518df64","texto":"Mensaje con PostgreSQL detenido","creadoEn":"2026-10-08T14:34:03.426Z"}
+HTTP 202
+[código de salida: 0]
+
+$ docker compose start aula-db
+ Container reserva-cupos-infra-aula-db-1  Starting
+ Container reserva-cupos-infra-aula-db-1  Started
+[código de salida: 0]
+
+$ curl -s -w '\n' http://localhost:3001/estado
+{"aula":"ok","postgresql":"conectado","api":"conectada"}
+[código de salida: 0]
+
+$ curl -s -w '\n' http://localhost:3001/pruebas/base
+[{"id":"ac37a8f3-7a0f-46cd-8d4f-271b1f56b10d","texto":"Prueba guardada desde Aula","creado_en":"2026-10-08T14:34:02.136Z"},{"id":"5cca3404-6ba3-4493-93c5-696d414a471c","texto":"Prueba guardada desde Aula","creado_en":"2026-10-08T14:34:02.090Z"},{"id":"6052f5f3-7045-4087-8bbb-c03b0793056c","texto":"Prueba guardada desde Aula","creado_en":"2026-10-08T14:34:02.047Z"}]
+[código de salida: 0]
+
+## Mensajes procesados por el worker
+
+$ docker compose logs --no-log-prefix worker
+
+> reserva-cupos-worker@0.1.0 start
+> node src/main.js
+
+[WORKER] Esperando mensajes en infraestructura.pruebas
+[WORKER] Mensaje procesado: {
+  id: 'ba294ea2-c3bf-4384-9114-c24e9a296233',
+  texto: 'Hola desde Aula',
+  creadoEn: '2026-10-08T14:34:02.919Z'
+}
+[WORKER] Mensaje procesado: {
+  id: '35e74c91-4941-4eac-9f86-9c475518df64',
+  texto: 'Mensaje con PostgreSQL detenido',
+  creadoEn: '2026-10-08T14:34:03.426Z'
+}
+[WORKER] Mensaje procesado: {
+  id: '0aa8f628-a5ff-4b30-b7de-a7e63efe19f2',
+  texto: 'Mensaje desde la interfaz con PostgreSQL detenido',
+  creadoEn: '2026-10-08T14:34:07.311Z'
+}
+[código de salida: 0]
+

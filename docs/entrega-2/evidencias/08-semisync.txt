@@ -1,0 +1,74 @@
+# 08 · Replicación semisíncrona: caída y reinicio de la réplica
+# Ejecución: 08/10/2026 11:34 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+## Caída de la réplica
+
+$ docker compose stop mysql-replica
+ Container reserva-cupos-infra-mysql-replica-1  Stopping
+ Container reserva-cupos-infra-mysql-replica-1  Stopped
+[código de salida: 0]
+
+$ time docker compose exec -T mysql-primary mysql -uroot -proot_local_2026 -e 'CREATE DATABASE prueba_semisync;'
+mysql: [Warning] Using a password on the command line interface can be insecure.
+
+real	0m10.329s
+user	0m0.116s
+sys	0m0.054s
+[código de salida: 0]
+
+$ docker compose exec -T mysql-primary mysql -uroot -proot_local_2026 -e "SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_status'; SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_no_tx';"
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Variable_name	Value
+Rpl_semi_sync_source_status	OFF
+Variable_name	Value
+Rpl_semi_sync_source_no_tx	1
+[código de salida: 0]
+
+$ docker compose start mysql-replica
+ Container reserva-cupos-infra-mysql-primary-1  Waiting
+ Container reserva-cupos-infra-mysql-primary-1  Healthy
+ Container reserva-cupos-infra-mysql-replica-1  Starting
+ Container reserva-cupos-infra-mysql-replica-1  Started
+[código de salida: 0]
+
+$ docker compose exec -T mysql-primary mysql -uroot -proot_local_2026 -e 'DROP DATABASE prueba_semisync;'
+mysql: [Warning] Using a password on the command line interface can be insecure.
+[código de salida: 0]
+
+$ docker compose exec -T mysql-primary mysql -uroot -proot_local_2026 -e "SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_status'; SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_clients';"
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Variable_name	Value
+Rpl_semi_sync_source_status	ON
+Variable_name	Value
+Rpl_semi_sync_source_clients	1
+[código de salida: 0]
+
+## Reinicio de la réplica
+
+$ docker compose restart mysql-replica
+ Container reserva-cupos-infra-mysql-replica-1  Restarting
+ Container reserva-cupos-infra-mysql-replica-1  Started
+[código de salida: 0]
+
+$ docker compose exec -T mysql-replica mysql -uroot -proot_local_2026 -e "SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_replica_status';"
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Variable_name	Value
+Rpl_semi_sync_replica_status	ON
+[código de salida: 0]
+
+$ docker compose exec -T mysql-primary mysql -uroot -proot_local_2026 -e "SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_clients';"
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Variable_name	Value
+Rpl_semi_sync_source_clients	1
+[código de salida: 0]
+
+$ docker compose exec -T mysql-replica mysql -uroot -proot_local_2026 -e 'SHOW REPLICA STATUS\G' | grep -E 'Replica_IO_Running|Replica_SQL_Running:|Seconds_Behind_Source|Last_IO_Error:|Last_SQL_Error:'
+mysql: [Warning] Using a password on the command line interface can be insecure.
+           Replica_IO_Running: Yes
+          Replica_SQL_Running: Yes
+        Seconds_Behind_Source: 0
+                Last_IO_Error: 
+               Last_SQL_Error: 
+[código de salida: 0]
+

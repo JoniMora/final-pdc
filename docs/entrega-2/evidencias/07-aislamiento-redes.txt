@@ -1,0 +1,32 @@
+# 07 · Aislamiento de redes
+# Ejecución: 08/10/2026 11:34 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+## Nombres de otras redes: no se resuelven
+
+$ docker compose exec -T aula node -e "require('dns').lookup('mysql-primary', (e, a) => console.log(e ? e.code : a))"
+ENOTFOUND
+[código de salida: 0]
+
+$ docker compose exec -T aula node -e "require('dns').lookup('rabbitmq', (e, a) => console.log(e ? e.code : a))"
+ENOTFOUND
+[código de salida: 0]
+
+$ docker compose exec -T api node -e "require('dns').lookup('aula-db', (e, a) => console.log(e ? e.code : a))"
+ENOTFOUND
+[código de salida: 0]
+
+## Controles: nombres de la misma red
+
+$ docker compose exec -T aula node -e "require('dns').lookup('api', (e, a) => console.log(e ? e.code : a))"
+192.168.0.2
+[código de salida: 0]
+
+$ docker compose exec -T aula node -e "require('dns').lookup('aula-db', (e, a) => console.log(e ? e.code : a))"
+172.30.0.2
+[código de salida: 0]
+
+$ docker compose exec -T worker node -e "require('dns').lookup('rabbitmq', (e, a) => console.log(e ? e.code : a))"
+172.31.0.3
+[código de salida: 0]
+

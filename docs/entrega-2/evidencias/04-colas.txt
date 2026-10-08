@@ -1,12 +1,52 @@
-Transcripción de la salida compartida de:
-docker compose exec rabbitmq rabbitmqctl list_queues name messages consumers
+# 04 · Topología de RabbitMQ
+# Ejecución: 08/10/2026 11:34 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
 
-name                      messages consumers
-webhooks.espera.1m         0        0
-webhooks.espera.5m         0        0
-webhooks.espera.10s        0        0
-reservas.comandos.0        0        0
-reservas.dlq               0        0
-infraestructura.pruebas   0        1
-webhooks.entregas          0        0
-webhooks.dlq               0        0
+$ docker compose exec -T rabbitmq rabbitmqctl list_exchanges name type
+Listing exchanges for vhost / ...
+name	type
+	direct
+amq.direct	direct
+amq.fanout	fanout
+amq.headers	headers
+amq.match	headers
+amq.rabbitmq.log	topic
+amq.rabbitmq.trace	topic
+amq.topic	topic
+reservas.comandos	x-consistent-hash
+reservas.dlx	direct
+webhooks.dlx	direct
+webhooks.eventos	direct
+[código de salida: 0]
+
+$ docker compose exec -T rabbitmq rabbitmqctl list_queues name durable messages consumers arguments
+Timeout: 60.0 seconds ...
+Listing queues for vhost / ...
+name	durable	messages	consumers	arguments
+webhooks.espera.1m	true	0	0	[{"x-dead-letter-exchange","webhooks.eventos"},{"x-dead-letter-routing-key","entrega"},{"x-message-ttl",60000},{"x-queue-type","classic"}]
+webhooks.espera.5m	true	0	0	[{"x-dead-letter-exchange","webhooks.eventos"},{"x-dead-letter-routing-key","entrega"},{"x-message-ttl",300000},{"x-queue-type","classic"}]
+webhooks.espera.10s	true	0	0	[{"x-dead-letter-exchange","webhooks.eventos"},{"x-dead-letter-routing-key","entrega"},{"x-message-ttl",10000},{"x-queue-type","classic"}]
+reservas.comandos.0	true	0	0	[{"x-dead-letter-exchange","reservas.dlx"},{"x-dead-letter-routing-key","fallido"},{"x-queue-type","classic"}]
+reservas.dlq	true	0	0	[{"x-queue-type","classic"}]
+infraestructura.pruebas	true	0	1	[{"x-queue-type","classic"}]
+webhooks.entregas	true	0	0	[{"x-dead-letter-exchange","webhooks.dlx"},{"x-dead-letter-routing-key","fallido"},{"x-queue-type","classic"}]
+webhooks.dlq	true	0	0	[{"x-queue-type","classic"}]
+[código de salida: 0]
+
+$ docker compose exec -T rabbitmq rabbitmqctl list_bindings source_name destination_name routing_key
+Listing bindings for vhost /...
+source_name	destination_name	routing_key
+	webhooks.espera.1m	webhooks.espera.1m
+	webhooks.espera.5m	webhooks.espera.5m
+	webhooks.espera.10s	webhooks.espera.10s
+	reservas.comandos.0	reservas.comandos.0
+	reservas.dlq	reservas.dlq
+	infraestructura.pruebas	infraestructura.pruebas
+	webhooks.entregas	webhooks.entregas
+	webhooks.dlq	webhooks.dlq
+webhooks.eventos	webhooks.entregas	entrega
+webhooks.dlx	webhooks.dlq	fallido
+reservas.comandos	reservas.comandos.0	1
+reservas.dlx	reservas.dlq	fallido
+[código de salida: 0]
+
