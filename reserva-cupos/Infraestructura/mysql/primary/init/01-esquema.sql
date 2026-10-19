@@ -97,6 +97,12 @@ CREATE TABLE reservas (
                               estado
                               ),
 
+                          -- El barredor del relay busca pendientes de todos los tenants.
+                          KEY ix_reservas_pendientes (
+                              estado,
+                              creado_en
+                              ),
+
                           CONSTRAINT fk_reserva_actividad
                               FOREIGN KEY (tenant_id, actividad_id)
                                   REFERENCES actividades(tenant_id, id),
