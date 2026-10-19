@@ -8,13 +8,14 @@ Temática 7 — Plataforma de e-learning de alta concurrencia, generalizada a un
 | **Grupo N°** | 15 |
 | **Integrantes** | Jonathan Mora Colodrero · María Constanza Gigli |
 | **Repositorio** | https://github.com/JoniMora/final-pdc |
-| **Estado actual** | Entrega 2 — Infraestructura (`v2.1-infraestructura`), verificada el 08/10/2026 |
+| **Estado actual** | Entrega 3 — Comunicación síncrona y asíncrona (`v3-comunicacion`), verificada el 19/10/2026 |
 
 | Entrega | Contenido | Tag |
 |---|---|---|
 | 0 | Plan del proyecto | `v0.2-plan-del-proyecto` (original: `v0-plan-del-proyecto`) |
 | 1 | Propuesta de arquitectura (modelo 4+1) | `v1.2-propuesta-arquitectura` (original: `v1-propuesta-arquitectura`) |
 | 2 | Infraestructura: nueve contenedores, tres redes, primario-réplica semisíncrono y RabbitMQ | `v2.1-infraestructura` (original: `v2-infraestructura`) |
+| 3 | Comunicación: API v1 síncrona, outbox → relay → RabbitMQ → worker asíncrono y caso de concurrencia demostrado | `v3-comunicacion` |
 
 > **Revisión 1 (17/09/2026)** — persistencia primario-réplica con replicación semi-sincrónica: el nodo único de MySQL era un punto único de falla.
 > **Revisión 2 (22/09/2026)** — ampliación de alcance a pedido de la cátedra: API pública multi-tenant para cualquier dominio con cupo y continuidad operativa de los sistemas consumidores ante la caída de su propia base de datos.
@@ -22,16 +23,19 @@ Temática 7 — Plataforma de e-learning de alta concurrencia, generalizada a un
 ---
 
 
-## Entrega 2: implementación actual
+## Entrega 3: implementación actual
 
-La aplicación está en [`reserva-cupos`](reserva-cupos/README.md), separada de la documentación de las entregas. Ejecuta nueve contenedores en tres redes: API, worker, relay, notificador, RabbitMQ, MySQL primario y réplica, Aula y PostgreSQL.
+La aplicación está en [`reserva-cupos`](reserva-cupos/README.md), separada de la documentación de las entregas. Sobre la infraestructura de la Entrega 2 (nueve contenedores, tres redes, primario-réplica semisíncrono y RabbitMQ) se implementa el recorrido real de una reserva:
 
+- **Canal síncrono** — API pública v1 por HTTP con autenticación por tenant, admisión `202` + `Location` con `Idempotency-Key`, consultas, listado paginado por cursor y feed `/v1/cambios`. Contrato en [`openapi.yaml`](reserva-cupos/contrato/openapi.yaml). Aula, el cliente de referencia, crea materias e inscribe alumnos por esta vía.
+- **Canal asíncrono** — outbox transaccional: la API y el worker escriben cada cambio en `cambios` dentro de su transacción; el relay lo secuencia y publica los comandos con *publisher confirms* en el exchange de hash consistente `reservas.comandos`; el worker los consume con `prefetch(1)` y `ack` posterior al `COMMIT`.
+- **Caso de concurrencia** — 500 solicitudes simultáneas sobre una actividad de 10 cupos terminan en exactamente 10 confirmadas, 490 rechazadas y 0 cupos negativos, con uno y con dos workers. En una comparación directa contra MySQL con 50 transacciones simultáneas, la variante ingenua (leer y después escribir) asigna 50 lugares sobre 10.
+
+- [Certificación de la Entrega 3](docs/entrega-3/README.md): justificación de cada semántica y cómo reproducir el caso de concurrencia.
+- [Evidencias de ejecución](docs/entrega-3/evidencias/README.md).
 - [Inicio local y pruebas](reserva-cupos/README.md).
-- [Evidencias de ejecución](docs/entrega-2/evidencias/README.md).
 
-Se verificaron comunicación HTTP y AMQP, persistencia, permisos, replicación semisíncrona (incluidas la caída y el reinicio de la réplica), espera TTL de diez segundos, independencia del worker y aislamiento de redes. La interfaz de Aula permite probar conexiones, registros propios y mensajes.
-
-**Alcance:** todavía no se implementan reservas reales, autenticación multi-tenant, procesamiento del outbox, feed ni envío de webhooks. Las secciones siguientes describen la arquitectura objetivo y deben leerse como propuesta; sus garantías de negocio aún no están implementadas. Tag de esta etapa: `v2.1-infraestructura`.
+**Alcance:** todavía no se implementan la cancelación de reservas, el envío de webhooks, el límite de tasa ni la contingencia y reconciliación de Aula (Entregas 4 y 5). Tag de esta etapa: `v3-comunicacion`.
 
 ## El problema
 
@@ -51,7 +55,7 @@ El contrato sigue convenciones difundidas en APIs públicas: versionado en la ru
 
 ### Nivelación de carga: la decisión contenciosa, de a una
 
-El patrón central es **Queue-Based Load Leveling**. La **admisión** —registrar que un participante *quiere* un cupo— es rápida y paralela: una fila nueva por solicitud, sin contención. La **decisión** —si lo *obtiene*— es contenciosa. Por eso se separan: la API registra la reserva en estado `pendiente` y responde `202`; la decisión la toma un **worker** que consume comandos de RabbitMQ de a uno (`prefetch(1)`) y descuenta el cupo con una única sentencia condicional dentro de una transacción InnoDB:
+El patrón central es **Queue-Based Load Leveling**. La **admisión** —registrar que un participante *quiere* un cupo— es rápida y paralela: una fila nueva por solicitud, sin contención entre admisiones. La **decisión** —si lo *obtiene*— es contenciosa. Por eso se separan: la API registra la reserva en estado `pendiente` y responde `202`; la decisión la toma un **worker** que consume comandos de RabbitMQ de a uno (`prefetch(1)`) y descuenta el cupo con una única sentencia condicional dentro de una transacción InnoDB:
 
 ```sql
 UPDATE actividades
@@ -135,26 +139,29 @@ La red `publica` simula internet; la red `interna` contiene el broker y las base
 ```
 final-pdc/
 ├── reserva-cupos/                 # Aplicación (desde la Entrega 2)
-│   ├── docker-compose.yml         # Nueve contenedores, tres redes y cuatro volúmenes
+│   ├── docker-compose.yml         # Nueve contenedores, tres redes y cuatro volúmenes (+ k6 a pedido)
+│   ├── contrato/openapi.yaml      # Contrato de la API v1 (desde la Entrega 3)
 │   ├── Infraestructura/
 │   │   ├── mysql/primary/         # Primario: binlog, GTID, esquema, usuarios y semisync
 │   │   ├── mysql/replica/         # Réplica semisíncrona en solo lectura
 │   │   ├── postgres/              # Base propia de Aula
 │   │   └── rabbitmq/              # Broker con exchange de hash consistente
 │   ├── servicios/
-│   │   ├── api/                   # Salud y publicación de mensajes de prueba
-│   │   ├── worker/                # Consumo de la cola de prueba
-│   │   ├── relay/                 # Topología de RabbitMQ y comprobaciones de conexión
-│   │   └── notificador/           # Comprobaciones de conexión
-│   └── clientes/
-│       └── aula/                  # Cliente de referencia con PostgreSQL propio
+│   │   ├── api/                   # API pública v1: autenticación, admisión, consultas, listado y feed
+│   │   ├── worker/                # Comando reservar: decisión atómica e idempotente
+│   │   ├── relay/                 # Topología, secuenciador del feed, publicador y barredor
+│   │   └── notificador/           # Comprobaciones de conexión (webhooks en la Entrega 4)
+│   ├── clientes/
+│   │   └── aula/                  # Cliente de referencia con PostgreSQL propio
+│   └── pruebas/carga/             # k6: ráfaga sobre una actividad y duplicados simultáneos
 └── docs/                          # Documentación por entrega
     ├── entrega-0/
     ├── entrega-1/
-    └── entrega-2/                 # Evidencias de la infraestructura
+    ├── entrega-2/                 # Evidencias de la infraestructura
+    └── entrega-3/                 # Certificación y evidencias de comunicación
 ```
 
-> **Nota:** la estructura objetivo, con el contrato OpenAPI, los módulos compartidos y las pruebas de carga y de fallos, se describe en la vista de desarrollo de la [Entrega 1](docs/entrega-1/informe.md); esas carpetas se incorporan en las entregas siguientes.
+> **Nota:** la estructura objetivo, con los módulos compartidos y las pruebas de fallos, se describe en la vista de desarrollo de la [Entrega 1](docs/entrega-1/informe.md); esas carpetas se incorporan en las entregas siguientes.
 
 ## Documentación
 
@@ -164,8 +171,11 @@ final-pdc/
 - [`docs/entrega-1/arquitectura.mmd`](docs/entrega-1/arquitectura.mmd) — fuente Mermaid del diagrama de despliegue.
 - [`docs/entrega-1/arquitectura.png`](docs/entrega-1/arquitectura.png) — diagrama exportado.
 - [`docs/entrega-1/presentacion.pdf`](docs/entrega-1/presentacion.pdf) — presentación de tres diapositivas.
-- [`reserva-cupos/README.md`](reserva-cupos/README.md) — inicio local paso a paso y pruebas de la Entrega 2.
+- [`reserva-cupos/README.md`](reserva-cupos/README.md) — inicio local paso a paso y pruebas de la entrega vigente.
 - [`docs/entrega-2/evidencias/`](docs/entrega-2/evidencias/README.md) — salida de los comandos de verificación y capturas de Aula.
+- [`docs/entrega-3/README.md`](docs/entrega-3/README.md) — certificación de la Entrega 3: canales, justificación de cada semántica y caso de concurrencia.
+- [`docs/entrega-3/evidencias/`](docs/entrega-3/evidencias/README.md) — salida de las pruebas de comunicación y concurrencia.
+- [`reserva-cupos/contrato/openapi.yaml`](reserva-cupos/contrato/openapi.yaml) — contrato OpenAPI 3.1 de la API v1.
 
 ## Escenario de validación
 

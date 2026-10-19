@@ -1,0 +1,141 @@
+# 07 · Ráfaga con dos workers consumiendo la misma cola
+# Ejecución: 19/10/2026 10:27 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+# -T: sin TTY para guardar la salida. -q: sin barra de progreso.
+
+$ docker compose up -d --scale worker=2
+ Container reserva-cupos-infra-aula-db-1  Running
+ Container reserva-cupos-infra-rabbitmq-1  Running
+ Container reserva-cupos-infra-mysql-primary-1  Running
+ Container reserva-cupos-infra-mysql-replica-1  Running
+ Container reserva-cupos-infra-api-1  Running
+ Container reserva-cupos-infra-relay-1  Running
+ Container reserva-cupos-infra-notificador-1  Running
+ Container reserva-cupos-infra-worker-2  Running
+ Container reserva-cupos-infra-aula-1  Running
+ Container reserva-cupos-infra-worker-3  Creating
+ Container reserva-cupos-infra-worker-3  Created
+ Container reserva-cupos-infra-mysql-primary-1  Waiting
+ Container reserva-cupos-infra-mysql-primary-1  Waiting
+ Container reserva-cupos-infra-rabbitmq-1  Waiting
+ Container reserva-cupos-infra-mysql-primary-1  Waiting
+ Container reserva-cupos-infra-mysql-primary-1  Waiting
+ Container reserva-cupos-infra-rabbitmq-1  Waiting
+ Container reserva-cupos-infra-mysql-primary-1  Waiting
+ Container reserva-cupos-infra-rabbitmq-1  Waiting
+ Container reserva-cupos-infra-mysql-primary-1  Healthy
+ Container reserva-cupos-infra-rabbitmq-1  Healthy
+ Container reserva-cupos-infra-mysql-primary-1  Healthy
+ Container reserva-cupos-infra-aula-db-1  Waiting
+ Container reserva-cupos-infra-api-1  Waiting
+ Container reserva-cupos-infra-mysql-primary-1  Healthy
+ Container reserva-cupos-infra-rabbitmq-1  Healthy
+ Container reserva-cupos-infra-mysql-primary-1  Healthy
+ Container reserva-cupos-infra-mysql-primary-1  Healthy
+ Container reserva-cupos-infra-rabbitmq-1  Healthy
+ Container reserva-cupos-infra-worker-3  Starting
+ Container reserva-cupos-infra-worker-3  Started
+ Container reserva-cupos-infra-aula-db-1  Healthy
+ Container reserva-cupos-infra-api-1  Healthy
+[código de salida: 0]
+
+$ docker compose exec -T rabbitmq rabbitmqctl list_queues name messages consumers | grep -E 'name|comandos'
+name	messages	consumers
+reservas.comandos.0	0	2
+[código de salida: 0]
+
+$ docker compose run --rm -T k6 run -q -e API_KEY=$CLAVE /pruebas/carga/rafaga.js
+time="2026-10-19T13:27:18Z" level=info msg="Actividad 01a15458-5a12-71f7-9702-fd777e198cba: 10 cupos, 500 solicitudes simultáneas" source=console
+time="2026-10-19T13:27:37Z" level=info msg="Resultado (sin pendientes tras 10.6 s de espera): confirmadas=10 rechazadas=490 pendientes=0 cupos_disponibles=0" source=console
+
+
+  █ THRESHOLDS 
+
+    checks
+    ✓ 'rate==1' rate=100.00%
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......................: 1004    54.2395/s
+    checks_succeeded...................: 100.00% 1004 out of 1004
+    checks_failed......................: 0.00%   0 out of 1004
+
+    ✓ admisión responde 202
+    ✓ admisión devuelve Location
+    ✓ 0 pendientes
+    ✓ exactamente 10 confirmadas
+    ✓ exactamente 490 rechazadas
+    ✓ cupos_disponibles = 0
+
+    HTTP
+    http_req_duration.......................................................: min=2.52ms   med=3.39s avg=3.4s  p(95)=6.51s max=7.42s
+      { expected_response:true }............................................: min=2.52ms   med=3.39s avg=3.4s  p(95)=6.51s max=7.42s
+    http_req_failed.........................................................: 0.00%  0 out of 565
+    http_reqs...............................................................: 565    30.523225/s
+
+    EXECUTION
+    iteration_duration......................................................: min=358.93ms med=4.18s avg=4.08s p(95)=6.81s max=7.79s
+    iterations..............................................................: 500    27.011703/s
+    vus.....................................................................: 0      min=0        max=481
+    vus_max.................................................................: 500    min=500      max=500
+
+    NETWORK
+    data_received...........................................................: 1.4 MB 75 kB/s
+    data_sent...............................................................: 190 kB 10 kB/s
+[código de salida: 0]
+
+# Decisiones de cada worker sobre la actividad de esta ráfaga.
+
+$ docker compose logs worker | grep 01a15458-5a12-71f7-9702-fd777e198cba | awk '{print $1, $NF}' | sort | uniq -c
+   6 reserva-cupos-infra-worker-2 confirmada
+ 245 reserva-cupos-infra-worker-2 rechazada
+   4 reserva-cupos-infra-worker-3 confirmada
+ 245 reserva-cupos-infra-worker-3 rechazada
+[código de salida: 0]
+
+$ docker compose exec -T mysql-primary mysql --default-character-set=utf8mb4 -uroot -proot_local_2026 reservas -e "SELECT a.nombre, a.capacidad, a.cupos_disponibles, r.estado, COUNT(*) AS reservas FROM actividades a JOIN reservas r ON r.actividad_id = a.id WHERE a.id = '01a15458-5a12-71f7-9702-fd777e198cba' GROUP BY a.id, r.estado ORDER BY r.estado"
+mysql: [Warning] Using a password on the command line interface can be insecure.
+nombre	capacidad	cupos_disponibles	estado	reservas
+Ráfaga 2026-10-19T13:27:18.798Z	10	0	confirmada	10
+Ráfaga 2026-10-19T13:27:18.798Z	10	0	rechazada	490
+[código de salida: 0]
+
+$ docker compose up -d --scale worker=1
+ Container reserva-cupos-infra-mysql-primary-1  Running
+ Container reserva-cupos-infra-aula-db-1  Running
+ Container reserva-cupos-infra-rabbitmq-1  Running
+ Container reserva-cupos-infra-relay-1  Running
+ Container reserva-cupos-infra-api-1  Running
+ Container reserva-cupos-infra-mysql-replica-1  Running
+ Container reserva-cupos-infra-notificador-1  Running
+ Container reserva-cupos-infra-worker-3  Running
+ Container reserva-cupos-infra-aula-1  Running
+ Container reserva-cupos-infra-mysql-primary-1  Waiting
+ Container reserva-cupos-infra-rabbitmq-1  Waiting
+ Container reserva-cupos-infra-mysql-primary-1  Waiting
+ Container reserva-cupos-infra-rabbitmq-1  Waiting
+ Container reserva-cupos-infra-mysql-primary-1  Waiting
+ Container reserva-cupos-infra-rabbitmq-1  Waiting
+ Container reserva-cupos-infra-mysql-primary-1  Waiting
+ Container reserva-cupos-infra-mysql-primary-1  Waiting
+ Container reserva-cupos-infra-rabbitmq-1  Healthy
+ Container reserva-cupos-infra-rabbitmq-1  Healthy
+ Container reserva-cupos-infra-mysql-primary-1  Healthy
+ Container reserva-cupos-infra-mysql-primary-1  Healthy
+ Container reserva-cupos-infra-api-1  Waiting
+ Container reserva-cupos-infra-aula-db-1  Waiting
+ Container reserva-cupos-infra-mysql-primary-1  Healthy
+ Container reserva-cupos-infra-rabbitmq-1  Healthy
+ Container reserva-cupos-infra-mysql-primary-1  Healthy
+ Container reserva-cupos-infra-mysql-primary-1  Healthy
+ Container reserva-cupos-infra-api-1  Healthy
+ Container reserva-cupos-infra-aula-db-1  Healthy
+[código de salida: 0]
+
+$ docker compose ps worker
+NAME                           IMAGE                        COMMAND                  SERVICE             CREATED             STATUS              PORTS
+reserva-cupos-infra-worker-3   reserva-cupos-infra-worker   "docker-entrypoint.s…"   worker              34 seconds ago      Up 33 seconds       
+[código de salida: 0]
+

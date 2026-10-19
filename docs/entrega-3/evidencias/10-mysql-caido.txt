@@ -1,0 +1,47 @@
+# 10 · Primario detenido: la API responde 503 y el procesamiento asíncrono pausa
+# Ejecución: 19/10/2026 10:27 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+$ docker compose stop mysql-primary
+ Container reserva-cupos-infra-mysql-primary-1  Stopping
+ Container reserva-cupos-infra-mysql-primary-1  Stopped
+[código de salida: 0]
+
+$ curl -s -i -X POST http://localhost:3000/v1/actividades -H "Authorization: Bearer $CLAVE_AULA" -H "Content-Type: application/json" -d '{"nombre":"Sin base","capacidad":1}' | grep -iE '^(HTTP|retry-after|content-type)|^\{'
+HTTP/1.1 503 Service Unavailable
+Retry-After: 5
+Content-Type: application/problem+json; charset=utf-8
+{"type":"urn:reserva-cupos:problema:no-disponible","title":"Servicio no disponible temporalmente","status":503}
+[código de salida: 0]
+
+$ curl -s -w '\n' http://localhost:3000/health
+{"servicio":"api","estado":"ok","mysql":"no disponible"}
+[código de salida: 0]
+
+$ docker compose logs --no-log-prefix --since 20s relay api | grep -E 'no disponible|fallido' | sort | uniq -c
+   1 [API] MySQL no disponible: ENOTFOUND
+  19 [relay] Ciclo fallido: ECONNREFUSED
+   6 [relay] Ciclo fallido: ENOTFOUND
+   2 [relay] Ciclo fallido: PROTOCOL_CONNECTION_LOST
+[código de salida: 0]
+
+$ docker compose start mysql-primary
+ Container reserva-cupos-infra-mysql-primary-1  Starting
+ Container reserva-cupos-infra-mysql-primary-1  Started
+[código de salida: 0]
+
+$ curl -s -w '\n' http://localhost:3000/health
+{"servicio":"api","estado":"ok","mysql":"conectado"}
+[código de salida: 0]
+
+$ docker compose exec -T mysql-primary mysql -uroot -proot_local_2026 -e "SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_status'"
+mysql: [Warning] Using a password on the command line interface can be insecure.
+Variable_name	Value
+Rpl_semi_sync_source_status	ON
+[código de salida: 0]
+
+$ curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/v1/actividades -H "Authorization: Bearer $CLAVE_AULA" -H "Content-Type: application/json" -d '{"nombre":"Con base","capacidad":1}'
+{"id":"01a15459-30c8-7726-b4d6-7bd010ff4597","nombre":"Con base","capacidad":1,"cupos_disponibles":1,"estado":"abierta","version":1,"metadata":null,"creado_en":"2026-10-19T13:28:13.768Z"}
+HTTP 201
+[código de salida: 0]
+

@@ -1,0 +1,36 @@
+# 09 · Reentrega de un comando ya procesado (al-menos-una-vez)
+# Ejecución: 19/10/2026 10:25 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+# Actividad de 5 cupos con una reserva confirmada (01a15456-84da-7088-b360-926d5bac7dfd).
+
+$ curl -s -w '\n' http://localhost:3000/v1/actividades/01a15456-833d-7eeb-b9a3-d18d40363207 -H "Authorization: Bearer $CLAVE"
+{"id":"01a15456-833d-7eeb-b9a3-d18d40363207","nombre":"Reentrega","capacidad":5,"cupos_disponibles":4,"estado":"abierta","version":2,"metadata":null,"creado_en":"2026-10-19T13:25:18.269Z"}
+[código de salida: 0]
+
+$ curl -s -w '\n' http://localhost:3000/v1/reservas/01a15456-84da-7088-b360-926d5bac7dfd -H "Authorization: Bearer $CLAVE"
+{"id":"01a15456-84da-7088-b360-926d5bac7dfd","actividad_id":"01a15456-833d-7eeb-b9a3-d18d40363207","participante":"dani","estado":"confirmada","version":2,"metadata":null,"creado_en":"2026-10-19T13:25:18.682Z"}
+[código de salida: 0]
+
+$ docker compose exec -T relay node src/reenviar-comando.js 01a15456-84da-7088-b360-926d5bac7dfd
+[prueba] Comando reservar reenviado para 01a15456-84da-7088-b360-926d5bac7dfd (estado actual: confirmada)
+[código de salida: 0]
+
+$ docker compose exec -T relay node src/reenviar-comando.js 01a15456-84da-7088-b360-926d5bac7dfd
+[prueba] Comando reservar reenviado para 01a15456-84da-7088-b360-926d5bac7dfd (estado actual: confirmada)
+[código de salida: 0]
+
+$ docker compose logs --no-log-prefix worker | grep 01a15456-84da-7088-b360-926d5bac7dfd
+[WORKER] Reserva 01a15456-84da-7088-b360-926d5bac7dfd (actividad 01a15456-833d-7eeb-b9a3-d18d40363207) confirmada
+[WORKER] Reserva 01a15456-84da-7088-b360-926d5bac7dfd (actividad 01a15456-833d-7eeb-b9a3-d18d40363207) ya estaba confirmada: comando repetido, sin cambios
+[WORKER] Reserva 01a15456-84da-7088-b360-926d5bac7dfd (actividad 01a15456-833d-7eeb-b9a3-d18d40363207) ya estaba confirmada: comando repetido, sin cambios
+[código de salida: 0]
+
+$ curl -s -w '\n' http://localhost:3000/v1/actividades/01a15456-833d-7eeb-b9a3-d18d40363207 -H "Authorization: Bearer $CLAVE"
+{"id":"01a15456-833d-7eeb-b9a3-d18d40363207","nombre":"Reentrega","capacidad":5,"cupos_disponibles":4,"estado":"abierta","version":2,"metadata":null,"creado_en":"2026-10-19T13:25:18.269Z"}
+[código de salida: 0]
+
+$ curl -s -w '\n' http://localhost:3000/v1/reservas/01a15456-84da-7088-b360-926d5bac7dfd -H "Authorization: Bearer $CLAVE"
+{"id":"01a15456-84da-7088-b360-926d5bac7dfd","actividad_id":"01a15456-833d-7eeb-b9a3-d18d40363207","participante":"dani","estado":"confirmada","version":2,"metadata":null,"creado_en":"2026-10-19T13:25:18.682Z"}
+[código de salida: 0]
+

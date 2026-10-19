@@ -1,0 +1,63 @@
+# 08 · Duplicados simultáneos en la admisión
+# Ejecución: 19/10/2026 10:25 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+# -T: sin TTY para guardar la salida. -q: sin barra de progreso.
+
+$ docker compose run --rm -T k6 run -q -e API_KEY=$CLAVE /pruebas/carga/duplicados.js
+time="2026-10-19T13:25:17Z" level=info msg="Reservas creadas: 2 (alumno-reintento, alumno-repetido)" source=console
+
+
+  █ THRESHOLDS 
+
+    checks
+    ✓ 'rate==1' rate=100.00%
+
+    respuestas{caso:clave,status:200}
+    ✓ 'count==19' count=19
+
+    respuestas{caso:clave,status:202}
+    ✓ 'count==1' count=1
+
+    respuestas{caso:participante,status:202}
+    ✓ 'count==1' count=1
+
+    respuestas{caso:participante,status:409}
+    ✓ 'count==19' count=19
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......................: 41      168.016463/s
+    checks_succeeded...................: 100.00% 41 out of 41
+    checks_failed......................: 0.00%   0 out of 41
+
+    ✓ misma clave: 202 o 200
+    ✓ mismo participante: 202 o 409
+    ✓ exactamente 2 reservas en la actividad
+
+    CUSTOM
+    respuestas...................................................................: 40    163.918501/s
+      { caso:clave,status:200 }..................................................: 19    77.861288/s
+      { caso:clave,status:202 }..................................................: 1     4.097963/s
+      { caso:participante,status:202 }...........................................: 1     4.097963/s
+      { caso:participante,status:409 }...........................................: 19    77.861288/s
+
+    HTTP
+    http_req_duration............................................................: avg=165.8ms  min=4.89ms  med=178.24ms max=202.37ms p(90)=196.13ms p(95)=198.15ms
+      { expected_response:true }.................................................: avg=165.8ms  min=4.89ms  med=178.24ms max=202.37ms p(90)=196.13ms p(95)=198.15ms
+    http_req_failed..............................................................: 0.00% 0 out of 42
+    http_reqs....................................................................: 42    172.114426/s
+
+    EXECUTION
+    iteration_duration...........................................................: avg=179.67ms min=94.25ms med=188.21ms max=208.65ms p(90)=201.6ms  p(95)=205.24ms
+    iterations...................................................................: 40    163.918501/s
+
+    NETWORK
+    data_received................................................................: 19 kB 77 kB/s
+    data_sent....................................................................: 14 kB 59 kB/s
+
+
+
+[código de salida: 0]
+
