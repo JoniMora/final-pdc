@@ -57,3 +57,8 @@ Desktop.ini
 *.iml
 
 .git-creado-por-error/
+
+# ---- Material interno para presentar las entregas ----
+docs/*/presentacion.html
+docs/*/guia-presentacion.txt
+docs/*/demo-comandos.txt
