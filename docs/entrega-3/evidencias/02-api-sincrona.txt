@@ -1,0 +1,111 @@
+# 02 · Canal síncrono: API v1 por HTTP
+# Ejecución: 19/10/2026 10:23 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+## Salud y creación de una actividad
+
+$ curl -s -w '\n' http://localhost:3000/health
+{"servicio":"api","estado":"ok","mysql":"conectado"}
+[código de salida: 0]
+
+$ curl -s -X POST http://localhost:3000/v1/actividades -H "Authorization: Bearer $CLAVE_AULA" -H "Content-Type: application/json" -d '{"nombre":"Programación Distribuida","capacidad":2,"metadata":{"comision":"B"}}'
+{"id":"01a15454-c24f-76f1-96c3-c6786a02fead","nombre":"Programación Distribuida","capacidad":2,"cupos_disponibles":2,"estado":"abierta","version":1,"metadata":{"comision":"B"},"creado_en":"2026-10-19T13:23:23.281Z"}
+[código de salida: 0]
+
+## Admisión: 202 Accepted con Location; la decisión es asíncrona
+
+$ curl -s -w '\nHTTP %{http_code} · Location: %header{location} · Retry-After: %header{retry-after}\n' -X POST http://localhost:3000/v1/actividades/01a15454-c24f-76f1-96c3-c6786a02fead/reservas -H "Authorization: Bearer $CLAVE_AULA" -H "Content-Type: application/json" -H 'Idempotency-Key: inscripcion-ana-1' -d '{"participante":"ana","metadata":{"nombre":"Ana Pérez"}}'
+{"id":"01a15454-fc7a-7e93-a7f9-62245d229459","actividad_id":"01a15454-c24f-76f1-96c3-c6786a02fead","participante":"ana","estado":"pendiente","version":1,"metadata":{"nombre":"Ana Pérez"},"creado_en":"2026-10-19T13:23:38.233Z"}
+HTTP 202 · Location: /v1/reservas/01a15454-fc7a-7e93-a7f9-62245d229459 · Retry-After: 1
+[código de salida: 0]
+
+$ curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/v1/reservas/01a15454-fc7a-7e93-a7f9-62245d229459 -H "Authorization: Bearer $CLAVE_AULA"
+{"id":"01a15454-fc7a-7e93-a7f9-62245d229459","actividad_id":"01a15454-c24f-76f1-96c3-c6786a02fead","participante":"ana","estado":"confirmada","version":2,"metadata":{"nombre":"Ana Pérez"},"creado_en":"2026-10-19T13:23:38.233Z"}
+HTTP 200
+[código de salida: 0]
+
+## Idempotencia: misma clave y cuerpo → 200 con la misma reserva; otro cuerpo → 422
+
+$ curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/v1/actividades/01a15454-c24f-76f1-96c3-c6786a02fead/reservas -H "Authorization: Bearer $CLAVE_AULA" -H "Content-Type: application/json" -H 'Idempotency-Key: inscripcion-ana-1' -d '{"participante":"ana","metadata":{"nombre":"Ana Pérez"}}'
+{"id":"01a15454-fc7a-7e93-a7f9-62245d229459","actividad_id":"01a15454-c24f-76f1-96c3-c6786a02fead","participante":"ana","estado":"confirmada","version":2,"metadata":{"nombre":"Ana Pérez"},"creado_en":"2026-10-19T13:23:38.233Z"}
+HTTP 200
+[código de salida: 0]
+
+$ curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/v1/actividades/01a15454-c24f-76f1-96c3-c6786a02fead/reservas -H "Authorization: Bearer $CLAVE_AULA" -H "Content-Type: application/json" -H 'Idempotency-Key: inscripcion-ana-1' -d '{"participante":"beto"}'
+{"type":"urn:reserva-cupos:problema:clave-reutilizada","title":"La Idempotency-Key ya se usó con otro cuerpo","status":422}
+HTTP 422
+[código de salida: 0]
+
+## Errores del contrato (Problem Details)
+
+$ curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/v1/actividades/01a15454-c24f-76f1-96c3-c6786a02fead/reservas -H "Authorization: Bearer $CLAVE_AULA" -H "Content-Type: application/json" -H 'Idempotency-Key: inscripcion-ana-2' -d '{"participante":"ana"}'
+{"type":"urn:reserva-cupos:problema:reserva-activa","title":"El participante ya tiene una reserva activa en esta actividad","status":409}
+HTTP 409
+[código de salida: 0]
+
+$ curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/v1/actividades/01a15454-c24f-76f1-96c3-c6786a02fead/reservas -H "Authorization: Bearer $CLAVE_AULA" -H "Content-Type: application/json" -d '{"participante":"beto"}'
+{"type":"urn:reserva-cupos:problema:solicitud-invalida","title":"Solicitud inválida","status":400,"detail":"Idempotency-Key es obligatoria (1 a 128 caracteres ASCII visibles)"}
+HTTP 400
+[código de salida: 0]
+
+$ curl -s -i http://localhost:3000/v1/reservas/01a15454-fc7a-7e93-a7f9-62245d229459 | grep -iE '^(HTTP|www-authenticate|content-type)|^\{'
+HTTP/1.1 401 Unauthorized
+WWW-Authenticate: Bearer realm="reserva-cupos"
+Content-Type: application/problem+json; charset=utf-8
+{"type":"urn:reserva-cupos:problema:no-autenticado","title":"Clave de API ausente o inválida","status":401}
+[código de salida: 0]
+
+$ curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/v1/reservas/01a15454-fc7a-7e93-a7f9-62245d229459 -H 'Authorization: Bearer clave-invalida'
+{"type":"urn:reserva-cupos:problema:no-autenticado","title":"Clave de API ausente o inválida","status":401}
+HTTP 401
+[código de salida: 0]
+
+## Aislamiento entre tenants: alta de un segundo tenant
+
+$ docker compose exec -T mysql-primary mysql -uroot -proot_local_2026 reservas -e "SET @nombre = 'Pruebas de carga'; SOURCE /crear-tenant.sql"
+mysql: [Warning] Using a password on the command line interface can be insecure.
+tenant_id	nombre	clave_api
+4cd6f09b-cbc0-11f1-a03b-0242ac150002	Pruebas de carga	rc_0d91d36eff477c76395cb5393033f751ca2c9c76ac7dd3f7e31eafe62d3113bf
+[código de salida: 0]
+
+# A continuación, $CLAVE es la clave_api mostrada.
+
+$ curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/v1/reservas/01a15454-fc7a-7e93-a7f9-62245d229459 -H "Authorization: Bearer $CLAVE"
+{"type":"about:blank","title":"Recurso no encontrado","status":404}
+HTTP 404
+[código de salida: 0]
+
+$ curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/v1/actividades/01a15454-c24f-76f1-96c3-c6786a02fead -H "Authorization: Bearer $CLAVE"
+{"type":"about:blank","title":"Recurso no encontrado","status":404}
+HTTP 404
+[código de salida: 0]
+
+$ curl -s -w '\nHTTP %{http_code}\n' 'http://localhost:3000/v1/cambios?desde=0' -H "Authorization: Bearer $CLAVE"
+{"datos":[],"ultima_secuencia":0}
+HTTP 200
+[código de salida: 0]
+
+## Cierre de la admisión
+
+$ curl -s -w '\nHTTP %{http_code}\n' -X PATCH http://localhost:3000/v1/actividades/01a15454-c24f-76f1-96c3-c6786a02fead -H "Authorization: Bearer $CLAVE_AULA" -H "Content-Type: application/json" -d '{"estado":"cerrada"}'
+{"id":"01a15454-c24f-76f1-96c3-c6786a02fead","nombre":"Programación Distribuida","capacidad":2,"cupos_disponibles":1,"estado":"cerrada","version":3,"metadata":{"comision":"B"},"creado_en":"2026-10-19T13:23:23.281Z"}
+HTTP 200
+[código de salida: 0]
+
+$ curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/v1/actividades/01a15454-c24f-76f1-96c3-c6786a02fead/reservas -H "Authorization: Bearer $CLAVE_AULA" -H "Content-Type: application/json" -H 'Idempotency-Key: inscripcion-caro-1' -d '{"participante":"caro"}'
+{"type":"urn:reserva-cupos:problema:actividad-cerrada","title":"La actividad no admite reservas","status":409}
+HTTP 409
+[código de salida: 0]
+
+## Listado paginado por cursor y feed de cambios
+
+$ curl -s -w '\nHTTP %{http_code}\n' 'http://localhost:3000/v1/actividades/01a15454-c24f-76f1-96c3-c6786a02fead/reservas?limite=1' -H "Authorization: Bearer $CLAVE_AULA"
+{"datos":[{"id":"01a15454-fc7a-7e93-a7f9-62245d229459","actividad_id":"01a15454-c24f-76f1-96c3-c6786a02fead","participante":"ana","estado":"confirmada","version":2,"metadata":{"nombre":"Ana Pérez"},"creado_en":"2026-10-19T13:23:38.233Z"}],"siguiente_cursor":null}
+HTTP 200
+[código de salida: 0]
+
+$ curl -s -w '\nHTTP %{http_code}\n' 'http://localhost:3000/v1/cambios?desde=0&limite=10' -H "Authorization: Bearer $CLAVE_AULA"
+{"datos":[{"secuencia":1,"tipo":"actividad.creada","ocurrido_en":"2026-10-19T13:23:27.078Z","entidad":{"id":"01a15454-c24f-76f1-96c3-c6786a02fead","estado":"abierta","nombre":"Programación Distribuida","version":1,"metadata":{"comision":"B"},"capacidad":2,"creado_en":"2026-10-19T13:23:23.281Z","cupos_disponibles":2}},{"secuencia":2,"tipo":"reserva.solicitada","ocurrido_en":"2026-10-19T13:23:38.237Z","entidad":{"id":"01a15454-fc7a-7e93-a7f9-62245d229459","estado":"pendiente","version":1,"metadata":{"nombre":"Ana Pérez"},"creado_en":"2026-10-19T13:23:38.233Z","actividad_id":"01a15454-c24f-76f1-96c3-c6786a02fead","participante":"ana"}},{"secuencia":3,"tipo":"reserva.confirmada","ocurrido_en":"2026-10-19T13:23:38.539Z","entidad":{"id":"01a15454-fc7a-7e93-a7f9-62245d229459","estado":"confirmada","version":2,"metadata":{"nombre":"Ana Pérez"},"creado_en":"2026-10-19T13:23:38.233Z","actividad_id":"01a15454-c24f-76f1-96c3-c6786a02fead","participante":"ana"}},{"secuencia":4,"tipo":"actividad.actualizada","ocurrido_en":"2026-10-19T13:23:38.545Z","entidad":{"id":"01a15454-c24f-76f1-96c3-c6786a02fead","estado":"abierta","nombre":"Programación Distribuida","version":2,"metadata":{"comision":"B"},"capacidad":2,"creado_en":"2026-10-19T13:23:23.281Z","cupos_disponibles":1}},{"secuencia":5,"tipo":"actividad.actualizada","ocurrido_en":"2026-10-19T13:23:41.050Z","entidad":{"id":"01a15454-c24f-76f1-96c3-c6786a02fead","estado":"cerrada","nombre":"Programación Distribuida","version":3,"metadata":{"comision":"B"},"capacidad":2,"creado_en":"2026-10-19T13:23:23.281Z","cupos_disponibles":1}}],"ultima_secuencia":5}
+HTTP 200
+[código de salida: 0]
+

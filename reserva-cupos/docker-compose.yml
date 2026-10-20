@@ -36,11 +36,14 @@ services:
     build:
       context: ./servicios/api
 
+    # La API no publica en RabbitMQ: escribe la reserva y su comando en el
+    # outbox de MySQL, y el relay los publica.
     environment:
       PORT: "3000"
-      RABBITMQ_HOST: rabbitmq
-      RABBITMQ_USER: demo
-      RABBITMQ_PASSWORD: demo_local_2026
+      DB_HOST: mysql-primary
+      DB_NAME: reservas
+      DB_USER: api_app
+      DB_PASSWORD: api_local_2026
 
     ports:
       - "127.0.0.1:3000:3000"
@@ -50,7 +53,7 @@ services:
       - interna
 
     depends_on:
-      rabbitmq:
+      mysql-primary:
         condition: service_healthy
 
     healthcheck:
@@ -70,6 +73,10 @@ services:
       context: ./servicios/worker
 
     environment:
+      DB_HOST: mysql-primary
+      DB_NAME: reservas
+      DB_USER: worker_app
+      DB_PASSWORD: worker_local_2026
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: demo
       RABBITMQ_PASSWORD: demo_local_2026
@@ -78,6 +85,8 @@ services:
       - interna
 
     depends_on:
+      mysql-primary:
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
 
@@ -92,6 +101,7 @@ services:
 
     volumes:
       - mysql-primary-data:/var/lib/mysql
+      - ./Infraestructura/mysql/primary/crear-tenant.sql:/crear-tenant.sql:ro
 
     networks:
       - interna
@@ -187,6 +197,8 @@ services:
     environment:
       PORT: "3001"
       API_URL: http://api:3000
+      # Clave de API del tenant Aula, solo para desarrollo local.
+      API_KEY: rc_aula_5589268069a379faa72a98ae640f818c09fc6179adf5f2146bd97aadbb06bc42
       PGHOST: aula-db
       PGPORT: "5432"
       PGDATABASE: aula
@@ -223,7 +235,6 @@ services:
       context: ./servicios/relay
 
     environment:
-      COMPONENTE: relay
       DB_HOST: mysql-primary
       DB_NAME: reservas
       DB_USER: relay_app
@@ -268,6 +279,22 @@ services:
         condition: service_healthy
 
     restart: unless-stopped
+
+  # Herramienta de pruebas de carga. No arranca con "docker compose up":
+  # se ejecuta con "docker compose run --rm k6 ...".
+  k6:
+    image: grafana/k6:1.0.0
+    profiles:
+      - pruebas
+
+    environment:
+      API_URL: http://api:3000
+
+    volumes:
+      - ./pruebas:/pruebas:ro
+
+    networks:
+      - publica
 
 networks:
   publica:

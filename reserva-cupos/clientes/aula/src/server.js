@@ -4,7 +4,9 @@ const { randomUUID } = require("node:crypto");
 const path = require("node:path");
 
 const app = express();
+app.disable("x-powered-by");
 const API_URL = process.env.API_URL || "http://api:3000";
+const API_KEY = process.env.API_KEY;
 const PORT = Number(process.env.PORT || 3001);
 
 // Lee PGHOST, PGUSER, PGPASSWORD y PGDATABASE del entorno.
@@ -21,7 +23,44 @@ pool.on("error", error => {
 app.use(express.json({ limit: "16kb" }));
 app.use(express.static(path.join(__dirname, "../public")));
 
-// Comprueba que la aplicación está funcionando.
+// Canal síncrono con el servicio: HTTP y clave de API del tenant.
+// Aula nunca accede a MySQL.
+async function llamarApi(metodo, ruta, { cuerpo, encabezados = {} } = {}) {
+    const response = await fetch(`${API_URL}${ruta}`, {
+        method: metodo,
+        headers: {
+            Authorization: `Bearer ${API_KEY}`,
+            ...(cuerpo ? { "Content-Type": "application/json" } : {}),
+            ...encabezados
+        },
+        body: cuerpo ? JSON.stringify(cuerpo) : undefined,
+        // Mayor que la espera de la réplica semisíncrona (10 s).
+        signal: AbortSignal.timeout(15000)
+    });
+
+    return {
+        status: response.status,
+        location: response.headers.get("location"),
+        retryAfter: response.headers.get("retry-after"),
+        cuerpo: await response.json()
+    };
+}
+
+// Reenvía al navegador la respuesta de la API con sus cabeceras útiles.
+function reenviar(res, respuesta) {
+    if (respuesta.location) res.set("Location", respuesta.location);
+    if (respuesta.retryAfter) res.set("Retry-After", respuesta.retryAfter);
+    res.status(respuesta.status).json(respuesta.cuerpo);
+}
+
+function apiNoDisponible(res, error) {
+    console.error("[AULA] API:", error.message);
+
+    res.status(503).json({
+        error: "No se pudo obtener respuesta de la API"
+    });
+}
+
 app.get("/health", (req, res) => {
     res.json({ servicio: "aula", estado: "ok" });
 });
@@ -29,7 +68,7 @@ app.get("/health", (req, res) => {
 // Comprueba las conexiones sin detener la página si alguna falla.
 app.get("/estado", async (req, res) => {
     const [base, api] = await Promise.allSettled([
-        pool.query("SELECT 1 FROM comprobaciones LIMIT 1"),
+        pool.query("SELECT 1 FROM materias LIMIT 1"),
 
         fetch(`${API_URL}/health`, {
             signal: AbortSignal.timeout(3000)
@@ -51,14 +90,14 @@ app.get("/estado", async (req, res) => {
     });
 });
 
-// Lee los últimos diez registros de la base propia de Aula.
-app.get("/pruebas/base", async (req, res) => {
+// Materias guardadas en la base propia de Aula.
+app.get("/materias", async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT id, texto, creado_en
-       FROM comprobaciones
-       ORDER BY creado_en DESC, id DESC
-       LIMIT 10`
+            `SELECT id, actividad_id, nombre, cupo, creado_en
+               FROM materias
+              ORDER BY creado_en DESC
+              LIMIT 20`
         );
 
         res.json(result.rows);
@@ -71,47 +110,93 @@ app.get("/pruebas/base", async (req, res) => {
     }
 });
 
-// Guarda un dato real en PostgreSQL.
-app.post("/pruebas/base", async (req, res) => {
+// Crea la actividad en el servicio y la registra como materia local.
+app.post("/materias", async (req, res) => {
+    const nombre = req.body?.nombre;
+    const cupo = Number(req.body?.cupo);
+
+    let respuesta;
+
     try {
-        const result = await pool.query(
-            `INSERT INTO comprobaciones (id, texto)
-       VALUES ($1, $2)
-       RETURNING id, texto, creado_en`,
-            [randomUUID(), "Prueba guardada desde Aula"]
-        );
-
-        res.status(201).json(result.rows[0]);
-    } catch (error) {
-        console.error("[AULA] Escritura:", error.message);
-
-        res.status(503).json({
-            error: "No se pudo guardar en la base de Aula"
+        respuesta = await llamarApi("POST", "/v1/actividades", {
+            cuerpo: {
+                nombre,
+                capacidad: cupo,
+                metadata: { origen: "aula", tipo: "materia" }
+            }
         });
+    } catch (error) {
+        return apiNoDisponible(res, error);
+    }
+
+    if (respuesta.status !== 201) {
+        return reenviar(res, respuesta);
+    }
+
+    const actividad = respuesta.cuerpo;
+
+    try {
+        await pool.query(
+            `INSERT INTO materias (id, actividad_id, nombre, cupo)
+             VALUES ($1, $2, $3, $4)`,
+            [randomUUID(), actividad.id, actividad.nombre, actividad.capacidad]
+        );
+    } catch (error) {
+        // La actividad ya existe en el servicio; la reconciliación con
+        // el feed de cambios se incorpora en la Entrega 5.
+        console.error("[AULA] Escritura:", error.message);
+    }
+
+    res.status(201).json(actividad);
+});
+
+// Estado de la materia e inscriptos confirmados, leídos de la API.
+app.get("/materias/:actividadId", async (req, res) => {
+    const ruta = `/v1/actividades/${encodeURIComponent(req.params.actividadId)}`;
+
+    try {
+        const actividad = await llamarApi("GET", ruta);
+
+        if (actividad.status !== 200) {
+            return reenviar(res, actividad);
+        }
+
+        const inscriptos = await llamarApi("GET", `${ruta}/reservas?estado=confirmada&limite=100`);
+
+        res.json({
+            ...actividad.cuerpo,
+            inscriptos: inscriptos.cuerpo.datos
+        });
+    } catch (error) {
+        apiNoDisponible(res, error);
     }
 });
 
-// Se comunica con la API por HTTP, sin acceder a MySQL.
-app.post("/pruebas/mensajes", async (req, res) => {
+// Solicita la inscripción. El navegador genera la Idempotency-Key y la
+// reutiliza si reintenta, así un reintento no duplica la reserva.
+app.post("/materias/:actividadId/inscripciones", async (req, res) => {
+    const ruta = `/v1/actividades/${encodeURIComponent(req.params.actividadId)}/reservas`;
+
     try {
-        const response = await fetch(`${API_URL}/pruebas/mensajes`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                texto: req.body?.texto
-            }),
-            signal: AbortSignal.timeout(7000)
-        });
-
-        res.status(response.status).json(await response.json());
+        reenviar(res, await llamarApi("POST", ruta, {
+            cuerpo: { participante: req.body?.alumno },
+            encabezados: {
+                "Idempotency-Key": req.get("idempotency-key") || randomUUID()
+            }
+        }));
     } catch (error) {
-        console.error("[AULA] API:", error.message);
+        apiNoDisponible(res, error);
+    }
+});
 
-        res.status(503).json({
-            error: "No se pudo obtener respuesta de la API"
-        });
+app.get("/inscripciones/:reservaId", async (req, res) => {
+    try {
+        reenviar(res, await llamarApi(
+            "GET",
+            `/v1/reservas/${encodeURIComponent(req.params.reservaId)}`
+        ));
+    } catch (error) {
+        apiNoDisponible(res, error);
     }
 });
 

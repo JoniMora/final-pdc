@@ -1,0 +1,134 @@
+# 04 · Canal asíncrono: outbox → relay → RabbitMQ → worker
+# Ejecución: 19/10/2026 10:23 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+## Topología usada por los comandos
+
+$ docker compose exec -T rabbitmq rabbitmqctl list_exchanges name type | grep -E 'name|reservas'
+name	type
+reservas.comandos	x-consistent-hash
+reservas.dlx	direct
+[código de salida: 0]
+
+$ docker compose exec -T rabbitmq rabbitmqctl list_bindings source_name destination_name routing_key | grep -E 'source_name|^reservas'
+source_name	destination_name	routing_key
+reservas.comandos	reservas.comandos.0	1
+reservas.dlx	reservas.dlq	fallido
+[código de salida: 0]
+
+## Worker detenido: la API sigue admitiendo y los comandos esperan en la cola
+
+$ docker compose stop worker
+ Container reserva-cupos-infra-worker-1  Stopping
+ Container reserva-cupos-infra-worker-1  Stopped
+[código de salida: 0]
+
+$ curl -s -o /dev/null -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/v1/actividades/01a15455-2c5a-7216-b85f-c795d5c809e3/reservas -H "Authorization: Bearer $CLAVE_AULA" -H "Content-Type: application/json" -H 'Idempotency-Key: desacople-w1' -d '{"participante":"w1"}'
+
+HTTP 202
+[código de salida: 0]
+
+$ curl -s -o /dev/null -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/v1/actividades/01a15455-2c5a-7216-b85f-c795d5c809e3/reservas -H "Authorization: Bearer $CLAVE_AULA" -H "Content-Type: application/json" -H 'Idempotency-Key: desacople-w2' -d '{"participante":"w2"}'
+
+HTTP 202
+[código de salida: 0]
+
+$ curl -s -o /dev/null -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/v1/actividades/01a15455-2c5a-7216-b85f-c795d5c809e3/reservas -H "Authorization: Bearer $CLAVE_AULA" -H "Content-Type: application/json" -H 'Idempotency-Key: desacople-w3' -d '{"participante":"w3"}'
+
+HTTP 202
+[código de salida: 0]
+
+$ docker compose exec -T rabbitmq rabbitmqctl list_queues name messages consumers | grep -E 'name|comandos'
+name	messages	consumers
+reservas.comandos.0	3	0
+[código de salida: 0]
+
+$ curl -s -w '\n' 'http://localhost:3000/v1/actividades/01a15455-2c5a-7216-b85f-c795d5c809e3/reservas?estado=pendiente' -H "Authorization: Bearer $CLAVE_AULA"
+{"datos":[{"id":"01a15455-3046-72cc-8140-aabb629bc16c","actividad_id":"01a15455-2c5a-7216-b85f-c795d5c809e3","participante":"w1","estado":"pendiente","version":1,"metadata":null,"creado_en":"2026-10-19T13:23:51.494Z"},{"id":"01a15455-306b-7815-920a-ab44df9655ca","actividad_id":"01a15455-2c5a-7216-b85f-c795d5c809e3","participante":"w2","estado":"pendiente","version":1,"metadata":null,"creado_en":"2026-10-19T13:23:51.531Z"},{"id":"01a15455-3094-73ce-beb8-f5473a055cd1","actividad_id":"01a15455-2c5a-7216-b85f-c795d5c809e3","participante":"w3","estado":"pendiente","version":1,"metadata":null,"creado_en":"2026-10-19T13:23:51.572Z"}],"siguiente_cursor":null}
+[código de salida: 0]
+
+$ docker compose start worker
+ Container reserva-cupos-infra-mysql-primary-1  Waiting
+ Container reserva-cupos-infra-rabbitmq-1  Waiting
+ Container reserva-cupos-infra-mysql-primary-1  Healthy
+ Container reserva-cupos-infra-rabbitmq-1  Healthy
+ Container reserva-cupos-infra-worker-1  Starting
+ Container reserva-cupos-infra-worker-1  Started
+[código de salida: 0]
+
+$ docker compose exec -T rabbitmq rabbitmqctl list_queues name messages consumers | grep -E 'name|comandos'
+name	messages	consumers
+reservas.comandos.0	0	1
+[código de salida: 0]
+
+$ docker compose logs --no-log-prefix worker | grep 01a15455-2c5a-7216-b85f-c795d5c809e3
+[WORKER] Reserva 01a15455-3046-72cc-8140-aabb629bc16c (actividad 01a15455-2c5a-7216-b85f-c795d5c809e3) confirmada
+[WORKER] Reserva 01a15455-306b-7815-920a-ab44df9655ca (actividad 01a15455-2c5a-7216-b85f-c795d5c809e3) confirmada
+[WORKER] Reserva 01a15455-3094-73ce-beb8-f5473a055cd1 (actividad 01a15455-2c5a-7216-b85f-c795d5c809e3) confirmada
+[código de salida: 0]
+
+## RabbitMQ detenido: la admisión y el secuenciador del feed continúan
+
+$ docker compose stop rabbitmq
+ Container reserva-cupos-infra-rabbitmq-1  Stopping
+ Container reserva-cupos-infra-rabbitmq-1  Stopped
+[código de salida: 0]
+
+$ curl -s -o /dev/null -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/v1/actividades/01a15455-2c5a-7216-b85f-c795d5c809e3/reservas -H "Authorization: Bearer $CLAVE_AULA" -H "Content-Type: application/json" -H 'Idempotency-Key: desacople-b1' -d '{"participante":"b1"}'
+
+HTTP 202
+[código de salida: 0]
+
+$ curl -s -o /dev/null -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/v1/actividades/01a15455-2c5a-7216-b85f-c795d5c809e3/reservas -H "Authorization: Bearer $CLAVE_AULA" -H "Content-Type: application/json" -H 'Idempotency-Key: desacople-b2' -d '{"participante":"b2"}'
+
+HTTP 202
+[código de salida: 0]
+
+$ docker compose exec -T mysql-primary mysql -uroot -proot_local_2026 reservas -e "SELECT r.participante_id, r.estado, c.tipo, c.secuencia, c.publicado_comando FROM reservas r JOIN cambios c ON c.entidad_id = r.id WHERE r.participante_id IN ('b1', 'b2') AND r.actividad_id = '01a15455-2c5a-7216-b85f-c795d5c809e3' ORDER BY c.id"
+mysql: [Warning] Using a password on the command line interface can be insecure.
+participante_id	estado	tipo	secuencia	publicado_comando
+b1	pendiente	reserva.solicitada	25	0
+b2	pendiente	reserva.solicitada	26	0
+[código de salida: 0]
+
+$ docker compose start rabbitmq
+ Container reserva-cupos-infra-rabbitmq-1  Starting
+ Container reserva-cupos-infra-rabbitmq-1  Started
+[código de salida: 0]
+
+$ docker compose logs --no-log-prefix --since 120s relay | grep -E 'RabbitMQ|publicados' | uniq
+[colas] Topologia de RabbitMQ configurada
+[relay] Conectado a RabbitMQ
+[relay] Secuenciados: 1 · comandos publicados: 0
+[relay] Secuenciados: 1 · comandos publicados: 1
+[relay] Secuenciados: 2 · comandos publicados: 0
+[relay] Secuenciados: 1 · comandos publicados: 0
+[relay] Secuenciados: 2 · comandos publicados: 1
+[relay] Secuenciados: 3 · comandos publicados: 1
+[relay] Secuenciados: 1 · comandos publicados: 0
+[relay] Secuenciados: 3 · comandos publicados: 3
+[relay] Secuenciados: 6 · comandos publicados: 0
+[relay] Conexión con RabbitMQ cerrada; reconectando
+[relay] Secuenciados: 1 · comandos publicados: 0
+[relay] RabbitMQ no disponible: getaddrinfo ENOTFOUND rabbitmq
+[relay] Secuenciados: 1 · comandos publicados: 0
+[relay] RabbitMQ no disponible: getaddrinfo ENOTFOUND rabbitmq
+[relay] RabbitMQ no disponible: connect ECONNREFUSED 172.21.0.8:5672
+[relay] Conectado a RabbitMQ
+[relay] Secuenciados: 0 · comandos publicados: 2
+[relay] Secuenciados: 2 · comandos publicados: 0
+[código de salida: 0]
+
+$ curl -s -w '\n' 'http://localhost:3000/v1/actividades/01a15455-2c5a-7216-b85f-c795d5c809e3' -H "Authorization: Bearer $CLAVE_AULA"
+{"id":"01a15455-2c5a-7216-b85f-c795d5c809e3","nombre":"Desacople","capacidad":5,"cupos_disponibles":0,"estado":"abierta","version":6,"metadata":null,"creado_en":"2026-10-19T13:23:50.490Z"}
+[código de salida: 0]
+
+$ docker compose exec -T mysql-primary mysql -uroot -proot_local_2026 reservas -e "SELECT r.participante_id, r.estado, c.tipo, c.secuencia, c.publicado_comando FROM reservas r JOIN cambios c ON c.entidad_id = r.id WHERE r.participante_id IN ('b1', 'b2') AND r.actividad_id = '01a15455-2c5a-7216-b85f-c795d5c809e3' ORDER BY c.id"
+mysql: [Warning] Using a password on the command line interface can be insecure.
+participante_id	estado	tipo	secuencia	publicado_comando
+b1	confirmada	reserva.solicitada	25	1
+b2	confirmada	reserva.solicitada	26	1
+b1	confirmada	reserva.confirmada	27	1
+b2	confirmada	reserva.confirmada	29	1
+[código de salida: 0]
+
