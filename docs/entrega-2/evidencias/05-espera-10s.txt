@@ -1,0 +1,11 @@
+# 05 · Espera de diez segundos por TTL
+# Ejecución: 08/10/2026 11:34 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+$ docker compose exec -T relay node src/probar-espera.js
+[prueba] Publicado en webhooks.espera.10s: 63adb902-d610-47e1-a854-5560a0716565
+[prueba] Recibido en webhooks.entregas: {"id":"63adb902-d610-47e1-a854-5560a0716565","texto":"Prueba de espera de diez segundos"}
+[prueba] Tiempo transcurrido: 10.11 segundos
+[prueba] OK: espera y enrutamiento comprobados
+[código de salida: 0]
+

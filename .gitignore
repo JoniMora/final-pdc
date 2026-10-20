@@ -53,3 +53,7 @@ Desktop.ini
 *.swp
 *.swo
 *~
+
+*.iml
+
+.git-creado-por-error/
