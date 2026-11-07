@@ -62,3 +62,9 @@ Desktop.ini
 docs/*/presentacion.html
 docs/*/guia-presentacion.txt
 docs/*/demo-comandos.txt
+
+# ---- Material de la cátedra: solo contexto, no se versiona ----
+docs/entrega-4/*.pdf
+docs/entrega-5/*.pdf
+docs/entrega-6/*.pdf
+docs/final/*.pdf
