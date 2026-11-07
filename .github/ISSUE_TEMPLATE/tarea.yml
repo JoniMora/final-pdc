@@ -1,0 +1,24 @@
+name: Tarea
+description: Un requerimiento del proyecto (funcionalidad, prueba, documentación o gestión).
+body:
+  - type: textarea
+    id: que
+    attributes:
+      label: Qué
+      description: Qué hay que hacer y por qué.
+    validations:
+      required: true
+  - type: textarea
+    id: criterios
+    attributes:
+      label: Criterios de aceptación
+      value: |
+        - [ ] 
+    validations:
+      required: true
+  - type: textarea
+    id: dependencias
+    attributes:
+      label: Dependencias
+      description: Qué issues lo bloquean y a cuáles bloquea (también se cargan como relación "blocked by").
+      placeholder: "Bloqueado por: #\nBloquea a: #"
