@@ -1,0 +1,17 @@
+# Verificación del proveedor: Schemathesis genera solicitudes a partir de
+# contrato/openapi.yaml y comprueba que cada respuesta de la API cumpla el
+# contrato (códigos, cabeceras y esquemas), que rechace lo inválido y que
+# acepte lo válido.
+
+[checks.positive_data_acceptance]
+# 409 y 422 son reglas de negocio documentadas, no rechazos de un dato
+# inválido: actividad cerrada, reserva activa del participante y
+# Idempotency-Key reutilizada con otro cuerpo (la fase con estado de
+# Schemathesis repite claves).
+expected-statuses = ["2xx", "3xx", "401", "403", "404", "409", "422", "429", "5xx"]
+
+[[operations]]
+# cursor es un valor opaco que entrega la propia API: un texto inventado
+# cumple el esquema pero no es un cursor, y la API lo rechaza con 400.
+include-operation-id = "listarReservas"
+checks.positive_data_acceptance.expected-statuses = ["2xx", "3xx", "400", "401", "403", "404", "429", "5xx"]

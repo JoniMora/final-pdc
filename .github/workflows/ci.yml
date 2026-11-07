@@ -1,0 +1,145 @@
+# Integración continua. El desacople entre componentes se verifica acá, no
+# por acuerdos entre integrantes: un cambio que rompe un contrato, o una
+# implementación que no lo cumple, no puede mergearse.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contratos:
+    name: Contratos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: OpenAPI válido (Redocly)
+        run: npx --yes @redocly/cli@2.76.0 lint reserva-cupos/contrato/openapi.yaml --config reserva-cupos/contrato/redocly.yaml
+
+      - name: AsyncAPI válido
+        run: npx --yes @asyncapi/cli@6.3.0 validate reserva-cupos/contrato/asyncapi.yaml
+
+      - name: Sin cambios incompatibles respecto de main (oasdiff)
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && format('origin/{0}', github.base_ref) || 'HEAD~1' }}
+        run: |
+          mkdir -p /tmp/oas
+          git show "$BASE:reserva-cupos/contrato/openapi.yaml" > /tmp/oas/base.yaml
+          cp reserva-cupos/contrato/openapi.yaml reserva-cupos/contrato/oasdiff-excepciones.txt /tmp/oas/
+          docker run --rm -v /tmp/oas:/specs:ro tufin/oasdiff:v1.11.7 \
+            breaking /specs/base.yaml /specs/openapi.yaml \
+            --fail-on ERR --err-ignore /specs/oasdiff-excepciones.txt
+
+  pruebas:
+    name: Pruebas (${{ matrix.componente }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        componente:
+          - compartido
+          - servicios/api
+          - servicios/worker
+          - servicios/relay
+          - servicios/notificador
+          - clientes/aula
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Dependencias del módulo compartido
+        working-directory: reserva-cupos/compartido
+        run: npm ci
+
+      - name: Pruebas
+        working-directory: reserva-cupos/${{ matrix.componente }}
+        run: |
+          npm ci
+          npm test
+
+  consumidor:
+    name: Aula contra el mock del contrato (Prism)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Mock de la API generado del contrato
+        run: |
+          docker run -d --name prism -p 4010:4010 \
+            -v "$PWD/reserva-cupos/contrato:/contrato:ro" \
+            stoplight/prism:5 mock -d -m false -h 0.0.0.0 /contrato/openapi.yaml
+          for i in $(seq 1 30); do
+            curl -s -o /dev/null http://localhost:4010/v1/cambios -H "Authorization: Bearer x" && exit 0
+            sleep 1
+          done
+          docker logs prism
+          exit 1
+
+      - name: Pruebas de Aula contra el mock
+        env:
+          PRISM_URL: http://localhost:4010
+        run: |
+          (cd reserva-cupos/compartido && npm ci)
+          cd reserva-cupos/clientes/aula
+          npm ci
+          npm test
+
+  integracion:
+    name: Integración (Schemathesis y ráfaga)
+    runs-on: ubuntu-latest
+    needs: [contratos, pruebas]
+    defaults:
+      run:
+        working-directory: reserva-cupos
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Levantar el sistema
+        run: |
+          docker compose up --build -d --wait
+          docker compose exec -T mysql-replica sh -c "mysql -uroot -proot_local_2026 < /configurar-replica.sql"
+
+      - name: La API cumple el contrato (Schemathesis)
+        run: |
+          docker run --rm --network reserva-cupos-infra_publica \
+            -v "$PWD/contrato:/contrato:ro" -v "$PWD/pruebas/contrato:/config:ro" \
+            schemathesis/schemathesis:4.33.1 --config-file /config/schemathesis.toml \
+            run /contrato/openapi.yaml --url http://traefik \
+            -H "Authorization: Bearer rc_aula_5589268069a379faa72a98ae640f818c09fc6179adf5f2146bd97aadbb06bc42" \
+            --checks all --max-examples 25 --seed 2026 --generation-with-security-parameters false
+
+      - name: Ráfaga de 500 solicitudes sobre 10 cupos
+        run: |
+          CLAVE=$(docker compose exec -T mysql-primary mysql -uroot -proot_local_2026 reservas -N \
+            -e "SET @nombre = 'CI'; SOURCE /crear-tenant.sql" | awk '{print $NF}' | tail -1)
+          docker compose run --rm k6 run -q -e API_KEY="$CLAVE" /pruebas/carga/rafaga.js
+
+      - name: Registros ante una falla
+        if: failure()
+        run: docker compose logs --tail=80
+
+      - name: Bajar el sistema
+        if: always()
+        run: docker compose down -v
