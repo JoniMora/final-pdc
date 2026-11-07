@@ -1,0 +1,52 @@
+# Publica la documentación de los contratos en GitHub Pages cada vez que
+# cambian en main.
+name: Documentación de la API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - reserva-cupos/contrato/**
+      - docs/api/**
+      - .github/workflows/documentacion.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.publicacion.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Armar el sitio
+        run: |
+          mkdir -p sitio
+          cp docs/api/*.html sitio/
+          cp reserva-cupos/contrato/openapi.yaml reserva-cupos/contrato/CHANGELOG.md sitio/
+          # El visor de AsyncAPI recibe el documento con las referencias a
+          # openapi.yaml ya resueltas.
+          npx --yes @asyncapi/cli@6.3.0 bundle reserva-cupos/contrato/asyncapi.yaml --output sitio/asyncapi.yaml
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: sitio
+
+      - id: publicacion
+        uses: actions/deploy-pages@v4

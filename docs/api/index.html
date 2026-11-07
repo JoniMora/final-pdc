@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Contratos · Reserva de cupos</title>
+    <style>
+        :root { --fondo: #f5f6f8; --texto: #18202f; --suave: #5b6476; --borde: #d9dde5; --acento: #1f4fd1; --tarjeta: #ffffff; }
+        @media (prefers-color-scheme: dark) {
+            :root { --fondo: #12151c; --texto: #e8ebf1; --suave: #a3abba; --borde: #2b313d; --acento: #8fb0ff; --tarjeta: #1a1f29; }
+        }
+        body { margin: 0; background: var(--fondo); color: var(--texto); font: 16px/1.55 system-ui, sans-serif; }
+        main { max-width: 760px; margin: 0 auto; padding: 48px 16px; }
+        h1 { font-size: 1.7rem; margin: 0 0 4px; }
+        p.sub { color: var(--suave); margin: 0 0 32px; }
+        a.tarjeta { display: block; background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 10px; padding: 18px 20px; margin-bottom: 14px; color: inherit; text-decoration: none; }
+        a.tarjeta:hover { border-color: var(--acento); }
+        a.tarjeta strong { color: var(--acento); font-size: 1.05rem; }
+        a.tarjeta span { display: block; color: var(--suave); margin-top: 4px; }
+        footer { margin-top: 32px; color: var(--suave); font-size: .9rem; }
+        footer a { color: var(--acento); }
+    </style>
+</head>
+<body>
+<main>
+    <h1>Servicio multi-tenant de reserva de cupos</h1>
+    <p class="sub">Contratos de interfaz · Programación Distribuida y Componentes · Grupo 15</p>
+
+    <a class="tarjeta" href="rest.html">
+        <strong>API pública REST y webhooks (OpenAPI 3.1)</strong>
+        <span>Lo que usa cada sistema consumidor: actividades, reservas, cancelaciones, el feed de cambios y los webhooks firmados.</span>
+    </a>
+
+    <a class="tarjeta" href="mensajeria.html">
+        <strong>Mensajería interna (AsyncAPI 3.0)</strong>
+        <span>Los mensajes que viajan por RabbitMQ entre el relay, el worker y el notificador.</span>
+    </a>
+
+    <a class="tarjeta" href="CHANGELOG.md">
+        <strong>Historial de versiones</strong>
+        <span>Qué cambió en cada versión y por qué sigue siendo compatible.</span>
+    </a>
+
+    <footer>
+        Fuente: <a href="https://github.com/JoniMora/final-pdc/tree/main/reserva-cupos/contrato">reserva-cupos/contrato</a>.
+        Esta página se publica automáticamente cuando el contrato cambia en <code>main</code>.
+    </footer>
+</main>
+</body>
+</html>
