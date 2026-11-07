@@ -90,7 +90,7 @@ jobs:
           docker run -d --name prism -p 4010:4010 \
             -v "$PWD/reserva-cupos/contrato:/contrato:ro" \
             stoplight/prism:5 mock -d -m false -h 0.0.0.0 /contrato/openapi.yaml
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             curl -s -o /dev/null http://localhost:4010/v1/cambios -H "Authorization: Bearer x" && exit 0
             sleep 1
           done
@@ -123,11 +123,15 @@ jobs:
 
       - name: La API cumple el contrato (Schemathesis)
         run: |
+          # Tenant propio: los datos que genera Schemathesis no se mezclan
+          # con los de Aula.
+          CLAVE=$(docker compose exec -T mysql-primary mysql -uroot -proot_local_2026 reservas -N \
+            -e "SET @nombre = 'Verificación del contrato'; SOURCE /crear-tenant.sql" | awk '{print $NF}' | tail -1)
           docker run --rm --network reserva-cupos-infra_publica \
             -v "$PWD/contrato:/contrato:ro" -v "$PWD/pruebas/contrato:/config:ro" \
             schemathesis/schemathesis:4.33.1 --config-file /config/schemathesis.toml \
             run /contrato/openapi.yaml --url http://traefik \
-            -H "Authorization: Bearer rc_aula_5589268069a379faa72a98ae640f818c09fc6179adf5f2146bd97aadbb06bc42" \
+            -H "Authorization: Bearer $CLAVE" \
             --checks all --max-examples 25 --seed 2026 --generation-with-security-parameters false
 
       - name: Ráfaga de 500 solicitudes sobre 10 cupos
