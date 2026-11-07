@@ -1,12 +1,17 @@
 {
   "name": "reserva-cupos-api",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "scripts": {
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test": "node --test"
   },
   "dependencies": {
     "express": "5.1.0",
+    "express-openapi-validator": "5.6.2",
     "mysql2": "3.14.3"
+  },
+  "devDependencies": {
+    "js-yaml": "5.5.0"
   }
 }

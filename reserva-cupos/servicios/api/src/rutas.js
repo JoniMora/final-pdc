@@ -18,6 +18,10 @@ const RESERVA = "id, actividad_id, participante_id, estado, version, metadata, c
 const ESTADOS_RESERVA = ["pendiente", "confirmada", "rechazada", "cancelada", "fallida"];
 const CLAVE_IDEMPOTENCIA = /^[\x21-\x7e]{1,128}$/;
 
+// Pedido de cancelación: es un comando para el worker, no un cambio de
+// estado, así que no aparece en el feed del tenant.
+const PEDIDO_CANCELACION = "reserva.cancelacion_solicitada";
+
 const rutas = express.Router();
 
 // El tenant se deriva siempre de la clave, nunca de la ruta ni del cuerpo.
@@ -87,8 +91,6 @@ function responderRepeticion(res, fila, hash) {
     if (reserva.estado === "pendiente") res.set("Retry-After", "1");
     res.json(reserva);
 }
-
-rutas.use(autenticar);
 
 rutas.post("/actividades", async (req, res) => {
     const { nombre, capacidad } = req.body ?? {};
@@ -261,6 +263,60 @@ rutas.get("/reservas/:id", async (req, res) => {
     res.json(reserva);
 });
 
+// Cancelación asíncrona: registra el pedido y su comando en el outbox y
+// responde 202; el worker cancela y, si estaba confirmada, devuelve el
+// cupo. Es idempotente: mientras haya un pedido reciente no se registra
+// otro, y una reserva ya cancelada responde 200.
+rutas.post("/reservas/:id/cancelacion", async (req, res) => {
+    if (!esUuid(req.params.id)) throw problemas.noEncontrado();
+
+    const resultado = await enTransaccion(async conexion => {
+        // FOR SHARE alcanza: la API no modifica la reserva (no tiene
+        // privilegio de UPDATE sobre ella), solo la lee de forma estable.
+        const [filas] = await conexion.query(
+            `SELECT ${RESERVA} FROM reservas WHERE id = ? AND tenant_id = ? FOR SHARE`,
+            [req.params.id, req.tenantId]
+        );
+
+        if (filas.length === 0) return null;
+
+        const reserva = reservaJson(filas[0]);
+
+        if (reserva.estado === "cancelada") return { reserva, admitida: false };
+
+        if (reserva.estado === "rechazada" || reserva.estado === "fallida") {
+            throw problemas.reservaNoCancelable(reserva.estado);
+        }
+
+        // Un pedido reciente sigue en curso. Uno de más de 30 s con la
+        // reserva todavía activa se registra de nuevo: cubre la pérdida
+        // del comando (el worker es idempotente ante un duplicado).
+        const [pedidos] = await conexion.query(
+            `SELECT 1 FROM cambios
+              WHERE entidad_id = ? AND tipo = ? AND creado_en > NOW(3) - INTERVAL 30 SECOND
+              LIMIT 1`,
+            [reserva.id, PEDIDO_CANCELACION]
+        );
+
+        if (pedidos.length === 0) {
+            await registrarCambio(conexion, req.tenantId, "reserva", reserva, PEDIDO_CANCELACION, {
+                comando: true
+            });
+        }
+
+        return { reserva, admitida: true };
+    });
+
+    if (!resultado) throw problemas.noEncontrado();
+
+    if (!resultado.admitida) return res.json(resultado.reserva);
+
+    res.status(202)
+        .location(`/v1/reservas/${resultado.reserva.id}`)
+        .set("Retry-After", "1")
+        .json(resultado.reserva);
+});
+
 // Listado paginado por cursor. Los UUIDv7 están ordenados por tiempo,
 // así que el cursor es el último identificador entregado.
 rutas.get("/actividades/:id/reservas", async (req, res) => {
@@ -323,10 +379,10 @@ rutas.get("/cambios", async (req, res) => {
 
     const [filas] = await pool.query(
         `SELECT secuencia, tipo, snapshot, creado_en FROM cambios
-          WHERE tenant_id = ? AND secuencia > ?
+          WHERE tenant_id = ? AND secuencia > ? AND tipo <> ?
           ORDER BY secuencia
           LIMIT ?`,
-        [req.tenantId, desde, limite]
+        [req.tenantId, desde, PEDIDO_CANCELACION, limite]
     );
 
     const datos = filas.map(fila => ({
@@ -342,4 +398,4 @@ rutas.get("/cambios", async (req, res) => {
     });
 });
 
-module.exports = rutas;
+module.exports = { rutas, autenticar };

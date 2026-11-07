@@ -41,6 +41,10 @@ const problemas = {
     reservaActiva: () =>
         new Problema(409, "reserva-activa", "El participante ya tiene una reserva activa en esta actividad"),
 
+    reservaNoCancelable: estado =>
+        new Problema(409, "reserva-no-cancelable", "La reserva no se puede cancelar",
+            `La reserva está ${estado}: no tiene un cupo asignado que devolver`),
+
     claveReutilizada: () =>
         new Problema(422, "clave-reutilizada", "La Idempotency-Key ya se usó con otro cuerpo"),
 
