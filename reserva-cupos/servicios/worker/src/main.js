@@ -1,10 +1,34 @@
 const amqp = require("amqplib");
+const { crearPool, esErrorDeInfraestructura } = require("./db");
+const { reservar } = require("./reservar");
 
-const COLA = "infraestructura.pruebas";
+const COLA = "reservas.comandos.0";
+const PAUSA_INFRAESTRUCTURA_MS = 5000;
+
+const pool = crearPool();
 
 function salir(error) {
     console.error("[WORKER]", error.message);
     process.exit(1);
+}
+
+function esperar(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function leerComando(entrega) {
+    const comando = JSON.parse(entrega.content.toString("utf8"));
+
+    if (
+        comando.comando !== "reservar" ||
+        typeof comando.reserva_id !== "string" ||
+        typeof comando.actividad_id !== "string" ||
+        typeof comando.tenant_id !== "string"
+    ) {
+        throw new Error("Formato de comando inválido");
+    }
+
+    return comando;
 }
 
 async function iniciar() {
@@ -27,50 +51,69 @@ async function iniciar() {
         salir(new Error("Se cerró el canal de RabbitMQ"));
     });
 
-    await canal.assertQueue(COLA, { durable: true });
+    // Mismos argumentos que declara el relay en configurar-colas.js.
+    await canal.assertQueue(COLA, {
+        durable: true,
+        arguments: {
+            "x-dead-letter-exchange": "reservas.dlx",
+            "x-dead-letter-routing-key": "fallido"
+        }
+    });
 
-    // Recibimos un mensaje sin confirmar por vez.
+    // Un comando sin confirmar por vez: nivela la carga sobre MySQL.
     await canal.prefetch(1);
 
     await canal.consume(
         COLA,
-        (entrega) => {
+        async entrega => {
             if (!entrega) {
                 salir(new Error("RabbitMQ canceló el consumidor"));
                 return;
             }
 
+            let comando;
+
             try {
-                const mensaje = JSON.parse(
-                    entrega.content.toString("utf8")
+                comando = leerComando(entrega);
+            } catch (error) {
+                console.error("[WORKER] Comando descartado a la DLQ:", error.message);
+                canal.nack(entrega, false, false);
+                return;
+            }
+
+            try {
+                const resultado = await reservar(pool, comando);
+
+                const reserva = `Reserva ${comando.reserva_id} (actividad ${comando.actividad_id})`;
+
+                console.log(
+                    resultado.repetido
+                        ? `[WORKER] ${reserva} ya estaba ${resultado.estado}: comando repetido, sin cambios`
+                        : `[WORKER] ${reserva} ${resultado.estado}`
                 );
 
-                if (
-                    typeof mensaje.id !== "string" ||
-                    typeof mensaje.texto !== "string"
-                ) {
-                    throw new Error("Formato de mensaje inválido");
-                }
-
-                // En esta prueba, procesar significa mostrar el mensaje.
-                console.log("[WORKER] Mensaje procesado:", mensaje);
-
-                // Confirmamos después de procesarlo.
+                // Recién después del COMMIT se confirma el mensaje.
                 canal.ack(entrega);
             } catch (error) {
-                console.error(
-                    "[WORKER] Mensaje inválido:",
-                    error.message
-                );
-
-                // Descartamos los mensajes malformados.
-                canal.nack(entrega, false, false);
+                if (esErrorDeInfraestructura(error)) {
+                    // Pausa sin consumir reintentos ni derivar a la DLQ:
+                    // el comando vuelve a la cola.
+                    console.error(
+                        "[WORKER] MySQL no disponible, se reintentará:",
+                        error.code || error.message
+                    );
+                    await esperar(PAUSA_INFRAESTRUCTURA_MS);
+                    canal.nack(entrega, false, true);
+                } else {
+                    console.error("[WORKER] Error de datos, comando a la DLQ:", error.message);
+                    canal.nack(entrega, false, false);
+                }
             }
         },
         { noAck: false }
     );
 
-    console.log(`[WORKER] Esperando mensajes en ${COLA}`);
+    console.log(`[WORKER] Esperando comandos en ${COLA}`);
 }
 
 iniciar().catch(salir);

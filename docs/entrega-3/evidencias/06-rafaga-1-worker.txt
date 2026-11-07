@@ -1,0 +1,61 @@
+# 06 · Ráfaga: 500 solicitudes simultáneas sobre 10 cupos, un worker
+# Ejecución: 19/10/2026 10:26 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+# -T: sin TTY para guardar la salida. -q: sin barra de progreso.
+
+$ docker compose ps worker
+NAME                           IMAGE                        COMMAND                  SERVICE             CREATED              STATUS              PORTS
+reserva-cupos-infra-worker-2   reserva-cupos-infra-worker   "docker-entrypoint.s…"   worker              About a minute ago   Up About a minute   
+[código de salida: 0]
+
+$ docker compose run --rm -T k6 run -q -e API_KEY=$CLAVE /pruebas/carga/rafaga.js
+time="2026-10-19T13:26:31Z" level=info msg="Actividad 01a15457-839a-729e-bee9-26ae0bd2dc07: 10 cupos, 500 solicitudes simultáneas" source=console
+time="2026-10-19T13:27:05Z" level=info msg="Resultado (sin pendientes tras 13.1 s de espera): confirmadas=10 rechazadas=490 pendientes=0 cupos_disponibles=0" source=console
+
+
+  █ THRESHOLDS 
+
+    checks
+    ✓ 'rate==1' rate=100.00%
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......................: 1004    24.255762/s
+    checks_succeeded...................: 100.00% 1004 out of 1004
+    checks_failed......................: 0.00%   0 out of 1004
+
+    ✓ admisión responde 202
+    ✓ admisión devuelve Location
+    ✓ 0 pendientes
+    ✓ exactamente 10 confirmadas
+    ✓ exactamente 490 rechazadas
+    ✓ cupos_disponibles = 0
+
+    HTTP
+    http_req_duration.......................................................: min=3.25ms med=6.89s avg=6.69s  p(95)=10.28s max=14.23s
+      { expected_response:true }............................................: min=3.25ms med=6.89s avg=6.69s  p(95)=10.28s max=14.23s
+    http_req_failed.........................................................: 0.00%  0 out of 584
+    http_reqs...............................................................: 584    14.108929/s
+
+    EXECUTION
+    iteration_duration......................................................: min=6.88s  med=9.66s avg=10.58s p(95)=14.84s max=15.81s
+    iterations..............................................................: 500    12.079563/s
+    vus.....................................................................: 0      min=0        max=500
+    vus_max.................................................................: 500    min=500      max=500
+
+    NETWORK
+    data_received...........................................................: 1.7 MB 42 kB/s
+    data_sent...............................................................: 196 kB 4.7 kB/s
+[código de salida: 0]
+
+# Verificación directa en MySQL de la actividad creada por esta ráfaga.
+
+$ docker compose exec -T mysql-primary mysql --default-character-set=utf8mb4 -uroot -proot_local_2026 reservas -e "SELECT a.nombre, a.capacidad, a.cupos_disponibles, r.estado, COUNT(*) AS reservas FROM actividades a JOIN reservas r ON r.actividad_id = a.id WHERE a.id = '01a15457-839a-729e-bee9-26ae0bd2dc07' GROUP BY a.id, r.estado ORDER BY r.estado"
+mysql: [Warning] Using a password on the command line interface can be insecure.
+nombre	capacidad	cupos_disponibles	estado	reservas
+Ráfaga 2026-10-19T13:26:23.894Z	10	0	confirmada	10
+Ráfaga 2026-10-19T13:26:23.894Z	10	0	rechazada	490
+[código de salida: 0]
+

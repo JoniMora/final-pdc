@@ -1,0 +1,30 @@
+# 05 · Caso de concurrencia: lectura y escritura separadas contra UPDATE condicional
+# Ejecución: 19/10/2026 10:24 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+# Actividad de prueba vacía de 10 cupos creada por la API: 01a15455-aa73-7a1e-82f1-46db1050d8a1
+
+$ docker compose exec -T worker node src/demostrar-concurrencia.js 01a15455-aa73-7a1e-82f1-46db1050d8a1 50 0
+Actividad 01a15455-aa73-7a1e-82f1-46db1050d8a1: capacidad 10, 50 transacciones simultáneas, pausa ingenua 0 ms
+
+ingenua  asignados= 50 capacidad=10 cupos_finales=7 sobreasignados=40
+atomica  asignados= 10 capacidad=10 cupos_finales=0 sobreasignados=0
+
+OK: la sentencia condicional asignó exactamente la capacidad.
+[código de salida: 0]
+
+$ docker compose exec -T worker node src/demostrar-concurrencia.js 01a15455-aa73-7a1e-82f1-46db1050d8a1 50 5
+Actividad 01a15455-aa73-7a1e-82f1-46db1050d8a1: capacidad 10, 50 transacciones simultáneas, pausa ingenua 5 ms
+
+ingenua  asignados= 50 capacidad=10 cupos_finales=9 sobreasignados=40
+atomica  asignados= 10 capacidad=10 cupos_finales=0 sobreasignados=0
+
+OK: la sentencia condicional asignó exactamente la capacidad.
+[código de salida: 0]
+
+$ docker compose exec -T mysql-primary mysql -uroot -proot_local_2026 -e "SELECT * FROM information_schema.CHECK_CONSTRAINTS WHERE CONSTRAINT_NAME = 'chk_cupos'"
+mysql: [Warning] Using a password on the command line interface can be insecure.
+CONSTRAINT_CATALOG	CONSTRAINT_SCHEMA	CONSTRAINT_NAME	CHECK_CLAUSE
+def	reservas	chk_cupos	((`cupos_disponibles` >= 0) and (`cupos_disponibles` <= `capacidad`))
+[código de salida: 0]
+

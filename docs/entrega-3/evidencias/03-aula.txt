@@ -1,0 +1,49 @@
+# 03 · Aula → HTTP → API (cliente de referencia)
+# Ejecución: 19/10/2026 10:23 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+$ curl -s -w '\n' http://localhost:3001/estado
+{"aula":"ok","postgresql":"conectado","api":"conectada"}
+[código de salida: 0]
+
+$ curl -s -X POST http://localhost:3001/materias -H 'Content-Type: application/json' -d '{"nombre":"Sistemas Operativos","cupo":2}'
+{"id":"01a15455-0a22-774e-b472-f6290f0a201f","nombre":"Sistemas Operativos","capacidad":2,"cupos_disponibles":2,"estado":"abierta","version":1,"metadata":{"origen":"aula","tipo":"materia"},"creado_en":"2026-10-19T13:23:41.729Z"}
+[código de salida: 0]
+
+$ curl -s -w '\n' http://localhost:3001/materias
+[{"id":"6ac9a738-eff0-42a7-89f0-62fba3e5627e","actividad_id":"01a15455-0a22-774e-b472-f6290f0a201f","nombre":"Sistemas Operativos","cupo":2,"creado_en":"2026-10-19T13:23:41.772Z"}]
+[código de salida: 0]
+
+$ curl -s -w '\nHTTP %{http_code} · Location: %header{location} · Retry-After: %header{retry-after}\n' -X POST http://localhost:3001/materias/01a15455-0a22-774e-b472-f6290f0a201f/inscripciones -H 'Content-Type: application/json' -H 'Idempotency-Key: aula-ana-1' -d '{"alumno":"ana"}'
+{"id":"01a15455-0b84-7bd7-9e33-4c21d9b87460","actividad_id":"01a15455-0a22-774e-b472-f6290f0a201f","participante":"ana","estado":"pendiente","version":1,"metadata":null,"creado_en":"2026-10-19T13:23:42.084Z"}
+HTTP 202 · Location: /v1/reservas/01a15455-0b84-7bd7-9e33-4c21d9b87460 · Retry-After: 1
+[código de salida: 0]
+
+$ curl -s -w '\nHTTP %{http_code} · Location: %header{location} · Retry-After: %header{retry-after}\n' -X POST http://localhost:3001/materias/01a15455-0a22-774e-b472-f6290f0a201f/inscripciones -H 'Content-Type: application/json' -H 'Idempotency-Key: aula-beto-1' -d '{"alumno":"beto"}'
+{"id":"01a15455-0cf1-7322-b8c7-71c084ea0fea","actividad_id":"01a15455-0a22-774e-b472-f6290f0a201f","participante":"beto","estado":"pendiente","version":1,"metadata":null,"creado_en":"2026-10-19T13:23:42.449Z"}
+HTTP 202 · Location: /v1/reservas/01a15455-0cf1-7322-b8c7-71c084ea0fea · Retry-After: 1
+[código de salida: 0]
+
+$ curl -s -w '\nHTTP %{http_code} · Location: %header{location} · Retry-After: %header{retry-after}\n' -X POST http://localhost:3001/materias/01a15455-0a22-774e-b472-f6290f0a201f/inscripciones -H 'Content-Type: application/json' -H 'Idempotency-Key: aula-caro-1' -d '{"alumno":"caro"}'
+{"id":"01a15455-0f91-7d2d-bf36-9f8a5dde53de","actividad_id":"01a15455-0a22-774e-b472-f6290f0a201f","participante":"caro","estado":"pendiente","version":1,"metadata":null,"creado_en":"2026-10-19T13:23:43.121Z"}
+HTTP 202 · Location: /v1/reservas/01a15455-0f91-7d2d-bf36-9f8a5dde53de · Retry-After: 1
+[código de salida: 0]
+
+$ curl -s -w '\n' http://localhost:3001/materias/01a15455-0a22-774e-b472-f6290f0a201f
+{"id":"01a15455-0a22-774e-b472-f6290f0a201f","nombre":"Sistemas Operativos","capacidad":2,"cupos_disponibles":0,"estado":"abierta","version":3,"metadata":{"tipo":"materia","origen":"aula"},"creado_en":"2026-10-19T13:23:41.729Z","inscriptos":[{"id":"01a15455-0b84-7bd7-9e33-4c21d9b87460","actividad_id":"01a15455-0a22-774e-b472-f6290f0a201f","participante":"ana","estado":"confirmada","version":2,"metadata":null,"creado_en":"2026-10-19T13:23:42.084Z"},{"id":"01a15455-0cf1-7322-b8c7-71c084ea0fea","actividad_id":"01a15455-0a22-774e-b472-f6290f0a201f","participante":"beto","estado":"confirmada","version":2,"metadata":null,"creado_en":"2026-10-19T13:23:42.449Z"}]}
+[código de salida: 0]
+
+$ docker compose exec -T aula-db psql -U aula_admin -d aula -c 'SELECT actividad_id, nombre, cupo FROM materias'
+             actividad_id             |       nombre        | cupo 
+--------------------------------------+---------------------+------
+ 01a15455-0a22-774e-b472-f6290f0a201f | Sistemas Operativos |    2
+(1 row)
+
+[código de salida: 0]
+
+$ docker compose logs --no-log-prefix worker | grep 01a15455-0a22-774e-b472-f6290f0a201f
+[WORKER] Reserva 01a15455-0b84-7bd7-9e33-4c21d9b87460 (actividad 01a15455-0a22-774e-b472-f6290f0a201f) confirmada
+[WORKER] Reserva 01a15455-0cf1-7322-b8c7-71c084ea0fea (actividad 01a15455-0a22-774e-b472-f6290f0a201f) confirmada
+[WORKER] Reserva 01a15455-0f91-7d2d-bf36-9f8a5dde53de (actividad 01a15455-0a22-774e-b472-f6290f0a201f) rechazada
+[código de salida: 0]
+

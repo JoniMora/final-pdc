@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Aula - Prueba de infraestructura</title>
+    <title>Aula - Inscripciones</title>
 
     <style>
         body {
@@ -48,13 +48,27 @@
             background: #eef1f6;
             padding: 14px;
         }
+
+        ul {
+            padding-left: 0;
+            list-style: none;
+        }
+
+        li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid #e3e7ef;
+        }
     </style>
 </head>
 
 <body>
 <main>
     <h1>Aula</h1>
-    <p>Cliente de referencia: prueba de infraestructura de la entrega 2.</p>
+    <p>Cliente de referencia del servicio de reserva de cupos (Entrega 3).</p>
 
     <section>
         <h2>Estado de las conexiones</h2>
@@ -63,59 +77,157 @@
     </section>
 
     <section>
-        <h2>Base propia de Aula</h2>
+        <h2>Crear materia</h2>
         <p>
-            Guarda un registro de prueba en PostgreSQL
-            y consulta los últimos diez.
+            Aula crea la actividad en el servicio por HTTP
+            y guarda la materia en su base PostgreSQL.
         </p>
 
-        <button id="guardar">Guardar prueba</button>
-        <button id="listar">Ver registros</button>
+        <form id="crear">
+            <label for="nombre">Nombre</label>
+            <input id="nombre" required maxlength="200" value="Programación Distribuida">
 
-        <pre id="base">Todavía no se consultaron registros.</pre>
+            <label for="cupo">Cupo</label>
+            <input id="cupo" type="number" required min="1" max="100000" value="10">
+
+            <button type="submit">Crear materia</button>
+        </form>
+
+        <pre id="creada">Todavía no se creó una materia.</pre>
     </section>
 
     <section>
-        <h2>Mensaje al servicio</h2>
-        <p>
-            Aula envía por HTTP; la API publica en RabbitMQ
-            y el worker procesa.
-        </p>
-
-        <form id="formulario">
-            <label for="texto">Texto del mensaje</label>
-            <input
-                    id="texto"
-                    required
-                    maxlength="1000"
-                    value="Hola desde Aula"
-            >
-            <button type="submit">Enviar mensaje</button>
-        </form>
-
-        <pre id="mensaje">Todavía no se envió un mensaje.</pre>
+        <h2>Materias</h2>
+        <button id="listar">Ver materias</button>
+        <ul id="materias"></ul>
     </section>
 
-    <p>
-        Esta pantalla verifica conexiones y mensajes.
-        Todavía no permite reservar cupos.
-    </p>
+    <section>
+        <h2>Inscripción</h2>
+        <p id="seleccionada">Seleccionar una materia de la lista.</p>
+
+        <form id="inscribir">
+            <label for="alumno">Alumno</label>
+            <input id="alumno" required maxlength="128" value="alumno-1">
+            <button type="submit">Inscribirse</button>
+        </form>
+
+        <p>
+            La API responde 202: la solicitud quedó registrada como pendiente.
+            La página consulta el estado hasta que el worker la decide.
+        </p>
+
+        <pre id="inscripcion">Todavía no se solicitó una inscripción.</pre>
+    </section>
+
+    <section>
+        <h2>Cupos e inscriptos</h2>
+        <button id="detalle">Actualizar</button>
+        <pre id="inscriptos">Seleccionar una materia de la lista.</pre>
+    </section>
 </main>
 
 <script>
+    let actividadId = null;
+
+    function mostrar(destino, texto) {
+        document.getElementById(destino).textContent = texto;
+    }
+
+    async function pedir(url, opciones = {}) {
+        const response = await fetch(url, opciones);
+        return { response, data: await response.json() };
+    }
+
     async function consultar(url, destino, opciones = {}) {
-        const panel = document.getElementById(destino);
-        panel.textContent = "Procesando...";
+        mostrar(destino, "Procesando...");
 
         try {
-            const response = await fetch(url, opciones);
-            const data = await response.json();
-
-            panel.textContent =
-                `HTTP ${response.status}\n${JSON.stringify(data, null, 2)}`;
+            const { response, data } = await pedir(url, opciones);
+            mostrar(destino, `HTTP ${response.status}\n${JSON.stringify(data, null, 2)}`);
+            return { response, data };
         } catch (error) {
-            panel.textContent =
-                `No se pudo completar la consulta: ${error.message}`;
+            mostrar(destino, `No se pudo completar la consulta: ${error.message}`);
+        }
+    }
+
+    function esperar(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function seleccionar(materia) {
+        actividadId = materia.actividad_id;
+        mostrar("seleccionada", `Materia: ${materia.nombre} (cupo ${materia.cupo})`);
+        verDetalle();
+    }
+
+    async function listar() {
+        const lista = document.getElementById("materias");
+        lista.replaceChildren();
+
+        try {
+            const { response, data } = await pedir("/materias");
+
+            if (!response.ok) {
+                lista.textContent = data.error;
+                return;
+            }
+
+            for (const materia of data) {
+                const item = document.createElement("li");
+                const texto = document.createElement("span");
+                const boton = document.createElement("button");
+
+                texto.textContent = `${materia.nombre} · cupo ${materia.cupo}`;
+                boton.textContent = "Seleccionar";
+                boton.onclick = () => seleccionar(materia);
+
+                item.append(texto, boton);
+                lista.append(item);
+            }
+        } catch (error) {
+            lista.textContent = `No se pudo completar la consulta: ${error.message}`;
+        }
+    }
+
+    async function verDetalle() {
+        if (!actividadId) return;
+
+        mostrar("inscriptos", "Procesando...");
+
+        try {
+            const { response, data } = await pedir(`/materias/${actividadId}`);
+
+            if (!response.ok) {
+                mostrar("inscriptos", `HTTP ${response.status}\n${JSON.stringify(data, null, 2)}`);
+                return;
+            }
+
+            const nombres = data.inscriptos.map(reserva => `- ${reserva.participante}`);
+
+            mostrar(
+                "inscriptos",
+                `Cupos disponibles: ${data.cupos_disponibles} de ${data.capacidad}\n` +
+                `Inscriptos confirmados (${data.inscriptos.length}):\n` +
+                (nombres.join("\n") || "(ninguno)")
+            );
+        } catch (error) {
+            mostrar("inscriptos", `No se pudo completar la consulta: ${error.message}`);
+        }
+    }
+
+    // Consulta el estado respetando Retry-After hasta que deje de estar pendiente.
+    async function seguir(reservaId, lineas) {
+        for (let intento = 0; intento < 30; intento++) {
+            const { response, data } = await pedir(`/inscripciones/${reservaId}`);
+
+            lineas.push(`GET estado → HTTP ${response.status}: ${data.estado}`);
+            mostrar("inscripcion", lineas.join("\n"));
+
+            if (data.estado !== "pendiente") return;
+
+            const segundos = Number(response.headers.get("retry-after") || 1);
+            await esperar(segundos * 1000);
         }
     }
 
@@ -123,31 +235,65 @@
         consultar("/estado", "estado");
     };
 
-    document.getElementById("guardar").onclick = () => {
-        consultar("/pruebas/base", "base", {
-            method: "POST"
-        });
-    };
+    document.getElementById("listar").onclick = listar;
+    document.getElementById("detalle").onclick = verDetalle;
 
-    document.getElementById("listar").onclick = () => {
-        consultar("/pruebas/base", "base");
-    };
-
-    document.getElementById("formulario").onsubmit = event => {
+    document.getElementById("crear").onsubmit = async event => {
         event.preventDefault();
 
-        consultar("/pruebas/mensajes", "mensaje", {
+        const resultado = await consultar("/materias", "creada", {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                texto: document.getElementById("texto").value
+                nombre: document.getElementById("nombre").value,
+                cupo: document.getElementById("cupo").value
             })
         });
+
+        if (resultado?.response.status === 201) listar();
+    };
+
+    document.getElementById("inscribir").onsubmit = async event => {
+        event.preventDefault();
+
+        if (!actividadId) {
+            mostrar("inscripcion", "Primero seleccionar una materia.");
+            return;
+        }
+
+        mostrar("inscripcion", "Procesando...");
+
+        try {
+            const { response, data } = await pedir(`/materias/${actividadId}/inscripciones`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Idempotency-Key": crypto.randomUUID()
+                },
+                body: JSON.stringify({
+                    alumno: document.getElementById("alumno").value
+                })
+            });
+
+            const lineas = [
+                `POST inscripción → HTTP ${response.status}`,
+                `Location: ${response.headers.get("location") || "-"}`,
+                JSON.stringify(data, null, 2)
+            ];
+
+            mostrar("inscripcion", lineas.join("\n"));
+
+            if (response.status === 202 || response.status === 200) {
+                await seguir(data.id, lineas);
+                verDetalle();
+            }
+        } catch (error) {
+            mostrar("inscripcion", `No se pudo completar la consulta: ${error.message}`);
+        }
     };
 
     consultar("/estado", "estado");
+    listar();
 </script>
 </body>
 </html>

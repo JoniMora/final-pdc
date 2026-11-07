@@ -1,27 +1,40 @@
-# Reserva de cupos — Entrega 2: infraestructura
+# Reserva de cupos — Entrega 3: comunicación síncrona y asíncrona
 
 Proyecto final de Programación Distribuida y Componentes.
 Grupo 15: Jonathan Mora Colodrero y María Constanza Gigli.
 
 ## Alcance
 
-Esta entrega implementa la infraestructura de ejecución y pruebas de
-comunicación entre componentes.
+Esta entrega reemplaza los mensajes de prueba de la Entrega 2 por el
+recorrido real de una reserva:
+
+```
+Aula ──HTTP──▶ API ──transacción──▶ MySQL (reserva + outbox)
+                                       │
+                         relay ◀───────┘ secuencia y publica
+                           │
+                           ▼
+                RabbitMQ reservas.comandos ──▶ worker ──▶ MySQL (decisión + outbox)
+```
 
 Incluye:
-- Nueve contenedores administrados con Docker Compose.
-- Tres redes para separar las comunicaciones.
-- MySQL primario y réplica con replicación semisíncrona.
-- Esquema inicial de reservas y usuarios con permisos por componente.
-- RabbitMQ con colas de comandos, notificaciones, esperas y errores.
-- API y worker que permiten publicar y procesar mensajes de prueba.
-- Cliente Aula con interfaz web y base propia en PostgreSQL.
-- Volúmenes persistentes para las bases de datos y RabbitMQ.
+- API pública v1 con autenticación por tenant, admisión `202` con
+  `Idempotency-Key`, consultas, listado paginado y feed de cambios.
+- Contrato OpenAPI 3.1 en [`contrato/openapi.yaml`](contrato/openapi.yaml).
+- Outbox transaccional: la API y el worker escriben cada cambio en la
+  tabla `cambios` dentro de la misma transacción; ninguno publica en
+  RabbitMQ.
+- Relay: secuenciador del feed, publicador de comandos con
+  *publisher confirms* y barredor de reservas pendientes.
+- Worker: comando `reservar` idempotente con descuento atómico del cupo.
+- Aula: crea materias e inscribe alumnos a través de la API.
+- Pruebas de concurrencia: comparación ingenua/atómica, ráfaga de 500
+  solicitudes con k6 (con uno y con dos workers), duplicados simultáneos
+  y reentrega de comandos.
 
-Todavía no implementa reservas reales, autenticación multi-tenant,
-procesamiento del outbox, feed de cambios ni envío de webhooks.
-Relay y notificador comprueban conexiones y ejecutan consultas de prueba.
-Relay también configura la topología de RabbitMQ al iniciar.
+Todavía no incluye: cancelación de reservas (`DELETE /v1/reservas/{id}`),
+envío de webhooks, límite de tasa, contingencia y reconciliación de Aula.
+Se incorporan en las Entregas 4 y 5.
 
 ## Requisitos
 
@@ -30,546 +43,330 @@ Relay también configura la topología de RabbitMQ al iniciar.
 - Docker Compose.
 - Puertos locales 3000, 3001 y 15672 disponibles.
 
-Node.js, MySQL, PostgreSQL y RabbitMQ se ejecutan dentro de los
-contenedores; no es necesario instalarlos directamente en el equipo.
+Node.js, MySQL, PostgreSQL, RabbitMQ y k6 se ejecutan dentro de
+contenedores; no es necesario instalarlos en el equipo.
 
-Los comandos pueden ejecutarse en cualquier terminal (PowerShell, bash o zsh).
-Cuando un comando cambia según el sistema, se muestran las dos variantes.
+Los ejemplos con `curl` están escritos para bash o zsh. En Windows usar
+`curl.exe` desde PowerShell o ejecutarlos en Git Bash o WSL.
 
 ## Componentes
 
 | Servicio | Función en esta entrega |
 |---|---|
-| api | Recibe mensajes por HTTP y los publica en RabbitMQ. |
-| worker | Consume mensajes de prueba, los muestra en los logs y confirma su procesamiento. |
-| mysql-primary | Almacena el esquema y los datos del servicio. |
-| mysql-replica | Replica los cambios del primario y permanece en modo de solo lectura. |
-| rabbitmq | Mantiene la infraestructura de mensajería. |
-| relay | Configura exchanges y colas; comprueba acceso a MySQL y RabbitMQ. |
-| notificador | Comprueba acceso a MySQL y RabbitMQ. |
-| aula | Proporciona la interfaz web y se comunica con la API y su base propia. |
-| aula-db | Almacena los registros de prueba de Aula en PostgreSQL. |
+| api | API pública v1. Escribe en MySQL; no usa RabbitMQ. |
+| relay | Configura la topología, secuencia el outbox, publica comandos y barre pendientes. |
+| worker | Consume `reservas.comandos.0` y decide cada reserva. |
+| mysql-primary | Persistencia del servicio: tenants, actividades, reservas y cambios. |
+| mysql-replica | Réplica semisíncrona en solo lectura. |
+| rabbitmq | Exchange de hash consistente `reservas.comandos` y colas. |
+| notificador | Sin cambios respecto de la Entrega 2 (comprueba conexiones). |
+| aula | Cliente de referencia: materias e inscripciones por HTTP. |
+| aula-db | Base propia de Aula (PostgreSQL). |
+| k6 | Herramienta de pruebas de carga. Solo se ejecuta a pedido. |
 
-## Redes
-
-| Red | Servicios conectados |
-|---|---|
-| publica | api, aula, notificador |
-| interna | api, worker, mysql-primary, mysql-replica, rabbitmq, relay, notificador |
-| tenant | aula, aula-db |
-
-Aula accede a la API mediante HTTP y no comparte la red de MySQL.
-PostgreSQL se encuentra únicamente en la red del tenant.
-
-Estas redes son redes bridge locales. El nombre `publica` no significa
-que los servicios estén publicados en Internet.
-
-Solo se publican en el equipo:
-- API: http://localhost:3000
-- Aula: http://localhost:3001
-- Administración de RabbitMQ: http://localhost:15672
-
-Los puertos publicados están vinculados a 127.0.0.1.
-Las bases de datos no publican puertos al equipo.
+Las redes no cambian: `publica`, `interna` y `tenant`. Aula llega a la
+API por HTTP y no tiene ruta hacia MySQL ni RabbitMQ. El contenedor de
+k6 está únicamente en la red `publica`: prueba el servicio igual que un
+cliente externo.
 
 ## Inicio
 
 ### Obtener el código
 
-El código de esta entrega está publicado en el tag `v2.1-infraestructura`
-(rama `entrega-2-infraestructura`). La rama `main` se actualiza cuando
-se aprueba la entrega.
-
 ```shell
 git clone https://github.com/JoniMora/final-pdc.git
 cd final-pdc
-git checkout v2.1-infraestructura
-```
-
-### Levantar el entorno
-
-Desde la raíz del repositorio, ingresar a la carpeta de la aplicación:
-
-```shell
+git checkout v3-comunicacion
 cd reserva-cupos
 ```
 
-Validar la configuración:
+### Volúmenes nuevos
+
+Esta entrega modifica los scripts iniciales de MySQL (índice nuevo y
+tenant de Aula) y de PostgreSQL (tabla `materias`). Los scripts solo se
+ejecutan al inicializar volúmenes vacíos, así que una instalación que
+viene de la Entrega 2 debe eliminar sus volúmenes:
 
 ```shell
-docker compose config --quiet
+docker compose down -v
 ```
 
-Construir las imágenes y levantar los servicios:
+Esto borra los datos locales de la Entrega 2.
+
+### Levantar el entorno
 
 ```shell
 docker compose up --build -d
-```
-
-Comprobar el estado:
-
-```shell
 docker compose ps -a
 ```
 
-La primera construcción puede tardar porque descarga imágenes e instala
-dependencias. Si el comando termina con un error de dependencia, ver
-[Problemas frecuentes](#problemas-frecuentes).
-
-### Configurar la réplica en una instalación nueva
-
-Cuando MySQL primario y réplica aparezcan como healthy, ejecutar:
+Cuando MySQL primario y réplica estén healthy, configurar la réplica
+(una vez por instalación):
 
 ```shell
 docker compose exec -T mysql-replica sh -c "mysql -uroot -proot_local_2026 < /configurar-replica.sql"
 ```
 
-Este paso se realiza una sola vez por instalación con volúmenes nuevos.
-La configuración se conserva en el volumen de la réplica.
+Si responde `Access denied`, la réplica todavía está inicializando:
+esperar unos segundos y repetir.
 
-No es necesario repetirlo al detener y volver a iniciar los contenedores.
-
-Comprobar la replicación:
+Comprobar la replicación y el modo semisíncrono:
 
 ```shell
 docker compose exec mysql-replica mysql -uroot -proot_local_2026 -e "SHOW REPLICA STATUS\G"
+docker compose exec mysql-primary mysql -uroot -proot_local_2026 -e "SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_status'"
 ```
 
-Resultados esperados:
-- Replica_IO_Running: Yes.
-- Replica_SQL_Running: Yes.
-- Last_IO_Error y Last_SQL_Error vacíos.
-- Seconds_Behind_Source: 0 cuando termine de aplicar los cambios.
+Se espera `Replica_IO_Running: Yes`, `Replica_SQL_Running: Yes` y
+`Rpl_semi_sync_source_status: ON`. Hasta que la réplica esté configurada,
+cada escritura espera el tiempo límite semisíncrono de diez segundos.
 
-Comprobar el estado semisíncrono en el primario:
+## Tenants y claves de API
 
-```shell
-docker compose exec mysql-primary mysql -uroot -proot_local_2026 -e "SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_status'; SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_clients';"
-```
+Toda ruta `/v1` exige `Authorization: Bearer <clave>`. La base guarda
+solo el hash SHA-256 de cada clave.
 
-Resultados esperados:
-- Rpl_semi_sync_source_status: ON.
-- Rpl_semi_sync_source_clients: 1.
-
-La réplica puede necesitar tiempo para aplicar los datos iniciales.
-Que ambos contenedores estén healthy no demuestra, por sí solo,
-que la replicación esté configurada o actualizada.
-
-## Demostración de comunicación
-
-Abrir:
-
-http://localhost:3001
-
-La interfaz permite:
-1. Consultar las conexiones de Aula con PostgreSQL y la API.
-2. Guardar y consultar registros de prueba en PostgreSQL.
-3. Enviar un mensaje al servicio.
-
-El recorrido del mensaje es:
-
-Aula → HTTP → API → RabbitMQ → worker.
-
-La respuesta HTTP 202 indica que la API aceptó la publicación del
-mensaje después de recibir la confirmación de RabbitMQ.
-No significa que el worker ya lo haya procesado.
-
-Para comprobar el procesamiento:
-
-```shell
-docker compose logs --tail=20 worker
-```
-
-El identificador del mensaje recibido por el worker debe coincidir con
-el identificador mostrado en la respuesta de la interfaz.
-
-También se puede probar directamente desde la terminal.
-
-macOS o Linux:
+El tenant **Aula** se crea al inicializar MySQL. Su clave, solo para
+desarrollo local, está en `docker-compose.yml`:
 
 ```bash
-curl http://localhost:3000/health
+export CLAVE_AULA=rc_aula_5589268069a379faa72a98ae640f818c09fc6179adf5f2146bd97aadbb06bc42
+```
+
+Para crear otro tenant (las pruebas de carga usan uno propio):
+
+```shell
+docker compose exec mysql-primary mysql -uroot -proot_local_2026 reservas -e "SET @nombre = 'Pruebas de carga'; SOURCE /crear-tenant.sql"
+```
+
+El comando muestra `tenant_id`, `nombre` y `clave_api`. La clave se
+genera con 256 bits aleatorios y no vuelve a mostrarse:
+
+```bash
+export CLAVE=<clave_api mostrada>
+```
+
+## API v1
+
+| Método y ruta | Respuestas |
+|---|---|
+| `POST /v1/actividades` | `201` + `Location` · `400` · `401` |
+| `GET /v1/actividades/{id}` | `200` · `404` |
+| `PATCH /v1/actividades/{id}` (`{"estado":"cerrada"}`) | `200` · `400` · `404` |
+| `POST /v1/actividades/{id}/reservas` (exige `Idempotency-Key`) | `202` + `Location` + `Retry-After` · `200` repetición · `409` · `422` |
+| `GET /v1/reservas/{id}` | `200` (+ `Retry-After` si está pendiente) · `404` |
+| `GET /v1/actividades/{id}/reservas?estado=&cursor=&limite=` | `200` |
+| `GET /v1/cambios?desde=&limite=` | `200` |
+
+Los errores son `application/problem+json` (RFC 9457). Si MySQL no
+responde, la API devuelve `503` con `Retry-After`. Un recurso de otro
+tenant responde `404`, igual que uno inexistente.
+
+## Canal síncrono: Aula → API
+
+Abrir http://localhost:3001 y:
+1. Crear una materia con cupo. Aula llama a `POST /v1/actividades` y
+   guarda la materia en su PostgreSQL.
+2. Seleccionarla e inscribir un alumno. Aula llama a
+   `POST /v1/actividades/{id}/reservas` con una `Idempotency-Key`
+   generada en el navegador.
+3. La página muestra la respuesta `202` con `Location` y consulta
+   `GET /v1/reservas/{id}` respetando `Retry-After` hasta que el worker
+   decide.
+
+El mismo recorrido desde la terminal:
+
+```bash
+curl -s -X POST http://localhost:3000/v1/actividades \
+  -H "Authorization: Bearer $CLAVE_AULA" -H "Content-Type: application/json" \
+  -d '{"nombre":"Programación Distribuida","capacidad":2}'
 ```
 
 ```bash
-curl -X POST http://localhost:3000/pruebas/mensajes -H "Content-Type: application/json" -d '{"texto":"Mensaje de prueba"}'
+export ACTIVIDAD=<id devuelto>
+
+curl -s -i -X POST http://localhost:3000/v1/actividades/$ACTIVIDAD/reservas \
+  -H "Authorization: Bearer $CLAVE_AULA" -H "Content-Type: application/json" \
+  -H "Idempotency-Key: inscripcion-ana-1" -d '{"participante":"ana"}'
 ```
 
-Windows (PowerShell):
+Se espera `HTTP/1.1 202 Accepted`, `Location: /v1/reservas/<id>` y la
+reserva en estado `pendiente`. Consultar la `Location` un instante
+después muestra `confirmada`. Repetir el mismo `POST` devuelve `200` con
+la misma reserva; cambiar el participante con la misma clave devuelve
+`422`.
 
-```powershell
-Invoke-RestMethod -Uri http://localhost:3000/health
-```
-
-```powershell
-Invoke-RestMethod -Method Post -Uri http://localhost:3000/pruebas/mensajes -ContentType "application/json" -Body '{"texto":"Mensaje de prueba"}'
-```
-
-## Independencia y persistencia de PostgreSQL
-
-Detener únicamente la base de Aula:
+## Canal asíncrono: outbox → relay → RabbitMQ → worker
 
 ```shell
-docker compose stop aula-db
+docker compose logs --tail=20 relay worker
 ```
 
-Desde la interfaz, enviar un mensaje al servicio.
+El relay informa `Secuenciados: N · comandos publicados: M` y el worker
+`Reserva <id> (actividad <id>) confirmada` o `rechazada`.
 
-El mensaje puede seguir el recorrido Aula → API → RabbitMQ → worker
-aunque PostgreSQL esté detenido. Guardar o consultar registros de Aula
-requiere que PostgreSQL esté disponible.
-
-Comprobar el mensaje:
-
-```shell
-docker compose logs --tail=20 worker
-```
-
-Volver a iniciar PostgreSQL:
-
-```shell
-docker compose start aula-db
-```
-
-Cuando esté disponible, actualizar el estado y consultar los registros.
-
-Los registros anteriores permanecen almacenados en el volumen.
-Esta prueba demuestra independencia del envío de mensajes respecto
-de PostgreSQL; no implementa reconciliación de reservas.
-
-## Independencia del worker
-
-Detener únicamente el worker:
+### Worker detenido
 
 ```shell
 docker compose stop worker
 ```
 
-Enviar tres mensajes. La API los acepta (HTTP 202) aunque el worker
-esté detenido.
+Las solicitudes siguen respondiendo `202` y los comandos quedan en
+`reservas.comandos.0`:
 
-macOS o Linux:
+```shell
+docker compose exec rabbitmq rabbitmqctl list_queues name messages consumers
+```
+
+Al ejecutar `docker compose start worker`, las reservas pendientes se
+deciden.
+
+### RabbitMQ detenido
+
+Con `docker compose stop rabbitmq`, la API sigue admitiendo y el relay
+sigue secuenciando: el feed (`GET /v1/cambios`) avanza y los comandos
+quedan en el outbox con `publicado_comando = 0`. Al ejecutar
+`docker compose start rabbitmq`, el relay se reconecta y los publica.
+
+## Caso de concurrencia: cupos de una misma actividad
+
+### Comparación ingenua y atómica
+
+Crear una actividad de prueba vacía y ejecutar la comparación dentro del
+worker (usa el usuario `worker_app`):
 
 ```bash
-for i in 1 2 3; do curl -s -X POST http://localhost:3000/pruebas/mensajes -H "Content-Type: application/json" -d "{\"texto\":\"Con worker detenido $i\"}"; echo; done
+ACTIVIDAD=$(curl -s -X POST http://localhost:3000/v1/actividades \
+  -H "Authorization: Bearer $CLAVE" -H "Content-Type: application/json" \
+  -d '{"nombre":"Demostración de concurrencia","capacidad":10}' | sed 's/.*"id":"\([^"]*\)".*/\1/')
+
+docker compose exec worker node src/demostrar-concurrencia.js $ACTIVIDAD 50 0
 ```
 
-Windows (PowerShell):
+Cincuenta transacciones compiten por diez cupos. La estrategia ingenua
+(leer el cupo y después escribir el valor calculado) pierde
+actualizaciones y asigna más lugares que la capacidad; la sentencia
+condicional del worker asigna exactamente diez. El script restablece el
+contador al terminar.
 
-```powershell
-1..3 | ForEach-Object { Invoke-RestMethod -Method Post -Uri http://localhost:3000/pruebas/mensajes -ContentType "application/json" -Body (@{ texto = "Con worker detenido $_" } | ConvertTo-Json) }
-```
-
-Comprobar que RabbitMQ retiene los mensajes:
+### Ráfaga de 500 solicitudes
 
 ```shell
-docker compose exec rabbitmq rabbitmqctl list_queues name messages consumers
+docker compose run --rm k6 run -e API_KEY=$CLAVE /pruebas/carga/rafaga.js
 ```
 
-Se espera infraestructura.pruebas con 3 mensajes y 0 consumidores.
+El script crea una actividad de 10 cupos, envía 500 solicitudes
+simultáneas con claves y participantes únicos, espera a que no queden
+pendientes y verifica por la API: 10 confirmadas, 490 rechazadas,
+0 pendientes y `cupos_disponibles = 0`. Termina con código distinto de
+cero si algún control falla.
 
-Volver a iniciar el worker y comprobar que procesa los pendientes:
+Con dos workers consumiendo la misma cola:
 
 ```shell
-docker compose start worker
+docker compose up -d --scale worker=2
+docker compose run --rm k6 run -e API_KEY=$CLAVE /pruebas/carga/rafaga.js
+docker compose up -d --scale worker=1
 ```
+
+El resultado debe ser el mismo: la garantía la da el `UPDATE`
+condicional de InnoDB, no la cantidad de consumidores.
+
+Comprobación directa en MySQL:
 
 ```shell
-docker compose exec rabbitmq rabbitmqctl list_queues name messages consumers
+docker compose exec mysql-primary mysql --default-character-set=utf8mb4 -uroot -proot_local_2026 reservas -e "SELECT a.nombre, a.capacidad, a.cupos_disponibles, r.estado, COUNT(*) AS reservas FROM actividades a JOIN reservas r ON r.actividad_id = a.id WHERE a.nombre LIKE 'Ráfaga%' GROUP BY a.id, r.estado ORDER BY a.creado_en, r.estado"
 ```
+
+`--default-character-set=utf8mb4` es necesario para que el cliente
+interprete la "á" del filtro: el contenedor no define un locale.
+
+### Duplicados simultáneos
 
 ```shell
-docker compose logs --tail=30 worker
+docker compose run --rm k6 run -e API_KEY=$CLAVE /pruebas/carga/duplicados.js
 ```
 
-Se espera infraestructura.pruebas sin mensajes, con un consumidor,
-y los tres identificadores en los logs del worker.
+Veinte solicitudes simultáneas del mismo participante con claves
+distintas producen una `202` y diecinueve `409`; veinte reintentos
+simultáneos con la misma `Idempotency-Key` producen una `202` y
+diecinueve `200`. La actividad termina con exactamente dos reservas.
 
-## Aislamiento de redes
-
-Aula no comparte red con MySQL ni con RabbitMQ, y la API no comparte
-red con PostgreSQL. Desde cada contenedor, esos nombres no se resuelven:
+### Reentrega de un comando
 
 ```shell
-docker compose exec aula node -e "require('dns').lookup('mysql-primary', (e, a) => console.log(e ? e.code : a))"
+docker compose exec relay node src/reenviar-comando.js <reserva_id confirmada>
+docker compose logs --tail=5 worker
 ```
 
-```shell
-docker compose exec aula node -e "require('dns').lookup('rabbitmq', (e, a) => console.log(e ? e.code : a))"
-```
-
-```shell
-docker compose exec api node -e "require('dns').lookup('aula-db', (e, a) => console.log(e ? e.code : a))"
-```
-
-Se espera ENOTFOUND en los tres casos. Como control, el mismo comando
-desde aula hacia api devuelve una dirección IP.
-
-## Esquema y permisos de MySQL
-
-La base `reservas` contiene:
-- tenants.
-- actividades.
-- reservas.
-- cambios.
-
-Existen usuarios separados:
-- api_app.
-- worker_app.
-- relay_app.
-- notificador_app.
-- replicador.
-
-Los permisos preparan la separación de responsabilidades.
-En esta entrega la API y el worker de prueba utilizan RabbitMQ;
-todavía no ejecutan operaciones de reservas en MySQL.
-
-Comprobar las tablas y el modo de solo lectura de la réplica:
-
-```shell
-docker compose exec mysql-replica mysql -uroot -proot_local_2026 -e "SHOW TABLES FROM reservas; SELECT @@global.read_only, @@global.super_read_only;"
-```
-
-Ambas variables de solo lectura deben valer 1.
-
-### Prueba de permisos
-
-La API no debe poder modificar los cupos:
-
-```shell
-docker compose exec mysql-primary mysql -uapi_app -papi_local_2026 -e "UPDATE reservas.actividades SET cupos_disponibles = cupos_disponibles WHERE 1 = 0;"
-```
-
-Se espera un error de permiso UPDATE denegado.
-
-El worker sí tiene ese permiso:
-
-```shell
-docker compose exec mysql-primary mysql -uworker_app -pworker_local_2026 -e "UPDATE reservas.actividades SET cupos_disponibles = cupos_disponibles WHERE 1 = 0;"
-```
-
-Se espera que termine sin error.
-La condición WHERE 1 = 0 evita modificar filas en ambas pruebas.
-
-### Caída de la réplica
-
-Con la réplica detenida, el primario espera la confirmación hasta el
-tiempo límite de diez segundos y continúa en modo asíncrono:
-
-```shell
-docker compose stop mysql-replica
-```
-
-```shell
-docker compose exec mysql-primary mysql -uroot -proot_local_2026 -e "CREATE DATABASE prueba_semisync;"
-```
-
-```shell
-docker compose exec mysql-primary mysql -uroot -proot_local_2026 -e "SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_status';"
-```
-
-Se espera que CREATE DATABASE tarde unos diez segundos y que el estado
-pase a OFF.
-
-Volver a iniciar la réplica:
-
-```shell
-docker compose start mysql-replica
-```
-
-Cuando la réplica esté al día, el siguiente commit restablece el modo
-semisíncrono. Eliminar la base de prueba y, unos segundos después,
-consultar el estado:
-
-```shell
-docker compose exec mysql-primary mysql -uroot -proot_local_2026 -e "DROP DATABASE prueba_semisync;"
-```
-
-```shell
-docker compose exec mysql-primary mysql -uroot -proot_local_2026 -e "SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_status'; SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_clients';"
-```
-
-Resultados esperados:
-- Rpl_semi_sync_source_status: ON.
-- Rpl_semi_sync_source_clients: 1.
-
-### Reinicio de la réplica
-
-Al reiniciarse, la réplica vuelve a registrarse como semisíncrona.
-`replica.cnf` incluye `loose-rpl-semi-sync-replica-enabled=ON` para que
-la opción esté activa antes de que la réplica se reconecte al primario.
-
-```shell
-docker compose restart mysql-replica
-```
-
-Cuando vuelva a estar healthy:
-
-```shell
-docker compose exec mysql-replica mysql -uroot -proot_local_2026 -e "SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_replica_status';"
-```
-
-```shell
-docker compose exec mysql-primary mysql -uroot -proot_local_2026 -e "SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_clients';"
-```
-
-Resultados esperados:
-- Rpl_semi_sync_replica_status: ON.
-- Rpl_semi_sync_source_clients: 1.
-
-## Topología de RabbitMQ
-
-Exchanges:
-- reservas.comandos: distribución mediante consistent hash.
-- reservas.dlx: enrutamiento de errores de comandos.
-- webhooks.eventos: enrutamiento de notificaciones.
-- webhooks.dlx: enrutamiento de errores de notificaciones.
-
-Colas:
-- infraestructura.pruebas.
-- reservas.comandos.0.
-- reservas.dlq.
-- webhooks.entregas.
-- webhooks.dlq.
-- webhooks.espera.10s.
-- webhooks.espera.1m.
-- webhooks.espera.5m.
-
-Las colas de espera tienen TTL y reenvían los mensajes expirados
-hacia webhooks.entregas.
-
-La topología está preparada, pero todavía no existe un notificador
-que envíe webhooks y gestione sus reintentos.
-
-Consultar las colas:
-
-```shell
-docker compose exec rabbitmq rabbitmqctl list_queues name messages consumers
-```
-
-En reposo se espera un consumidor en infraestructura.pruebas.
-Las colas destinadas a las reservas y webhooks todavía no tienen
-consumidores de negocio.
-
-### Prueba de espera de diez segundos
-
-Con webhooks.espera.10s y webhooks.entregas vacías y sin consumidores,
-ejecutar:
-
-```shell
-docker compose exec relay node src/probar-espera.js
-```
-
-El script:
-1. Publica un mensaje persistente en webhooks.espera.10s.
-2. Espera su llegada a webhooks.entregas.
-3. Comprueba el identificador y el tiempo transcurrido.
-4. Confirma el mensaje recibido.
-
-Se espera un tiempo transcurrido de al menos diez segundos y el
-resultado OK.
-
-La prueba verifica TTL y enrutamiento; no verifica un envío de webhook
-ni los intervalos de uno y cinco minutos.
+El worker informa `comando repetido, sin cambios`; los cupos y la
+versión de la reserva no cambian.
 
 ## Logs
 
 ```shell
-docker compose logs --tail=30 api worker
+docker compose logs --tail=30 api relay worker
 ```
-
-```shell
-docker compose logs --tail=30 relay notificador
-```
-
-Relay y notificador deben informar sus conexiones con MySQL y RabbitMQ.
 
 ## Detener y reanudar
 
-Detener los servicios conservando los contenedores y volúmenes:
-
 ```shell
 docker compose stop
-```
-
-Reanudar:
-
-```shell
 docker compose up -d
 ```
 
-Eliminar los contenedores y redes del proyecto conservando los volúmenes:
-
-```shell
-docker compose down
-```
-
-No utilizar `docker compose down -v` para una detención normal:
-esa opción elimina los volúmenes y sus datos.
-
-Los scripts iniciales de MySQL y PostgreSQL se ejecutan al inicializar
-volúmenes vacíos. Editarlos no modifica automáticamente una base
-ya inicializada.
+`docker compose down` elimina contenedores y redes y conserva los
+volúmenes. `docker compose down -v` también elimina los datos.
 
 ## Problemas frecuentes
 
-- `docker compose up` termina con
-  `dependency failed to start: container ... is unhealthy`:
-  en el primer arranque, un servicio puede no estar disponible a tiempo
-  para los que dependen de él. Ejecutar nuevamente `docker compose up -d`
-  y comprobar con `docker compose ps -a` que los nueve contenedores
-  estén en ejecución.
-- La réplica recién configurada responde `Unknown database 'reservas'`:
-  todavía está aplicando las transacciones iniciales del primario.
-  Esperar y consultar `Seconds_Behind_Source` en `SHOW REPLICA STATUS`.
+- `dependency failed to start: container ... is unhealthy` en el primer
+  arranque: ejecutar nuevamente `docker compose up -d`.
+- Las escrituras tardan diez segundos: la réplica no está configurada o
+  está detenida, y el primario espera el tiempo límite semisíncrono.
+- `401` en todas las rutas: la clave no corresponde a un tenant de esta
+  instalación (por ejemplo, volúmenes de la Entrega 2).
+- Aula responde "La base de Aula no esta disponible" y su log muestra
+  `relation "materias" does not exist`: volúmenes creados con los
+  scripts de la Entrega 2.
 - Alguno de los puertos 3000, 3001 o 15672 está en uso: detener el
   proceso que lo ocupa o cambiar el puerto publicado en
   `docker-compose.yml`.
 
 ## Credenciales locales
 
-Las credenciales incluidas son exclusivamente para desarrollo local.
+Exclusivamente para desarrollo local.
 
-Administración de RabbitMQ:
-- Usuario: demo.
-- Contraseña: demo_local_2026.
-
-MySQL:
-- root: root_local_2026.
-- api_app: api_local_2026.
-- worker_app: worker_local_2026.
-- relay_app: relay_local_2026.
-- notificador_app: notificador_local_2026.
-- replicador: replica_local_2026.
-
-PostgreSQL:
-- aula_admin: postgres_local_2026.
-- aula_app: aula_local_2026.
+- Clave de API de Aula:
+  `rc_aula_5589268069a379faa72a98ae640f818c09fc6179adf5f2146bd97aadbb06bc42`.
+- RabbitMQ: demo / demo_local_2026.
+- MySQL: root_local_2026; api_app, worker_app, relay_app,
+  notificador_app y replicador con las contraseñas de
+  `docker-compose.yml` y `02-usuarios.sql`.
+- PostgreSQL: aula_admin / postgres_local_2026; aula_app / aula_local_2026.
 
 ## Limitaciones
 
-- Todos los contenedores se ejecutan en un único equipo.
-- No existe promoción automática de la réplica.
-- La replicación semisíncrona puede pasar a asíncrona si vence el
-  tiempo de espera configurado de diez segundos.
-- No se garantiza ausencia de pérdida de datos ante cualquier fallo.
-- Los healthchecks comprueban condiciones específicas de cada servicio;
-  no sustituyen las pruebas de comunicación o replicación.
-- El worker procesa mensajes de prueba, no reservas.
-- Relay todavía no publica cambios del outbox.
-- Notificador todavía no envía webhooks.
-- Aula todavía no permite reservar cupos.
-- La cola de prueba no está conectada a las DLQ de reservas o webhooks.
-- Todos los componentes usan el mismo usuario de RabbitMQ; los permisos
-  por componente se aplican solamente en MySQL.
-- Worker, relay y notificador no tienen healthcheck; su estado se
-  comprueba en los logs.
+- La admisión durable está acotada por el `COMMIT` semisíncrono: en el
+  equipo de prueba, una ráfaga de 500 se admite completa en 8 a 16
+  segundos según la corrida (ver evidencias 06 y 07); cada solicitud
+  espera su turno en el pool de conexiones de la API.
+- Con dos workers sobre la misma cola no se garantiza el orden de
+  llegada: la no sobreasignación se mantiene, pero una solicitud
+  posterior puede obtener el último cupo. El particionado por actividad
+  (un consumidor por partición) se mide en la Entrega 6.
+- Sin cancelación, webhooks, límite de tasa ni contingencia de Aula.
+- Errores de datos del worker van a `reservas.dlq`; la reserva queda
+  pendiente (el estado `fallida` se incorpora en la Entrega 4).
+- Si Aula no puede guardar una materia en PostgreSQL después de crearla
+  en el servicio, la actividad queda sin materia local hasta la
+  reconciliación de la Entrega 5.
+- Todos los contenedores se ejecutan en un único equipo y el failover
+  de MySQL es manual.
 
 ## Documentación
 
-La propuesta de arquitectura y la documentación de las entregas
-se encuentran en la carpeta `docs` de la raíz del repositorio.
-
-Las evidencias de esta entrega se encuentran en:
-
-[Evidencias de entrega 2](../docs/entrega-2/evidencias/README.md)
+- [Certificación y evidencias de la Entrega 3](../docs/entrega-3/README.md)
+- [Contrato OpenAPI](contrato/openapi.yaml)
+- Las pruebas de infraestructura de la Entrega 2 (permisos, semisync,
+  colas de espera) siguen disponibles en el tag `v2.1-infraestructura`.

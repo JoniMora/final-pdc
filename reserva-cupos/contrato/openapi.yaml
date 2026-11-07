@@ -1,0 +1,493 @@
+openapi: 3.1.0
+
+info:
+  title: Servicio multi-tenant de reserva de cupos
+  version: 1.0.0
+  summary: API pública v1 (Entrega 3)
+  description: |
+    Contrato de la API pública. Cada organización consumidora es un tenant
+    que se autentica con su propia clave; el tenant se deriva siempre de la
+    clave y nunca de la ruta ni del cuerpo. Un recurso de otro tenant
+    responde `404`, igual que uno inexistente.
+
+    La admisión de una reserva es síncrona y la decisión es asíncrona:
+    `POST /v1/actividades/{id}/reservas` registra la reserva como
+    `pendiente` y responde `202` con `Location`; el worker la confirma o la
+    rechaza después. El cliente consulta el resultado en `Location`
+    respetando `Retry-After`.
+
+    Los errores se devuelven como Problem Details (RFC 9457).
+
+    `DELETE /v1/reservas/{id}` (cancelación) y el límite de tasa (`429`) se
+    incorporan en entregas siguientes y no forman parte de esta versión.
+
+servers:
+  - url: http://localhost:3000
+    description: Entorno local (Docker Compose)
+
+security:
+  - claveApi: []
+
+tags:
+  - name: actividades
+    description: Recursos con cupo limitado (una materia, un partido, un turno).
+  - name: reservas
+    description: Asignación de un cupo a un participante.
+  - name: cambios
+    description: Feed ordenado de cambios para la reconciliación del tenant.
+
+paths:
+  /v1/actividades:
+    post:
+      tags: [actividades]
+      operationId: crearActividad
+      summary: Crear una actividad con cupo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NuevaActividad"
+      responses:
+        "201":
+          description: Actividad creada.
+          headers:
+            Location:
+              $ref: "#/components/headers/Location"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Actividad"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "503":
+          $ref: "#/components/responses/NoDisponible"
+
+  /v1/actividades/{id}:
+    parameters:
+      - $ref: "#/components/parameters/IdActividad"
+    get:
+      tags: [actividades]
+      operationId: consultarActividad
+      summary: Consultar la actividad y sus cupos disponibles
+      responses:
+        "200":
+          description: Actividad.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Actividad"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "503":
+          $ref: "#/components/responses/NoDisponible"
+    patch:
+      tags: [actividades]
+      operationId: cambiarEstadoActividad
+      summary: Abrir o cerrar la admisión
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [estado]
+              properties:
+                estado:
+                  type: string
+                  enum: [abierta, cerrada]
+      responses:
+        "200":
+          description: Actividad con el estado actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Actividad"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "503":
+          $ref: "#/components/responses/NoDisponible"
+
+  /v1/actividades/{id}/reservas:
+    parameters:
+      - $ref: "#/components/parameters/IdActividad"
+    post:
+      tags: [reservas]
+      operationId: solicitarReserva
+      summary: Solicitar una reserva (admisión asíncrona)
+      description: |
+        Registra la reserva como `pendiente` y su comando en el outbox, en una
+        única transacción, y responde `202`. La decisión la toma el worker.
+
+        Repetir la solicitud con la misma `Idempotency-Key` y el mismo cuerpo
+        devuelve la misma reserva con `200`; con otro cuerpo, `422`.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: Clave elegida por el cliente, única por tenant. Se reutiliza al reintentar.
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 128
+            pattern: "^[\\x21-\\x7e]+$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NuevaReserva"
+      responses:
+        "202":
+          description: Solicitud admitida; la reserva queda pendiente.
+          headers:
+            Location:
+              $ref: "#/components/headers/Location"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reserva"
+        "200":
+          description: Repetición idempotente; devuelve la reserva en su estado actual.
+          headers:
+            Location:
+              $ref: "#/components/headers/Location"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reserva"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: El participante ya tiene una reserva activa o la actividad está cerrada.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problema"
+        "422":
+          description: La Idempotency-Key ya se usó con otro cuerpo.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problema"
+        "503":
+          $ref: "#/components/responses/NoDisponible"
+    get:
+      tags: [reservas]
+      operationId: listarReservas
+      summary: Listado paginado por cursor (operación en contingencia)
+      parameters:
+        - name: estado
+          in: query
+          schema:
+            $ref: "#/components/schemas/EstadoReserva"
+        - name: cursor
+          in: query
+          description: Valor de `siguiente_cursor` de la página anterior.
+          schema:
+            type: string
+        - name: limite
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: Página de reservas en orden de creación.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [datos, siguiente_cursor]
+                properties:
+                  datos:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Reserva"
+                  siguiente_cursor:
+                    type: [string, "null"]
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "503":
+          $ref: "#/components/responses/NoDisponible"
+
+  /v1/reservas/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags: [reservas]
+      operationId: consultarReserva
+      summary: Consultar el estado de una reserva
+      responses:
+        "200":
+          description: Reserva. Si está pendiente, incluye `Retry-After`.
+          headers:
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reserva"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "503":
+          $ref: "#/components/responses/NoDisponible"
+
+  /v1/cambios:
+    get:
+      tags: [cambios]
+      operationId: leerCambios
+      summary: Feed de cambios del tenant (reconciliación)
+      description: |
+        Cambios en orden de secuencia. Cada elemento trae la instantánea
+        completa de la entidad con su versión: aplicarlo dos veces o fuera de
+        orden no altera el resultado si el lector descarta versiones menores.
+        Un lector que ya vio la secuencia *n* nunca verá aparecer después una
+        menor.
+      parameters:
+        - name: desde
+          in: query
+          description: Última secuencia aplicada por el lector (punto de control).
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limite
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+      responses:
+        "200":
+          description: Cambios posteriores a `desde`.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [datos, ultima_secuencia]
+                properties:
+                  datos:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Cambio"
+                  ultima_secuencia:
+                    type: integer
+                    description: Nuevo punto de control para la próxima lectura.
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "503":
+          $ref: "#/components/responses/NoDisponible"
+
+components:
+  securitySchemes:
+    claveApi:
+      type: http
+      scheme: bearer
+      description: Clave de API del tenant (256 bits). El servicio guarda solo su hash SHA-256.
+
+  parameters:
+    IdActividad:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  headers:
+    Location:
+      description: Ruta del recurso creado o de la reserva a consultar.
+      schema:
+        type: string
+    RetryAfter:
+      description: Segundos sugeridos antes de volver a consultar.
+      schema:
+        type: integer
+
+  responses:
+    SolicitudInvalida:
+      description: Cuerpo, cabecera o parámetro inválido.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problema"
+    NoAutenticado:
+      description: Clave de API ausente o inválida.
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problema"
+    NoEncontrado:
+      description: El recurso no existe o pertenece a otro tenant.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problema"
+    NoDisponible:
+      description: La base de datos no está disponible; reintentar con la misma Idempotency-Key.
+      headers:
+        Retry-After:
+          $ref: "#/components/headers/RetryAfter"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problema"
+
+  schemas:
+    Metadata:
+      description: JSON opaco de hasta 16 KB. El servicio lo almacena y lo devuelve sin interpretarlo.
+      type: [object, "null"]
+
+    NuevaActividad:
+      type: object
+      required: [nombre, capacidad]
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          maxLength: 200
+        capacidad:
+          type: integer
+          minimum: 1
+          maximum: 100000
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+
+    Actividad:
+      type: object
+      required: [id, nombre, capacidad, cupos_disponibles, estado, version, metadata, creado_en]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: UUIDv7, ordenado por tiempo de creación.
+        nombre:
+          type: string
+        capacidad:
+          type: integer
+        cupos_disponibles:
+          type: integer
+          minimum: 0
+        estado:
+          type: string
+          enum: [abierta, cerrada]
+        version:
+          type: integer
+          minimum: 1
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        creado_en:
+          type: string
+          format: date-time
+
+    NuevaReserva:
+      type: object
+      required: [participante]
+      properties:
+        participante:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Identificador opaco del participante en el sistema del tenant.
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+
+    EstadoReserva:
+      type: string
+      enum: [pendiente, confirmada, rechazada, cancelada, fallida]
+
+    Reserva:
+      type: object
+      required: [id, actividad_id, participante, estado, version, metadata, creado_en]
+      properties:
+        id:
+          type: string
+          format: uuid
+        actividad_id:
+          type: string
+          format: uuid
+        participante:
+          type: string
+        estado:
+          $ref: "#/components/schemas/EstadoReserva"
+        version:
+          type: integer
+          minimum: 1
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        creado_en:
+          type: string
+          format: date-time
+
+    Cambio:
+      type: object
+      required: [secuencia, tipo, ocurrido_en, entidad]
+      properties:
+        secuencia:
+          type: integer
+        tipo:
+          type: string
+          enum:
+            - actividad.creada
+            - actividad.actualizada
+            - reserva.solicitada
+            - reserva.confirmada
+            - reserva.rechazada
+        ocurrido_en:
+          type: string
+          format: date-time
+        entidad:
+          description: Instantánea completa de la entidad después del cambio.
+          oneOf:
+            - $ref: "#/components/schemas/Actividad"
+            - $ref: "#/components/schemas/Reserva"
+
+    Problema:
+      description: Problem Details (RFC 9457).
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          examples: ["urn:reserva-cupos:problema:actividad-cerrada"]
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
