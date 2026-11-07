@@ -1,0 +1,74 @@
+# 03 · La API valida cada solicitud contra el contrato
+# Ejecución: 07/11/2026 20:39 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+express-openapi-validator usa contrato/openapi.yaml: una solicitud fuera de contrato se rechaza antes de llegar a la ruta.
+
+## Sin clave: 401 (la autenticación va primero)
+
+$ curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/v1/cambios
+{"type":"urn:reserva-cupos:problema:no-autenticado","title":"Clave de API ausente o inválida","status":401}
+HTTP 401
+[código de salida: 0]
+
+## Identificador que no es un UUID: 400
+
+$ curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/v1/reservas/no-es-un-uuid -H "Authorization: Bearer $CLAVE_AULA"
+{"type":"urn:reserva-cupos:problema:solicitud-invalida","title":"Solicitud inválida","status":400,"detail":"/params/id: must match format \"uuid\""}
+HTTP 400
+[código de salida: 0]
+
+## Parámetro fuera de rango: 400
+
+$ curl -s -w '\nHTTP %{http_code}\n' 'http://localhost:3000/v1/cambios?limite=900' -H "Authorization: Bearer $CLAVE_AULA"
+{"type":"urn:reserva-cupos:problema:solicitud-invalida","title":"Solicitud inválida","status":400,"detail":"/query/limite: must be <= 500"}
+HTTP 400
+[código de salida: 0]
+
+## Tipo incorrecto en el cuerpo: 400
+
+$ curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/v1/actividades -H "Authorization: Bearer $CLAVE_AULA" -H 'Content-Type: application/json' -d '{"nombre":"Redes","capacidad":"diez"}'
+{"type":"urn:reserva-cupos:problema:solicitud-invalida","title":"Solicitud inválida","status":400,"detail":"/body/capacidad: must be integer"}
+HTTP 400
+[código de salida: 0]
+
+## Falta la Idempotency-Key obligatoria: 400
+
+$ curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/v1/actividades/01a1b841-50b5-76de-9a8d-2ea04aafc9d8/reservas -H "Authorization: Bearer $CLAVE_AULA" -H 'Content-Type: application/json' -d '{"participante":"ana"}'
+{"type":"urn:reserva-cupos:problema:solicitud-invalida","title":"Solicitud inválida","status":400,"detail":"/headers/idempotency-key: must have required property 'idempotency-key'"}
+HTTP 400
+[código de salida: 0]
+
+## Cuerpo que no es JSON: 415
+
+$ curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/v1/actividades -H "Authorization: Bearer $CLAVE_AULA" -H 'Content-Type: text/plain' -d 'nombre=Redes'
+{"type":"urn:reserva-cupos:problema:tipo-no-soportado","title":"El cuerpo debe ser application/json","status":415}
+HTTP 415
+[código de salida: 0]
+
+## Método que el contrato no define: 405 con Allow
+
+$ curl -s -i -X DELETE http://localhost:3000/v1/cambios -H "Authorization: Bearer $CLAVE_AULA" | tr -d '\r' | grep -E '^HTTP|^Allow|^\{'
+HTTP/1.1 405 Method Not Allowed
+Allow: GET
+{"type":"urn:reserva-cupos:problema:metodo-no-permitido","title":"Método no permitido","status":405}
+[código de salida: 0]
+
+## Ruta que el contrato no define: 404
+
+$ curl -s -w '\nHTTP %{http_code}\n' http://localhost:3000/v1/inscripciones -H "Authorization: Bearer $CLAVE_AULA"
+{"type":"about:blank","title":"Recurso no encontrado","status":404}
+HTTP 404
+[código de salida: 0]
+
+## Cada ruta implementada está en el contrato y viceversa (prueba de la API)
+
+$ cd servicios/api && npm test 2>&1 | grep -E '^(✔|✖|ℹ (tests|pass|fail))'
+✔ cada ruta de la API está en el contrato y viceversa (1.957814ms)
+✔ uuidv7 genera UUID versión 7 ordenados por tiempo (6.876672ms)
+✔ jsonCanonico no depende del orden de las claves (0.533624ms)
+✔ metadata acepta objetos de hasta 16 KB y rechaza el resto (4.209662ms)
+ℹ tests 4
+ℹ pass 4
+ℹ fail 0
+[código de salida: 0]

@@ -1,0 +1,72 @@
+# 11 · Cambios internos sin romper el contrato
+# Ejecución: 07/11/2026 20:40 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+Entre la Entrega 3 y esta cambió la implementación de la API (validador de contrato, cancelación), del worker (comando cancelar, fallida, validación de mensajes), del relay y del despliegue (gateway y varias instancias). El cliente de carga de la Entrega 3, escrito contra el contrato 1.0.0, no cambió y sigue obteniendo el mismo resultado, ahora con dos instancias de la API detrás de Traefik.
+
+$ git diff --stat v3-comunicacion -- servicios/api/src servicios/worker/src servicios/relay/src docker-compose.yml | tail -1
+ 11 files changed, 618 insertions(+), 119 deletions(-)
+[código de salida: 0]
+
+$ git diff --stat v3-comunicacion -- pruebas/carga; echo "(sin cambios en el cliente de carga)"
+(sin cambios en el cliente de carga)
+[código de salida: 0]
+
+$ docker compose up -d --scale api=2 --no-recreate api 2>&1 | grep -v Running; sleep 12; curl -s http://localhost:8080/api/http/services/api@docker | python3 -c 'import json,sys; d=json.load(sys.stdin); print("servicio api@docker:", d["status"]); [print(" ", url, "→", estado) for url, estado in sorted(d["serverStatus"].items())]'
+ Container reserva-cupos-infra-api-3  Creating
+ Container reserva-cupos-infra-api-3  Created
+ Container reserva-cupos-infra-mysql-primary-1  Waiting
+ Container reserva-cupos-infra-mysql-primary-1  Healthy
+ Container reserva-cupos-infra-api-3  Starting
+ Container reserva-cupos-infra-api-3  Started
+servicio api@docker: enabled
+  http://172.31.0.3:3000 → UP
+  http://172.31.0.6:3000 → UP
+[código de salida: 0]
+
+$ docker compose run --rm -T k6 run -q -e API_KEY=$CLAVE /pruebas/carga/rafaga.js
+time="2026-11-07T23:40:41Z" level=info msg="Actividad 01a1b862-c00f-78e3-bc1f-b2af5f4b4de1: 10 cupos, 500 solicitudes simultáneas" source=console
+time="2026-11-07T23:41:00Z" level=info msg="Resultado (sin pendientes tras 9.3 s de espera): confirmadas=10 rechazadas=490 pendientes=0 cupos_disponibles=0" source=console
+
+
+  █ THRESHOLDS 
+
+    checks
+    ✓ 'rate==1' rate=100.00%
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......................: 1004    53.104057/s
+    checks_succeeded...................: 100.00% 1004 out of 1004
+    checks_failed......................: 0.00%   0 out of 1004
+
+    ✓ admisión responde 202
+    ✓ admisión devuelve Location
+    ✓ 0 pendientes
+    ✓ exactamente 10 confirmadas
+    ✓ exactamente 490 rechazadas
+    ✓ cupos_disponibles = 0
+
+    HTTP
+    http_req_duration.......................................................: min=4.39ms   med=5.56s avg=5.09s p(95)=8.64s max=8.87s
+      { expected_response:true }............................................: min=4.39ms   med=5.56s avg=5.09s p(95)=8.64s max=8.87s
+    http_req_failed.........................................................: 0.00%  0 out of 558
+    http_reqs...............................................................: 558    29.514008/s
+
+    EXECUTION
+    iteration_duration......................................................: min=382.89ms med=6.13s avg=5.83s p(95)=8.84s max=9.1s 
+    iterations..............................................................: 500    26.446244/s
+    vus.....................................................................: 0      min=0        max=498
+    vus_max.................................................................: 500    min=500      max=500
+
+    NETWORK
+    data_received...........................................................: 1.2 MB 64 kB/s
+    data_sent...............................................................: 187 kB 9.9 kB/s
+
+
+
+[código de salida: 0]
+
+$ docker compose up -d --scale api=1 --no-recreate api 2>&1 | grep -E 'Removed|Stopped'; sleep 5
+[código de salida: 0]

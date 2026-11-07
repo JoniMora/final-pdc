@@ -1,0 +1,91 @@
+# 04 · Verificación del proveedor: la API real cumple el contrato (Schemathesis)
+# Ejecución: 07/11/2026 20:41 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+Schemathesis genera solicitudes a partir de contrato/openapi.yaml (casos de cobertura, fuzzing y secuencias con estado siguiendo los links) y verifica cada respuesta: códigos documentados, cabeceras, esquemas, que rechace lo inválido y acepte lo válido. Se ejecuta contra la API detrás de Traefik con un tenant propio, igual que en el CI. La configuración (pruebas/contrato/schemathesis.toml) declara las reglas de negocio documentadas que no son rechazos de datos (409, 422 y el cursor opaco).
+
+$ docker run --rm --network reserva-cupos-infra_publica -v "$PWD/contrato:/contrato:ro" -v "$PWD/pruebas/contrato:/config:ro" schemathesis/schemathesis:4.33.1 --config-file /config/schemathesis.toml run /contrato/openapi.yaml --url http://traefik -H "Authorization: Bearer $CLAVE_CONTRATO" --checks all --max-examples 25 --seed 2026 --generation-with-security-parameters false
+Schemathesis v4.33.1
+━━━━━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from /contrato/openapi.yaml (in 2.00s)
+
+     Base URL:         http://traefik
+     Specification:    Open API 3.1.0
+     Operations:       8 selected / 8 total
+     Configuration:    /config/schemathesis.toml
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✘
+     Accepts backslash and control characters in URL paths:    ✓
+
+ ⏭   Examples (in 0.03s)
+
+     ⏭  8 skipped
+
+ ✅  Coverage (in 7.28s)
+
+     ✅ 8 passed
+
+ ✅  Fuzzing (in 4.42s)
+
+     ✅ 8 passed
+
+ ✅  Stateful (in 4.27s)
+
+     Scenarios:    36
+     API Links:    13 covered / 33 selected / 33 total (27 inferred)
+
+     ✅ 36 passed
+
+=================================== WARNINGS ===================================
+
+Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
+
+  - POST /v1/reservas/{id}/cancelacion
+
+💡 Check the operations that create this data - their responses do not yield usable identifiers
+
+Schema validation mismatch: 1 operation mostly rejected generated data due to validation errors, indicating schema constraints don't match API validation
+
+  - GET /v1/actividades/{id}/reservas
+
+💡 Check your schema constraints - API validation may be stricter than documented
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 8/8
+  Tested: 8
+
+Test Phases:
+  ⏭  Examples
+  ✅ Coverage
+  ✅ Fuzzing
+  ✅ Stateful
+
+Warnings:
+  ⚠️ Missing test data: 1 operation repeatedly returned 404 responses
+  ⚠️ Schema validation mismatch: 1 operation mostly rejected generated data
+
+_______________________________ Schema Coverage ________________________________
+
+Operations            8/8    100.0%
+Parameters           15/15   100.0%
+Keywords             53/53   100.0%
+Examples              3/3    100.0%
+Responses            33/46    71.7%
+Response Keywords   318/460   69.1%
+
+HTML report         ./schema-coverage.html
+
+Test cases:
+  635 generated, 635 passed
+
+Seed: 2026
+
+============================= 2 warnings in 16.39s =============================
+[código de salida: 0]
+
+Avisos esperables: la fase con estado repite valores cortos de Idempotency-Key y la API responde 422 (clave reutilizada con otro cuerpo, regla documentada), por eso pocas veces obtiene una reserva real para consultar o cancelar; ese recorrido se demuestra en 08. El listado rechaza cursores inventados porque el cursor es opaco.

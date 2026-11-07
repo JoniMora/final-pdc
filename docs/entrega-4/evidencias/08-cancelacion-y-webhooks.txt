@@ -1,0 +1,123 @@
+# 08 · Cancelación asíncrona y webhooks firmados de punta a punta (Aula ↔ servicio)
+# Ejecución: 07/11/2026 20:40 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+Aula (http://localhost:3001) es el cliente: llama a la API por el gateway con su cliente derivado del contrato y recibe los webhooks en /webhooks/reservas.
+
+## Aula crea una materia de 2 cupos
+
+$ curl -s -X POST http://localhost:3001/materias -H 'Content-Type: application/json' -d '{"nombre":"Middleware y componentes","cupo":2}'
+{"id":"01a1b862-35a4-7daa-8185-cd3b645812d3","nombre":"Middleware y componentes","capacidad":2,"cupos_disponibles":2,"estado":"abierta","version":1,"metadata":{"origen":"aula","tipo":"materia"},"creado_en":"2026-11-07T23:40:06.436Z"}
+[código de salida: 0]
+
+## Tres alumnos se inscriben (2 cupos): cada admisión responde 202
+
+$ curl -s -X POST http://localhost:3001/materias/01a1b862-35a4-7daa-8185-cd3b645812d3/inscripciones -H 'Content-Type: application/json' -H 'Idempotency-Key: e4-ana' -d '{"alumno":"ana"}' -w '\nHTTP %{http_code}\n'
+{"id":"01a1b862-366f-7af9-b9dc-05cb81fbbbf9","actividad_id":"01a1b862-35a4-7daa-8185-cd3b645812d3","participante":"ana","estado":"pendiente","version":1,"metadata":null,"creado_en":"2026-11-07T23:40:06.639Z"}
+HTTP 202
+[código de salida: 0]
+
+$ curl -s -X POST http://localhost:3001/materias/01a1b862-35a4-7daa-8185-cd3b645812d3/inscripciones -H 'Content-Type: application/json' -H 'Idempotency-Key: e4-beto' -d '{"alumno":"beto"}' -w '\nHTTP %{http_code}\n'
+{"id":"01a1b862-3b17-7193-ba3b-52dffa965c42","actividad_id":"01a1b862-35a4-7daa-8185-cd3b645812d3","participante":"beto","estado":"pendiente","version":1,"metadata":null,"creado_en":"2026-11-07T23:40:07.831Z"}
+HTTP 202
+[código de salida: 0]
+
+$ curl -s -X POST http://localhost:3001/materias/01a1b862-35a4-7daa-8185-cd3b645812d3/inscripciones -H 'Content-Type: application/json' -H 'Idempotency-Key: e4-caro' -d '{"alumno":"caro"}' -w '\nHTTP %{http_code}\n'
+{"id":"01a1b862-3f8e-7a31-aca0-960038ef15df","actividad_id":"01a1b862-35a4-7daa-8185-cd3b645812d3","participante":"caro","estado":"pendiente","version":1,"metadata":null,"creado_en":"2026-11-07T23:40:08.974Z"}
+HTTP 202
+[código de salida: 0]
+
+## El worker decide y el notificador entrega un webhook firmado por cada decisión
+
+$ docker compose logs worker notificador aula 2>&1 | grep -E 'reservar|webhook-|Webhook'
+reserva-cupos-infra-aula-1         | [AULA] Webhook 3: reserva.confirmada v2 aplicado
+reserva-cupos-infra-aula-1         | [AULA] Webhook 6: reserva.confirmada v2 aplicado
+reserva-cupos-infra-aula-1         | [AULA] Webhook 9: reserva.rechazada v2 aplicado
+reserva-cupos-infra-notificador-1  | [notificador] webhook-3: reserva.confirmada entregado a aula:3001 (204)
+reserva-cupos-infra-notificador-1  | [notificador] webhook-6: reserva.confirmada entregado a aula:3001 (204)
+reserva-cupos-infra-notificador-1  | [notificador] webhook-9: reserva.rechazada entregado a aula:3001 (204)
+reserva-cupos-infra-worker-1       | [WORKER] reservar 01a1b862-366f-7af9-b9dc-05cb81fbbbf9 (actividad 01a1b862-35a4-7daa-8185-cd3b645812d3): confirmada
+reserva-cupos-infra-worker-1       | [WORKER] reservar 01a1b862-3b17-7193-ba3b-52dffa965c42 (actividad 01a1b862-35a4-7daa-8185-cd3b645812d3): confirmada
+reserva-cupos-infra-worker-1       | [WORKER] reservar 01a1b862-3f8e-7a31-aca0-960038ef15df (actividad 01a1b862-35a4-7daa-8185-cd3b645812d3): rechazada
+[código de salida: 0]
+
+## Aula muestra los inscriptos según la API y según su propia base, actualizada por los webhooks
+
+$ curl -s http://localhost:3001/materias/01a1b862-35a4-7daa-8185-cd3b645812d3 | python3 -c 'import json,sys; d=json.load(sys.stdin); print("cupos:", d["cupos_disponibles"], "de", d["capacidad"]); print("según la API:", sorted(r["participante"] for r in d["inscriptos"])); print("según la base de Aula:", d["inscriptos_locales"])'
+cupos: 0 de 2
+según la API: ['ana', 'beto']
+según la base de Aula: ['ana', 'beto']
+[código de salida: 0]
+
+## Ana cancela: 202 con Location; el worker devuelve el cupo
+
+$ curl -s -i -X POST http://localhost:3001/inscripciones/01a1b862-366f-7af9-b9dc-05cb81fbbbf9/cancelacion | tr -d '\r' | grep -E '^HTTP|^Location|^Retry-After|^\{'
+HTTP/1.1 202 Accepted
+Location: /v1/reservas/01a1b862-366f-7af9-b9dc-05cb81fbbbf9
+Retry-After: 1
+{"id":"01a1b862-366f-7af9-b9dc-05cb81fbbbf9","actividad_id":"01a1b862-35a4-7daa-8185-cd3b645812d3","participante":"ana","estado":"confirmada","version":2,"metadata":null,"creado_en":"2026-11-07T23:40:06.639Z"}
+[código de salida: 0]
+
+$ curl -s -w '\nHTTP %{http_code}\n' http://localhost:3001/inscripciones/01a1b862-366f-7af9-b9dc-05cb81fbbbf9
+{"id":"01a1b862-366f-7af9-b9dc-05cb81fbbbf9","actividad_id":"01a1b862-35a4-7daa-8185-cd3b645812d3","participante":"ana","estado":"cancelada","version":3,"metadata":null,"creado_en":"2026-11-07T23:40:06.639Z"}
+HTTP 200
+[código de salida: 0]
+
+$ docker compose logs worker notificador aula 2>&1 | grep -E 'cancel'
+reserva-cupos-infra-aula-1  | [AULA] Webhook 11: reserva.cancelada v3 aplicado
+reserva-cupos-infra-worker-1  | [WORKER] cancelar 01a1b862-366f-7af9-b9dc-05cb81fbbbf9 (actividad 01a1b862-35a4-7daa-8185-cd3b645812d3): cancelada, cupo devuelto
+reserva-cupos-infra-notificador-1  | [notificador] webhook-11: reserva.cancelada entregado a aula:3001 (204)
+[código de salida: 0]
+
+$ curl -s http://localhost:3001/materias/01a1b862-35a4-7daa-8185-cd3b645812d3 | python3 -c 'import json,sys; d=json.load(sys.stdin); print("cupos:", d["cupos_disponibles"], "de", d["capacidad"]); print("según la API:", sorted(r["participante"] for r in d["inscriptos"])); print("según la base de Aula:", d["inscriptos_locales"])'
+cupos: 1 de 2
+según la API: ['beto']
+según la base de Aula: ['beto']
+[código de salida: 0]
+
+## Repetir la cancelación no genera otro comando: 200 con la reserva cancelada
+
+$ curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/v1/reservas/01a1b862-366f-7af9-b9dc-05cb81fbbbf9/cancelacion -H "Authorization: Bearer $CLAVE_AULA"
+{"id":"01a1b862-366f-7af9-b9dc-05cb81fbbbf9","actividad_id":"01a1b862-35a4-7daa-8185-cd3b645812d3","participante":"ana","estado":"cancelada","version":3,"metadata":null,"creado_en":"2026-11-07T23:40:06.639Z"}
+HTTP 200
+[código de salida: 0]
+
+## Una reserva rechazada no se puede cancelar: 409
+
+$ curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/v1/reservas/01a1b862-3f8e-7a31-aca0-960038ef15df/cancelacion -H "Authorization: Bearer $CLAVE_AULA"
+{"type":"urn:reserva-cupos:problema:reserva-no-cancelable","title":"La reserva no se puede cancelar","status":409,"detail":"La reserva está rechazada: no tiene un cupo asignado que devolver"}
+HTTP 409
+[código de salida: 0]
+
+## El feed tiene los cambios de estado, no el pedido interno de cancelación
+
+$ curl -s 'http://localhost:3000/v1/cambios?desde=0' -H "Authorization: Bearer $CLAVE_AULA" | python3 -c 'import json,sys; [print(c["secuencia"], c["tipo"], c["entidad"].get("participante", c["entidad"].get("nombre")), "v" + str(c["entidad"]["version"])) for c in json.load(sys.stdin)["datos"]]'
+1 actividad.creada Middleware y componentes v1
+2 reserva.solicitada ana v1
+3 reserva.confirmada ana v2
+4 actividad.actualizada Middleware y componentes v2
+5 reserva.solicitada beto v1
+6 reserva.confirmada beto v2
+7 actividad.actualizada Middleware y componentes v3
+8 reserva.solicitada caro v1
+9 reserva.rechazada caro v2
+11 reserva.cancelada ana v3
+12 actividad.actualizada Middleware y componentes v4
+[código de salida: 0]
+
+## Base propia de Aula (PostgreSQL): proyección y última secuencia recibida por webhook
+
+$ docker compose exec -T aula-db psql -U aula_admin -d aula -c 'SELECT alumno, estado, version FROM inscripciones ORDER BY alumno' -c 'SELECT ultima_secuencia_webhook FROM punto_control'
+ alumno |   estado   | version 
+--------+------------+---------
+ ana    | cancelada  |       3
+ beto   | confirmada |       2
+ caro   | rechazada  |       2
+(3 rows)
+
+ ultima_secuencia_webhook 
+--------------------------
+                       11
+(1 row)
+
+[código de salida: 0]

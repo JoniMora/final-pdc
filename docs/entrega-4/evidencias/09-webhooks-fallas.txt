@@ -1,0 +1,130 @@
+# 09 · Webhooks ante fallas: firma, SSRF, reintentos escalonados y DLQ
+# Ejecución: 07/11/2026 20:41 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+## El receptor de Aula: firma inválida con marca de tiempo vigente → 401
+
+$ curl -s -o /dev/null -w 'HTTP %{http_code}\n' -X POST http://localhost:3001/webhooks/reservas -H 'Content-Type: application/json' -H 'X-Webhook-Id: manual' -H "X-Firma: t=$(date +%s),v1=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" -d '{"secuencia":2,"tipo":"reserva.confirmada","ocurrido_en":"2026-11-07T12:00:00.000Z","entidad":{"id":"01a1b862-366f-7af9-b9dc-05cb81fbbbf9","actividad_id":"01a1b862-35a4-7daa-8185-cd3b645812d3","participante":"ana","estado":"confirmada","version":2,"metadata":null,"creado_en":"2026-11-07T12:00:00.000Z"}}'; docker compose logs aula 2>&1 | grep 'rechazado' | tail -1
+HTTP 401
+reserva-cupos-infra-aula-1  | [AULA] Webhook manual rechazado: Firma inválida
+[código de salida: 0]
+
+## Firma correcta pero de hace 10 minutos (reinyección) → 401
+
+$ T=$(($(date +%s) - 600)); B='{"secuencia":2,"tipo":"reserva.confirmada","ocurrido_en":"2026-11-07T12:00:00.000Z","entidad":{"id":"01a1b862-366f-7af9-b9dc-05cb81fbbbf9","actividad_id":"01a1b862-35a4-7daa-8185-cd3b645812d3","participante":"ana","estado":"confirmada","version":2,"metadata":null,"creado_en":"2026-11-07T12:00:00.000Z"}}'; F=$(printf '%s' "$T.$B" | openssl dgst -sha256 -mac HMAC -macopt hexkey:$SECRETO | awk '{print $NF}'); curl -s -o /dev/null -w 'HTTP %{http_code}\n' -X POST http://localhost:3001/webhooks/reservas -H 'Content-Type: application/json' -H 'X-Webhook-Id: manual' -H "X-Firma: t=$T,v1=$F" -d "$B"; docker compose logs aula 2>&1 | grep 'rechazado' | tail -1
+HTTP 401
+reserva-cupos-infra-aula-1  | [AULA] Webhook manual rechazado: Marca de tiempo fuera de la ventana de 5 minutos
+[código de salida: 0]
+
+## Firma correcta y vigente de un evento ya aplicado (versión 2 < 3) → 204 sin cambios
+
+$ T=$(date +%s); B='{"secuencia":2,"tipo":"reserva.confirmada","ocurrido_en":"2026-11-07T12:00:00.000Z","entidad":{"id":"01a1b862-366f-7af9-b9dc-05cb81fbbbf9","actividad_id":"01a1b862-35a4-7daa-8185-cd3b645812d3","participante":"ana","estado":"confirmada","version":2,"metadata":null,"creado_en":"2026-11-07T12:00:00.000Z"}}'; F=$(printf '%s' "$T.$B" | openssl dgst -sha256 -mac HMAC -macopt hexkey:$SECRETO | awk '{print $NF}'); curl -s -o /dev/null -w 'HTTP %{http_code}\n' -X POST http://localhost:3001/webhooks/reservas -H 'Content-Type: application/json' -H 'X-Webhook-Id: manual' -H "X-Firma: t=$T,v1=$F" -d "$B"; docker compose logs aula 2>&1 | grep 'Webhook manual' | tail -1
+HTTP 204
+reserva-cupos-infra-aula-1  | [AULA] Webhook manual: reserva.confirmada v2 repetido o atrasado, sin cambios
+[código de salida: 0]
+
+## SSRF: tenants que registran como webhook una base interna y la dirección de metadatos de una nube
+
+$ docker compose exec -T mysql-primary mysql -uroot -proot_local_2026 reservas -e "UPDATE tenants SET webhook_url = 'http://mysql-primary:3306/', webhook_secret = RANDOM_BYTES(32) WHERE nombre = 'Atacante interno'; UPDATE tenants SET webhook_url = 'http://169.254.169.254/latest/meta-data/', webhook_secret = RANDOM_BYTES(32) WHERE nombre = 'Atacante metadatos'; SELECT nombre, webhook_url FROM tenants WHERE nombre LIKE 'Atacante%'"
+mysql: [Warning] Using a password on the command line interface can be insecure.
+nombre	webhook_url
+Atacante interno	http://mysql-primary:3306/
+Atacante metadatos	http://169.254.169.254/latest/meta-data/
+[código de salida: 0]
+
+$ ACT=$(curl -s -X POST http://localhost:3000/v1/actividades -H "Authorization: Bearer $CLAVE_A" -H 'Content-Type: application/json' -d '{"nombre":"Señuelo","capacidad":1}' | python3 -c 'import json,sys;print(json.load(sys.stdin)["id"])'); curl -s -o /dev/null -w 'reserva: HTTP %{http_code}\n' -X POST http://localhost:3000/v1/actividades/$ACT/reservas -H "Authorization: Bearer $CLAVE_A" -H 'Content-Type: application/json' -H 'Idempotency-Key: senuelo' -d '{"participante":"x"}'
+reserva: HTTP 202
+[código de salida: 0]
+
+$ ACT=$(curl -s -X POST http://localhost:3000/v1/actividades -H "Authorization: Bearer $CLAVE_B" -H 'Content-Type: application/json' -d '{"nombre":"Señuelo","capacidad":1}' | python3 -c 'import json,sys;print(json.load(sys.stdin)["id"])'); curl -s -o /dev/null -w 'reserva: HTTP %{http_code}\n' -X POST http://localhost:3000/v1/actividades/$ACT/reservas -H "Authorization: Bearer $CLAVE_B" -H 'Content-Type: application/json' -H 'Idempotency-Key: senuelo' -d '{"participante":"x"}'
+reserva: HTTP 202
+[código de salida: 0]
+
+$ docker compose logs notificador 2>&1 | grep 'destino rechazado'
+reserva-cupos-infra-notificador-1  | [notificador] webhook-1134: destino rechazado, a webhooks.dlq: mysql-primary resuelve a una dirección interna (172.30.0.2)
+reserva-cupos-infra-notificador-1  | [notificador] webhook-1136: destino rechazado, a webhooks.dlq: Dirección interna no permitida: 169.254.169.254
+[código de salida: 0]
+
+$ docker compose exec -T rabbitmq rabbitmqctl list_queues -q name messages | grep -E 'dlq|espera|entregas|comandos'
+webhooks.entregas	0
+webhooks.espera.1m	0
+reservas.comandos.0	0
+webhooks.espera.10s	0
+reservas.dlq	1
+webhooks.espera.5m	0
+webhooks.dlq	3
+[código de salida: 0]
+
+## Reintentos escalonados: Aula se detiene y una decisión no se puede entregar
+
+$ docker compose stop aula
+ Container reserva-cupos-infra-aula-1  Stopping
+ Container reserva-cupos-infra-aula-1  Stopped
+[código de salida: 0]
+
+$ ACT=$(curl -s -X POST http://localhost:3000/v1/actividades -H "Authorization: Bearer $CLAVE_AULA" -H 'Content-Type: application/json' -d '{"nombre":"Aula caída","capacidad":1}' | python3 -c 'import json,sys;print(json.load(sys.stdin)["id"])'); curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/v1/actividades/$ACT/reservas -H "Authorization: Bearer $CLAVE_AULA" -H 'Content-Type: application/json' -H 'Idempotency-Key: aula-caida' -d '{"participante":"dani"}'
+{"id":"01a1b863-a479-7cd6-8cc3-a864b547733c","actividad_id":"01a1b863-a41e-78db-9130-0312af1c6958","participante":"dani","estado":"pendiente","version":1,"metadata":null,"creado_en":"2026-11-07T23:41:40.345Z"}
+HTTP 202
+[código de salida: 0]
+
+$ docker compose logs notificador 2>&1 | grep 'Reintento'; docker compose exec -T rabbitmq rabbitmqctl list_queues -q name messages | grep -E 'dlq|espera|entregas|comandos'
+reserva-cupos-infra-notificador-1  | [notificador] webhook-1140: ENOTFOUND. Reintento 1 en webhooks.espera.10s
+webhooks.entregas	0
+webhooks.espera.1m	0
+reservas.comandos.0	0
+webhooks.espera.10s	1
+reservas.dlq	1
+webhooks.espera.5m	0
+webhooks.dlq	3
+[código de salida: 0]
+
+A los 10 s vuelve a webhooks.entregas, falla y pasa a la espera de 1 min; luego a la de 5 min.
+
+$ docker compose logs notificador 2>&1 | grep 'Reintento'; docker compose exec -T rabbitmq rabbitmqctl list_queues -q name messages | grep -E 'dlq|espera|entregas|comandos'
+reserva-cupos-infra-notificador-1  | [notificador] webhook-1140: ENOTFOUND. Reintento 1 en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] webhook-1140: ENOTFOUND. Reintento 2 en webhooks.espera.1m
+reserva-cupos-infra-notificador-1  | [notificador] webhook-1140: ENOTFOUND. Reintento 3 en webhooks.espera.5m
+webhooks.entregas	0
+webhooks.espera.1m	0
+reservas.comandos.0	0
+webhooks.espera.10s	0
+reservas.dlq	1
+webhooks.espera.5m	1
+webhooks.dlq	3
+[código de salida: 0]
+
+## Agotados los tres reintentos (10 s, 1 min y 5 min), la entrega queda en webhooks.dlq
+
+$ docker compose logs notificador 2>&1 | grep -E 'Reintento|Sin más reintentos'; docker compose exec -T rabbitmq rabbitmqctl list_queues -q name messages | grep -E 'dlq|espera|entregas|comandos'
+reserva-cupos-infra-notificador-1  | [notificador] webhook-1140: ENOTFOUND. Reintento 1 en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] webhook-1140: ENOTFOUND. Reintento 2 en webhooks.espera.1m
+reserva-cupos-infra-notificador-1  | [notificador] webhook-1140: ENOTFOUND. Reintento 3 en webhooks.espera.5m
+reserva-cupos-infra-notificador-1  | [notificador] webhook-1140: ENOTFOUND. Sin más reintentos, a webhooks.dlq
+webhooks.entregas	0
+webhooks.espera.1m	0
+reservas.comandos.0	0
+webhooks.espera.10s	0
+reservas.dlq	1
+webhooks.espera.5m	0
+webhooks.dlq	4
+[código de salida: 0]
+
+## La DLQ no implica pérdida: el evento sigue en el feed
+
+$ docker compose start aula && sleep 5
+ Container reserva-cupos-infra-mysql-primary-1  Waiting
+ Container reserva-cupos-infra-mysql-primary-1  Healthy
+ Container reserva-cupos-infra-aula-db-1  Waiting
+ Container reserva-cupos-infra-api-3  Waiting
+ Container reserva-cupos-infra-traefik-1  Waiting
+ Container reserva-cupos-infra-aula-db-1  Healthy
+ Container reserva-cupos-infra-traefik-1  Healthy
+ Container reserva-cupos-infra-api-3  Healthy
+ Container reserva-cupos-infra-aula-1  Starting
+ Container reserva-cupos-infra-aula-1  Started
+[código de salida: 0]
+
+$ curl -s 'http://localhost:3000/v1/cambios?desde=0&limite=500' -H "Authorization: Bearer $CLAVE_AULA" | python3 -c 'import json,sys; [print(c["secuencia"], c["tipo"], c["entidad"]["participante"], "v" + str(c["entidad"]["version"])) for c in json.load(sys.stdin)["datos"] if c["entidad"].get("participante") == "dani"]'
+1139 reserva.solicitada dani v1
+1140 reserva.confirmada dani v2
+[código de salida: 0]

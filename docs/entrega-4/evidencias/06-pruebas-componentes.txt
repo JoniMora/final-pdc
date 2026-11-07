@@ -1,0 +1,89 @@
+# 06 · Pruebas de cada componente contra los contratos (node:test)
+# Ejecución: 07/11/2026 20:39 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+## compartido
+
+$ cd compartido && npm test 2>&1 | grep -E '^(✔|✖|﹣|ℹ (tests|pass|fail|skipped))'
+✔ un comando reservar válido cumple el contrato de mensajería (60.634792ms)
+✔ un comando sin reserva_id o con campos de más se rechaza (30.041907ms)
+✔ la entrega de webhook reutiliza el evento definido en openapi.yaml (23.565235ms)
+✔ las rutas se arman desde las plantillas del contrato (20.341153ms)
+✔ una respuesta que no cumple el esquema documentado se detecta (20.534013ms)
+✔ el evento de webhook se valida como esquema del contrato (20.398265ms)
+ℹ tests 6
+ℹ pass 6
+ℹ fail 0
+ℹ skipped 0
+[código de salida: 0]
+
+## servicios/api
+
+$ cd servicios/api && npm test 2>&1 | grep -E '^(✔|✖|﹣|ℹ (tests|pass|fail|skipped))'
+✔ cada ruta de la API está en el contrato y viceversa (1.734355ms)
+✔ uuidv7 genera UUID versión 7 ordenados por tiempo (6.300917ms)
+✔ jsonCanonico no depende del orden de las claves (0.554277ms)
+✔ metadata acepta objetos de hasta 16 KB y rechaza el resto (2.01061ms)
+ℹ tests 4
+ℹ pass 4
+ℹ fail 0
+ℹ skipped 0
+[código de salida: 0]
+
+## servicios/worker
+
+$ cd servicios/worker && npm test 2>&1 | grep -E '^(✔|✖|﹣|ℹ (tests|pass|fail|skipped))'
+✔ un comando válido se ejecuta y se confirma (5.79314ms)
+✔ un mensaje fuera de contrato va a la DLQ sin ejecutarse (0.463979ms)
+✔ un error de infraestructura reencola sin consumir reintentos (0.468709ms)
+✔ una reserva inexistente va a la DLQ sin reintentos (0.368843ms)
+✔ agotados los reintentos, un reservar deja la reserva fallida (0.413611ms)
+✔ agotados los reintentos, un cancelar va a la DLQ y no se marca fallida (2.986931ms)
+ℹ tests 6
+ℹ pass 6
+ℹ fail 0
+ℹ skipped 0
+[código de salida: 0]
+
+## servicios/relay
+
+$ cd servicios/relay && npm test 2>&1 | grep -E '^(✔|✖|﹣|ℹ (tests|pass|fail|skipped))'
+✔ los pedidos del outbox se convierten en comandos que cumplen el contrato (8.358871ms)
+✔ las decisiones del worker se convierten en entregas de webhook válidas (9.365333ms)
+✔ un cambio que no es una decisión sobre una reserva no cumple el contrato de webhook (0.434887ms)
+ℹ tests 3
+ℹ pass 3
+ℹ fail 0
+ℹ skipped 0
+[código de salida: 0]
+
+## servicios/notificador
+
+$ cd servicios/notificador && npm test 2>&1 | grep -E '^(✔|✖|﹣|ℹ (tests|pass|fail|skipped))'
+✔ las direcciones privadas, de loopback y link-local se reconocen como internas (10.908172ms)
+✔ se rechazan URLs con otro protocolo, credenciales o IP interna literal (2.531038ms)
+✔ un nombre que resuelve a una IP interna se rechaza al conectar, salvo que esté permitido (0.537653ms)
+✔ el webhook firmado cumple el contrato y el receptor lo acepta (31.848716ms)
+✔ una firma vieja o con otro secreto se rechaza (5.666847ms)
+✔ la firma tiene el formato que define el contrato (0.480704ms)
+ℹ tests 6
+ℹ pass 6
+ℹ fail 0
+ℹ skipped 0
+[código de salida: 0]
+
+## clientes/aula
+
+$ cd clientes/aula && npm test 2>&1 | grep -E '^(✔|✖|﹣|ℹ (tests|pass|fail|skipped))'
+﹣ crear una materia usa crearActividad según el contrato (0.945205ms) # PRISM_URL no definida: requiere el mock de Prism
+﹣ consultar una materia y sus inscriptos (0.128033ms) # PRISM_URL no definida: requiere el mock de Prism
+﹣ inscribirse con Idempotency-Key y consultar el resultado (0.106202ms) # PRISM_URL no definida: requiere el mock de Prism
+﹣ cancelar una inscripción (0.107329ms) # PRISM_URL no definida: requiere el mock de Prism
+﹣ el mock rechaza una solicitud fuera de contrato antes de que llegue a una API real (0.112648ms) # PRISM_URL no definida: requiere el mock de Prism
+✔ un evento firmado según el contrato se acepta y cumple el esquema (8.728246ms)
+✔ se rechazan la firma de otro secreto, el cuerpo alterado y la reinyección (0.594897ms)
+ℹ tests 7
+ℹ pass 2
+ℹ fail 0
+ℹ skipped 5
+[código de salida: 0]

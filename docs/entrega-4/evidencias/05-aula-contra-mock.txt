@@ -1,0 +1,35 @@
+# 05 · Verificación del consumidor: Aula contra un mock generado del contrato (Prism)
+# Ejecución: 07/11/2026 20:39 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+Aula usa la API solo a través de contrato/openapi.yaml: su cliente arma cada llamada por operationId y valida cada respuesta. Acá se prueba contra un mock de Prism generado del mismo contrato, sin la API real. Prism responde 422 con la cabecera sl-violations a cualquier solicitud que no cumpla el contrato.
+
+$ docker run -d --name prism-mock -p 4010:4010 -v "$PWD/contrato:/contrato:ro" stoplight/prism:5 mock -d -m false -h 0.0.0.0 /contrato/openapi.yaml && sleep 6
+5cc540f0e6e3f37a18c1cf8b2f531fed285f3c826f27bcd0be05a09bfab4b91f
+[código de salida: 0]
+
+$ cd clientes/aula && PRISM_URL=http://localhost:4010 npm test
+
+> reserva-cupos-aula@0.2.0 test
+> node --test
+
+✔ crear una materia usa crearActividad según el contrato (228.176585ms)
+✔ consultar una materia y sus inscriptos (84.419331ms)
+✔ inscribirse con Idempotency-Key y consultar el resultado (48.514834ms)
+✔ cancelar una inscripción (19.891251ms)
+✔ el mock rechaza una solicitud fuera de contrato antes de que llegue a una API real (16.891785ms)
+✔ un evento firmado según el contrato se acepta y cumple el esquema (21.491117ms)
+✔ se rechazan la firma de otro secreto, el cuerpo alterado y la reinyección (0.877666ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 765.339027
+[código de salida: 0]
+
+$ docker rm -f prism-mock
+prism-mock
+[código de salida: 0]

@@ -1,0 +1,45 @@
+# 10 · Mensajes que no cumplen el contrato de mensajería
+# Ejecución: 07/11/2026 20:40 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+Se publica a mano en RabbitMQ (API de administración, puerto 15672 del host) un comando y una entrega de webhook que no cumplen contrato/asyncapi.yaml. El worker y el notificador los validan antes de procesarlos y los derivan a la DLQ sin reintentos.
+
+$ docker compose exec -T rabbitmq rabbitmqctl list_queues -q name messages | grep -E 'dlq|espera|entregas|comandos'
+webhooks.entregas	0
+webhooks.espera.1m	0
+reservas.comandos.0	0
+webhooks.espera.10s	0
+reservas.dlq	0
+webhooks.espera.5m	0
+webhooks.dlq	0
+[código de salida: 0]
+
+## Un comando reservar sin reserva_id ni actividad_id
+
+$ curl -s -u demo:demo_local_2026 -H 'Content-Type: application/json' -X POST http://localhost:15672/api/exchanges/%2F/amq.default/publish -d '{"routing_key":"reservas.comandos.0","payload":"{\"comando\":\"reservar\",\"tenant_id\":\"01a1542d-7ee2-7d8b-b3b3-40474b8dec7e\"}","payload_encoding":"string","properties":{"message_id":"manual-1"}}'; echo; sleep 2
+{"routed":true}
+[código de salida: 0]
+
+$ docker compose logs worker 2>&1 | grep DLQ
+reserva-cupos-infra-worker-1  | [WORKER] Comando a la DLQ: El mensaje ComandoReservar no cumple el contrato: / must have required property 'reserva_id'; / must have required property 'actividad_id'
+[código de salida: 0]
+
+## Una entrega de webhook con un tipo que el contrato no admite
+
+$ curl -s -u demo:demo_local_2026 -H 'Content-Type: application/json' -X POST http://localhost:15672/api/exchanges/%2F/amq.default/publish -d '{"routing_key":"webhooks.entregas","payload":"{\"cambio_id\":1,\"tenant_id\":\"01a1542d-7ee2-7d8b-b3b3-40474b8dec7e\",\"evento\":{\"secuencia\":1,\"tipo\":\"reserva.borrada\"}}","payload_encoding":"string","properties":{"message_id":"manual-2"}}'; echo; sleep 2
+{"routed":true}
+[código de salida: 0]
+
+$ docker compose logs notificador 2>&1 | grep 'fuera de contrato'
+reserva-cupos-infra-notificador-1  | [notificador] manual-2: fuera de contrato, a webhooks.dlq: El mensaje EntregaWebhook no cumple el contrato: /evento must have required property 'ocurrido_en'; /evento must have required property 'entidad'; /evento/tipo must be equal to one of the allowed values
+[código de salida: 0]
+
+$ docker compose exec -T rabbitmq rabbitmqctl list_queues -q name messages | grep -E 'dlq|espera|entregas|comandos'
+webhooks.entregas	0
+webhooks.espera.1m	0
+reservas.comandos.0	0
+webhooks.espera.10s	0
+reservas.dlq	1
+webhooks.espera.5m	0
+webhooks.dlq	1
+[código de salida: 0]
