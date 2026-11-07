@@ -1,0 +1,304 @@
+asyncapi: 3.0.0
+
+info:
+  title: Mensajería interna del servicio de reserva de cupos
+  version: 1.0.0
+  description: |
+    Contrato de los mensajes que viajan por RabbitMQ entre los componentes
+    internos del servicio. Es el complemento de `openapi.yaml`: allí está la
+    interfaz HTTP con los tenants; acá, la interfaz asíncrona entre el relay,
+    el worker y el notificador.
+
+    Reglas comunes:
+
+    - Solo el **relay** publica comandos y entregas de webhook, y lo hace desde
+      el outbox (tabla `cambios`) con *publisher confirms*. La entrega es
+      al-menos-una-vez: todos los consumidores son idempotentes.
+    - Cada mensaje viaja con las propiedades AMQP `messageId` (identificador
+      estable, se repite en las republicaciones), `type` (nombre del mensaje)
+      y `contentType: application/json`.
+    - Productores y consumidores validan cada mensaje contra estos esquemas.
+      Un mensaje que no cumple el contrato va a la cola de mensajes fallidos
+      (DLQ) y no se reintenta.
+    - Las entidades (`Reserva`, `Actividad`) y el evento de webhook se toman
+      de `openapi.yaml`: hay una sola definición de cada una.
+
+    Versionado: semántico sobre este documento, con los cambios registrados en
+    `CHANGELOG.md`.
+
+defaultContentType: application/json
+
+servers:
+  local:
+    host: rabbitmq:5672
+    protocol: amqp
+    protocolVersion: 0.9.1
+    description: RabbitMQ en la red `interna` de Docker Compose. No se expone al host.
+
+channels:
+  comandos:
+    address: reservas.comandos
+    title: Exchange de comandos
+    description: |
+      Exchange de tipo `x-consistent-hash`. La routing key es el
+      `actividad_id`, así todos los comandos de una actividad llegan a la
+      misma partición y se procesan en orden.
+    messages:
+      reservar:
+        $ref: "#/components/messages/ComandoReservar"
+      cancelar:
+        $ref: "#/components/messages/ComandoCancelar"
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: reservas.comandos
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+
+  particionComandos:
+    address: reservas.comandos.{particion}
+    title: Partición de comandos
+    description: |
+      Cola durable de una partición. Hoy existe la partición `0`; el
+      particionado en N colas se mide en la Entrega 6. Si un comando no se
+      puede procesar, se deriva a `reservas.dlq`.
+    parameters:
+      particion:
+        description: Número de partición.
+        examples: ["0"]
+    messages:
+      reservar:
+        $ref: "#/components/messages/ComandoReservar"
+      cancelar:
+        $ref: "#/components/messages/ComandoCancelar"
+    bindings:
+      amqp:
+        is: queue
+        queue:
+          name: reservas.comandos.0
+          durable: true
+          exclusive: false
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+
+  eventosWebhook:
+    address: webhooks.eventos
+    title: Exchange de entregas de webhook
+    description: Exchange `direct`; las entregas usan la routing key `entrega`.
+    messages:
+      entrega:
+        $ref: "#/components/messages/EntregaWebhook"
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: webhooks.eventos
+          type: direct
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+
+  entregasWebhook:
+    address: webhooks.entregas
+    title: Cola de entregas de webhook
+    description: Cola durable que consume el notificador. Si se agotan los reintentos, el mensaje va a `webhooks.dlq`.
+    messages:
+      entrega:
+        $ref: "#/components/messages/EntregaWebhook"
+    bindings:
+      amqp:
+        is: queue
+        queue:
+          name: webhooks.entregas
+          durable: true
+          exclusive: false
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+
+  esperaWebhook:
+    address: webhooks.espera.{espera}
+    title: Colas de espera de los reintentos
+    description: |
+      Colas con TTL. Al vencer, el mensaje vuelve a `webhooks.entregas` por
+      *dead-lettering*. El notificador elige la espera según el intento:
+      10 s, 1 min y 5 min.
+    parameters:
+      espera:
+        enum: ["10s", "1m", "5m"]
+    messages:
+      entrega:
+        $ref: "#/components/messages/EntregaWebhook"
+
+operations:
+  enviarComando:
+    action: send
+    channel:
+      $ref: "#/channels/comandos"
+    title: El relay publica un comando
+    description: |
+      Comandos que nacen del outbox (`reserva.solicitada` → `reservar`,
+      `reserva.cancelacion_solicitada` → `cancelar`) o del barredor, que
+      republica los comandos de reservas que siguen activas sin procesar.
+    bindings:
+      amqp:
+        deliveryMode: 2
+        mandatory: true
+        bindingVersion: 0.3.0
+    messages:
+      - $ref: "#/channels/comandos/messages/reservar"
+      - $ref: "#/channels/comandos/messages/cancelar"
+
+  procesarComando:
+    action: receive
+    channel:
+      $ref: "#/channels/particionComandos"
+    title: El worker procesa un comando
+    description: |
+      Consumo con `prefetch(1)` y `ack` después del `COMMIT`. Reentregar un
+      comando ya procesado no cambia nada.
+    messages:
+      - $ref: "#/channels/particionComandos/messages/reservar"
+      - $ref: "#/channels/particionComandos/messages/cancelar"
+
+  publicarEntrega:
+    action: send
+    channel:
+      $ref: "#/channels/eventosWebhook"
+    title: El relay publica una entrega de webhook
+    description: Una por cada decisión del worker sobre una reserva.
+    bindings:
+      amqp:
+        deliveryMode: 2
+        mandatory: true
+        bindingVersion: 0.3.0
+    messages:
+      - $ref: "#/channels/eventosWebhook/messages/entrega"
+
+  entregarWebhook:
+    action: receive
+    channel:
+      $ref: "#/channels/entregasWebhook"
+    title: El notificador entrega el webhook al tenant
+    description: Firma el evento y hace el `POST` descrito en la sección `webhooks` de `openapi.yaml`.
+    messages:
+      - $ref: "#/channels/entregasWebhook/messages/entrega"
+
+  reprogramarEntrega:
+    action: send
+    channel:
+      $ref: "#/channels/esperaWebhook"
+    title: El notificador reprograma una entrega fallida
+    bindings:
+      amqp:
+        deliveryMode: 2
+        mandatory: true
+        bindingVersion: 0.3.0
+    messages:
+      - $ref: "#/channels/esperaWebhook/messages/entrega"
+
+components:
+  messages:
+    ComandoReservar:
+      name: reservar
+      title: Comando reservar
+      summary: Decidir una reserva pendiente.
+      payload:
+        $ref: "#/components/schemas/ComandoReservar"
+      bindings:
+        amqp:
+          messageType: reservar
+          bindingVersion: 0.3.0
+
+    ComandoCancelar:
+      name: cancelar
+      title: Comando cancelar
+      summary: Cancelar una reserva y devolver el cupo si estaba confirmada.
+      payload:
+        $ref: "#/components/schemas/ComandoCancelar"
+      bindings:
+        amqp:
+          messageType: cancelar
+          bindingVersion: 0.3.0
+
+    EntregaWebhook:
+      name: entrega
+      title: Entrega de webhook
+      summary: Evento a notificar a un tenant.
+      headers:
+        type: object
+        properties:
+          x-intento:
+            type: integer
+            minimum: 0
+            description: Reintentos ya realizados. Lo agrega el notificador al reprogramar.
+      payload:
+        $ref: "#/components/schemas/EntregaWebhook"
+      bindings:
+        amqp:
+          messageType: entrega
+          bindingVersion: 0.3.0
+
+  schemas:
+    ComandoReservar:
+      type: object
+      additionalProperties: false
+      required: [comando, tenant_id, reserva_id, actividad_id]
+      properties:
+        comando:
+          type: string
+          const: reservar
+        cambio_id:
+          type: integer
+          minimum: 1
+          description: Fila del outbox que originó el comando. No viaja en los comandos del barredor.
+        tenant_id:
+          type: string
+          format: uuid
+        reserva_id:
+          type: string
+          format: uuid
+        actividad_id:
+          type: string
+          format: uuid
+
+    ComandoCancelar:
+      type: object
+      additionalProperties: false
+      required: [comando, tenant_id, reserva_id, actividad_id]
+      properties:
+        comando:
+          type: string
+          const: cancelar
+        cambio_id:
+          type: integer
+          minimum: 1
+        tenant_id:
+          type: string
+          format: uuid
+        reserva_id:
+          type: string
+          format: uuid
+        actividad_id:
+          type: string
+          format: uuid
+
+    EntregaWebhook:
+      type: object
+      additionalProperties: false
+      required: [cambio_id, tenant_id, evento]
+      properties:
+        cambio_id:
+          type: integer
+          minimum: 1
+          description: Fila del outbox; es el `X-Webhook-Id` del POST.
+        tenant_id:
+          type: string
+          format: uuid
+        evento:
+          $ref: "./openapi.yaml#/components/schemas/EventoReserva"
