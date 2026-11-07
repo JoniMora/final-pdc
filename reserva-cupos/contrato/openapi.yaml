@@ -66,10 +66,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Actividad"
+          links:
+            ConsultarActividad:
+              operationId: consultarActividad
+              parameters:
+                id: $response.body#/id
+            CambiarEstado:
+              operationId: cambiarEstadoActividad
+              parameters:
+                id: $response.body#/id
+            SolicitarReserva:
+              operationId: solicitarReserva
+              parameters:
+                id: $response.body#/id
+            ListarReservas:
+              operationId: listarReservas
+              parameters:
+                id: $response.body#/id
         "400":
           $ref: "#/components/responses/SolicitudInvalida"
         "401":
           $ref: "#/components/responses/NoAutenticado"
+        "415":
+          $ref: "#/components/responses/TipoNoSoportado"
         "503":
           $ref: "#/components/responses/NoDisponible"
 
@@ -123,6 +142,8 @@ paths:
           $ref: "#/components/responses/NoAutenticado"
         "404":
           $ref: "#/components/responses/NoEncontrado"
+        "415":
+          $ref: "#/components/responses/TipoNoSoportado"
         "503":
           $ref: "#/components/responses/NoDisponible"
 
@@ -167,6 +188,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Reserva"
+          links:
+            ConsultarReserva:
+              operationId: consultarReserva
+              parameters:
+                id: $response.body#/id
+            CancelarReserva:
+              operationId: cancelarReserva
+              parameters:
+                id: $response.body#/id
         "200":
           description: Repetición idempotente; devuelve la reserva en su estado actual.
           headers:
@@ -194,6 +224,8 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problema"
+        "415":
+          $ref: "#/components/responses/TipoNoSoportado"
         "503":
           $ref: "#/components/responses/NoDisponible"
     get:
@@ -210,6 +242,7 @@ paths:
           description: Valor de `siguiente_cursor` de la página anterior.
           schema:
             type: string
+            minLength: 1
         - name: limite
           in: query
           schema:
@@ -343,6 +376,7 @@ paths:
           schema:
             type: integer
             minimum: 0
+            maximum: 9007199254740991
             default: 0
         - name: limite
           in: query
@@ -419,6 +453,12 @@ components:
             $ref: "#/components/schemas/Problema"
     NoEncontrado:
       description: El recurso no existe o pertenece a otro tenant.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problema"
+    TipoNoSoportado:
+      description: El cuerpo no se envió como `application/json`.
       content:
         application/problem+json:
           schema:
