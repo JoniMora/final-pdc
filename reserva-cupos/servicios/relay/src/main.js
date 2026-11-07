@@ -1,21 +1,40 @@
 const mysql = require("mysql2/promise");
 const amqp = require("amqplib");
+const { crearValidadorDeMensajes } = require("../../../compartido/src/contrato");
+const { COMANDOS, ESQUEMAS, comandoDesdeCambio, entregaDesdeCambio } = require("./mensajes");
 
 // Único proceso que lee el outbox (tabla cambios) y publica.
-// Cumple tres funciones: secuenciador del feed, publicador de comandos
-// y barredor de reservas pendientes.
+// Cumple tres funciones: secuenciador del feed, publicador (comandos y
+// entregas de webhook) y barredor de reservas pendientes. Cada mensaje se
+// valida contra el contrato de mensajería antes de publicarse.
 
 const EXCHANGE = "reservas.comandos";
+const EXCHANGE_WEBHOOKS = "webhooks.eventos";
 const COLAS_COMANDOS = ["reservas.comandos.0"];
 const INTERVALO_MS = Number(process.env.RELAY_INTERVALO_MS || 500);
 const BARRIDO_MS = Number(process.env.RELAY_BARRIDO_MS || 30000);
 const ANTIGUEDAD_BARRIDO_S = 30;
 const LOTE = 200;
 
-// Tipo de cambio → comando que se envía al worker.
-const COMANDOS = {
-    "reserva.solicitada": "reservar"
-};
+const validar = crearValidadorDeMensajes();
+
+// Un mensaje que no cumple el contrato es un error de programación: no se
+// publica, queda sin marcar en el outbox y se informa una sola vez.
+const informados = new Set();
+
+function cumpleContrato(esquema, mensaje, cambioId) {
+    try {
+        validar(esquema, mensaje);
+        return true;
+    } catch (error) {
+        if (!informados.has(cambioId)) {
+            informados.add(cambioId);
+            console.error(`[relay] Cambio ${cambioId} no publicado: ${error.message}`);
+        }
+
+        return false;
+    }
+}
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
@@ -139,26 +158,24 @@ async function publicar() {
         [LOTE]
     );
 
-    const publicables = filas.filter(fila => COMANDOS[fila.tipo]);
-
     for (const fila of filas) {
-        if (!COMANDOS[fila.tipo]) {
+        if (!COMANDOS[fila.tipo] && !informados.has(fila.id)) {
+            informados.add(fila.id);
             console.error(`[relay] Cambio ${fila.id} de tipo ${fila.tipo} sin comando asociado`);
         }
     }
+
+    const publicables = filas
+        .filter(fila => COMANDOS[fila.tipo])
+        .map(fila => ({ fila, comando: comandoDesdeCambio(fila) }))
+        .filter(({ fila, comando }) => cumpleContrato(ESQUEMAS[comando.comando], comando, fila.id));
 
     if (publicables.length === 0) return 0;
 
     const enviado = canal;
 
-    for (const fila of publicables) {
-        publicarComando({
-            comando: COMANDOS[fila.tipo],
-            cambio_id: fila.id,
-            tenant_id: fila.tenant_id,
-            reserva_id: fila.entidad_id,
-            actividad_id: fila.snapshot.actividad_id
-        }, `cambio-${fila.id}`);
+    for (const { fila, comando } of publicables) {
+        publicarComando(comando, `cambio-${fila.id}`);
     }
 
     // Rechaza si RabbitMQ no confirma alguno: quedan sin marcar.
@@ -166,7 +183,55 @@ async function publicar() {
 
     await pool.query(
         "UPDATE cambios SET publicado_comando = TRUE WHERE id IN (?)",
-        [publicables.map(fila => fila.id)]
+        [publicables.map(({ fila }) => fila.id)]
+    );
+
+    return publicables.length;
+}
+
+// Entregas de webhook: una por cada cambio que lo requiere (las decisiones
+// del worker sobre reservas). El relay no sabe qué tenants tienen URL
+// registrada: eso lo resuelve el notificador. Mismo esquema que los
+// comandos: se marcan recién cuando RabbitMQ confirma.
+async function publicarWebhooks() {
+    if (!canal) return 0;
+
+    const [filas] = await pool.query(
+        `SELECT id, tenant_id, tipo, snapshot, secuencia, creado_en
+           FROM cambios
+          WHERE publicado_webhook = FALSE AND secuencia IS NOT NULL
+          ORDER BY id
+          LIMIT ?`,
+        [LOTE]
+    );
+
+    const publicables = filas
+        .map(fila => ({ fila, entrega: entregaDesdeCambio(fila) }))
+        .filter(({ fila, entrega }) => cumpleContrato("EntregaWebhook", entrega, fila.id));
+
+    if (publicables.length === 0) return 0;
+
+    const enviado = canal;
+
+    for (const { fila, entrega } of publicables) {
+        enviado.publish(
+            EXCHANGE_WEBHOOKS,
+            "entrega",
+            Buffer.from(JSON.stringify(entrega)),
+            {
+                persistent: true,
+                contentType: "application/json",
+                messageId: `webhook-${fila.id}`,
+                type: "entrega"
+            }
+        );
+    }
+
+    await enviado.waitForConfirms();
+
+    await pool.query(
+        "UPDATE cambios SET publicado_webhook = TRUE WHERE id IN (?)",
+        [publicables.map(({ fila }) => fila.id)]
     );
 
     return publicables.length;
@@ -198,12 +263,16 @@ async function barrer() {
     const enviado = canal;
 
     for (const fila of filas) {
-        publicarComando({
+        const comando = {
             comando: "reservar",
             tenant_id: fila.tenant_id,
             reserva_id: fila.id,
             actividad_id: fila.actividad_id
-        }, `barrido-${fila.id}`);
+        };
+
+        if (cumpleContrato("ComandoReservar", comando, `barrido-${fila.id}`)) {
+            publicarComando(comando, `barrido-${fila.id}`);
+        }
     }
 
     await enviado.waitForConfirms();
@@ -217,12 +286,13 @@ async function ciclo() {
     try {
         const secuenciados = await secuenciar();
         const publicados = await publicar();
+        const webhooks = await publicarWebhooks();
 
-        if (secuenciados || publicados) {
-            console.log(`[relay] Secuenciados: ${secuenciados} · comandos publicados: ${publicados}`);
+        if (secuenciados || publicados || webhooks) {
+            console.log(`[relay] Secuenciados: ${secuenciados} · comandos publicados: ${publicados} · webhooks: ${webhooks}`);
         }
 
-        lleno = secuenciados === LOTE || publicados === LOTE;
+        lleno = secuenciados === LOTE || publicados === LOTE || webhooks === LOTE;
     } catch (error) {
         // MySQL o RabbitMQ no disponibles: se reintenta en el próximo ciclo.
         console.error("[relay] Ciclo fallido:", error.code || error.message);
