@@ -1,11 +1,15 @@
 const amqp = require("amqplib");
+const { crearValidadorDeMensajes } = require("../../../compartido/src/contrato");
 const { crearPool, esErrorDeInfraestructura } = require("./db");
 const { reservar } = require("./reservar");
+const { cancelar, marcarFallida } = require("./cancelar");
+const { procesar } = require("./procesar");
 
 const COLA = "reservas.comandos.0";
 const PAUSA_INFRAESTRUCTURA_MS = 5000;
 
 const pool = crearPool();
+const validar = crearValidadorDeMensajes();
 
 function salir(error) {
     console.error("[WORKER]", error.message);
@@ -16,19 +20,29 @@ function esperar(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function leerComando(entrega) {
-    const comando = JSON.parse(entrega.content.toString("utf8"));
+const dependencias = {
+    validar,
+    acciones: {
+        reservar: comando => reservar(pool, comando),
+        cancelar: comando => cancelar(pool, comando)
+    },
+    marcarFallida: comando => marcarFallida(pool, comando),
+    esErrorDeInfraestructura,
+    esperar
+};
 
-    if (
-        comando.comando !== "reservar" ||
-        typeof comando.reserva_id !== "string" ||
-        typeof comando.actividad_id !== "string" ||
-        typeof comando.tenant_id !== "string"
-    ) {
-        throw new Error("Formato de comando inválido");
+function describir(comando, resultado) {
+    const reserva = `${comando.comando} ${comando.reserva_id} (actividad ${comando.actividad_id})`;
+
+    if (resultado.repetido) {
+        return `${reserva}: ya estaba ${resultado.estado}, comando repetido sin cambios`;
     }
 
-    return comando;
+    if (resultado.cupoDevuelto) {
+        return `${reserva}: cancelada, cupo devuelto`;
+    }
+
+    return `${reserva}: ${resultado.estado}`;
 }
 
 async function iniciar() {
@@ -71,49 +85,33 @@ async function iniciar() {
                 return;
             }
 
-            let comando;
+            const resultado = await procesar(entrega.content, dependencias);
 
-            try {
-                comando = leerComando(entrega);
-            } catch (error) {
-                console.error("[WORKER] Comando descartado a la DLQ:", error.message);
-                canal.nack(entrega, false, false);
-                return;
-            }
+            switch (resultado.accion) {
+                case "ack":
+                    console.log(`[WORKER] ${describir(resultado.comando, resultado.resultado)}`
+                        + (resultado.motivo ? ` (${resultado.motivo})` : ""));
+                    // Recién después del COMMIT se confirma el mensaje.
+                    canal.ack(entrega);
+                    break;
 
-            try {
-                const resultado = await reservar(pool, comando);
-
-                const reserva = `Reserva ${comando.reserva_id} (actividad ${comando.actividad_id})`;
-
-                console.log(
-                    resultado.repetido
-                        ? `[WORKER] ${reserva} ya estaba ${resultado.estado}: comando repetido, sin cambios`
-                        : `[WORKER] ${reserva} ${resultado.estado}`
-                );
-
-                // Recién después del COMMIT se confirma el mensaje.
-                canal.ack(entrega);
-            } catch (error) {
-                if (esErrorDeInfraestructura(error)) {
+                case "reencolar":
                     // Pausa sin consumir reintentos ni derivar a la DLQ:
                     // el comando vuelve a la cola.
-                    console.error(
-                        "[WORKER] MySQL no disponible, se reintentará:",
-                        error.code || error.message
-                    );
+                    console.error("[WORKER] MySQL no disponible, se reintentará:", resultado.motivo);
                     await esperar(PAUSA_INFRAESTRUCTURA_MS);
                     canal.nack(entrega, false, true);
-                } else {
-                    console.error("[WORKER] Error de datos, comando a la DLQ:", error.message);
+                    break;
+
+                default:
+                    console.error("[WORKER] Comando a la DLQ:", resultado.motivo);
                     canal.nack(entrega, false, false);
-                }
             }
         },
         { noAck: false }
     );
 
-    console.log(`[WORKER] Esperando comandos en ${COLA}`);
+    console.log(`[WORKER] Esperando comandos en ${COLA} (contrato de mensajería validado)`);
 }
 
 iniciar().catch(salir);
