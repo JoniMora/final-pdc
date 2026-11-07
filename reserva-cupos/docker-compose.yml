@@ -37,7 +37,7 @@ services:
   # API (docker compose up --scale api=3) toma las instancias nuevas sin
   # tocar configuración, les hace health check y balancea entre ellas.
   traefik:
-    image: traefik:v3.3
+    image: traefik:v3.6
 
     command:
       - --providers.docker=true
