@@ -2,12 +2,18 @@ const express = require("express");
 const { Pool } = require("pg");
 const { randomUUID } = require("node:crypto");
 const path = require("node:path");
+const { crearClienteApi, ErrorDeContrato } = require("./api");
+const { verificarFirma, aplicarReserva, aplicarEvento } = require("./webhooks");
 
 const app = express();
 app.disable("x-powered-by");
-const API_URL = process.env.API_URL || "http://api:3000";
-const API_KEY = process.env.API_KEY;
+
+// La API se alcanza por el gateway: Aula no conoce sus instancias.
+const API_URL = process.env.API_URL || "http://traefik";
 const PORT = Number(process.env.PORT || 3001);
+const SECRETO_WEBHOOK = Buffer.from(process.env.WEBHOOK_SECRET || "", "hex");
+
+const api = crearClienteApi({ baseUrl: API_URL, clave: process.env.API_KEY });
 
 // Lee PGHOST, PGUSER, PGPASSWORD y PGDATABASE del entorno.
 const pool = new Pool({
@@ -20,31 +26,41 @@ pool.on("error", error => {
     console.error("[AULA] PostgreSQL:", error.message);
 });
 
+// Receptor de webhooks (contrato/openapi.yaml, sección webhooks). Se
+// registra antes del parser JSON: la firma se verifica sobre el cuerpo
+// exacto recibido.
+app.post("/webhooks/reservas", express.raw({ type: "application/json", limit: "64kb" }), async (req, res) => {
+    const cuerpo = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : "";
+    const firma = verificarFirma(cuerpo, req.get("x-firma"), SECRETO_WEBHOOK);
+
+    if (!firma.valida) {
+        console.error(`[AULA] Webhook ${req.get("x-webhook-id") || "-"} rechazado: ${firma.motivo}`);
+        return res.status(401).end();
+    }
+
+    let evento;
+
+    try {
+        evento = api.contrato.validarEsquema("EventoReserva", JSON.parse(cuerpo));
+    } catch (error) {
+        console.error(`[AULA] Webhook ${req.get("x-webhook-id")} fuera de contrato: ${error.message}`);
+        return res.status(400).end();
+    }
+
+    try {
+        const aplicado = await aplicarEvento(pool, evento);
+        console.log(`[AULA] Webhook ${req.get("x-webhook-id")}: ${evento.tipo} v${evento.entidad.version}`
+            + (aplicado ? " aplicado" : " repetido o atrasado, sin cambios"));
+        res.status(204).end();
+    } catch (error) {
+        // Sin base no se puede aplicar: el notificador reintenta.
+        console.error("[AULA] Webhook no aplicado, PostgreSQL:", error.message);
+        res.status(503).end();
+    }
+});
+
 app.use(express.json({ limit: "16kb" }));
 app.use(express.static(path.join(__dirname, "../public")));
-
-// Canal síncrono con el servicio: HTTP y clave de API del tenant.
-// Aula nunca accede a MySQL.
-async function llamarApi(metodo, ruta, { cuerpo, encabezados = {} } = {}) {
-    const response = await fetch(`${API_URL}${ruta}`, {
-        method: metodo,
-        headers: {
-            Authorization: `Bearer ${API_KEY}`,
-            ...(cuerpo ? { "Content-Type": "application/json" } : {}),
-            ...encabezados
-        },
-        body: cuerpo ? JSON.stringify(cuerpo) : undefined,
-        // Mayor que la espera de la réplica semisíncrona (10 s).
-        signal: AbortSignal.timeout(15000)
-    });
-
-    return {
-        status: response.status,
-        location: response.headers.get("location"),
-        retryAfter: response.headers.get("retry-after"),
-        cuerpo: await response.json()
-    };
-}
 
 // Reenvía al navegador la respuesta de la API con sus cabeceras útiles.
 function reenviar(res, respuesta) {
@@ -53,21 +69,34 @@ function reenviar(res, respuesta) {
     res.status(respuesta.status).json(respuesta.cuerpo);
 }
 
-function apiNoDisponible(res, error) {
-    console.error("[AULA] API:", error.message);
+function errorDeApi(res, error) {
+    if (error instanceof ErrorDeContrato) {
+        console.error("[AULA] La API respondió fuera de contrato:", error.message);
+        return res.status(502).json({ error: "La API respondió fuera de contrato" });
+    }
 
-    res.status(503).json({
-        error: "No se pudo obtener respuesta de la API"
-    });
+    console.error("[AULA] API:", error.message);
+    res.status(503).json({ error: "No se pudo obtener respuesta de la API" });
+}
+
+// Guarda en la base propia una inscripción que la API devolvió. Si la base
+// no responde, el webhook o la reconciliación la completan después.
+async function proyectar(reserva) {
+    try {
+        await aplicarReserva(pool, reserva);
+    } catch (error) {
+        console.error("[AULA] Proyección local pendiente:", error.message);
+    }
 }
 
 app.get("/health", (req, res) => {
     res.json({ servicio: "aula", estado: "ok" });
 });
 
-// Comprueba las conexiones sin detener la página si alguna falla.
+// Comprueba las conexiones sin detener la página si alguna falla. /health
+// es operativo y no forma parte del contrato.
 app.get("/estado", async (req, res) => {
-    const [base, api] = await Promise.allSettled([
+    const [base, servicio] = await Promise.allSettled([
         pool.query("SELECT 1 FROM materias LIMIT 1"),
 
         fetch(`${API_URL}/health`, {
@@ -83,10 +112,9 @@ app.get("/estado", async (req, res) => {
 
     res.json({
         aula: "ok",
-        postgresql:
-            base.status === "fulfilled" ? "conectado" : "no disponible",
-        api:
-            api.status === "fulfilled" ? "conectada" : "no disponible"
+        contrato: `openapi.yaml ${api.contrato.version}`,
+        postgresql: base.status === "fulfilled" ? "conectado" : "no disponible",
+        api: servicio.status === "fulfilled" ? `conectada (instancia ${servicio.value.instancia})` : "no disponible"
     });
 });
 
@@ -112,21 +140,18 @@ app.get("/materias", async (req, res) => {
 
 // Crea la actividad en el servicio y la registra como materia local.
 app.post("/materias", async (req, res) => {
-    const nombre = req.body?.nombre;
-    const cupo = Number(req.body?.cupo);
-
     let respuesta;
 
     try {
-        respuesta = await llamarApi("POST", "/v1/actividades", {
+        respuesta = await api.llamar("crearActividad", {
             cuerpo: {
-                nombre,
-                capacidad: cupo,
+                nombre: req.body?.nombre,
+                capacidad: Number(req.body?.cupo),
                 metadata: { origen: "aula", tipo: "materia" }
             }
         });
     } catch (error) {
-        return apiNoDisponible(res, error);
+        return errorDeApi(res, error);
     }
 
     if (respuesta.status !== 201) {
@@ -150,53 +175,87 @@ app.post("/materias", async (req, res) => {
     res.status(201).json(actividad);
 });
 
-// Estado de la materia e inscriptos confirmados, leídos de la API.
+// Estado de la materia: inscriptos confirmados según la API y según la
+// base de Aula, que se mantiene al día con los webhooks.
 app.get("/materias/:actividadId", async (req, res) => {
-    const ruta = `/v1/actividades/${encodeURIComponent(req.params.actividadId)}`;
+    const parametros = { id: req.params.actividadId };
 
     try {
-        const actividad = await llamarApi("GET", ruta);
+        const actividad = await api.llamar("consultarActividad", { parametros });
 
         if (actividad.status !== 200) {
             return reenviar(res, actividad);
         }
 
-        const inscriptos = await llamarApi("GET", `${ruta}/reservas?estado=confirmada&limite=100`);
+        const inscriptos = await api.llamar("listarReservas", {
+            parametros,
+            query: { estado: "confirmada", limite: 100 }
+        });
+
+        let locales = null;
+
+        try {
+            const resultado = await pool.query(
+                `SELECT alumno FROM inscripciones
+                  WHERE actividad_id = $1 AND estado = 'confirmada'
+                  ORDER BY alumno`,
+                [req.params.actividadId]
+            );
+            locales = resultado.rows.map(fila => fila.alumno);
+        } catch (_) {
+            // La base de Aula no está disponible: se informa solo la API.
+        }
 
         res.json({
             ...actividad.cuerpo,
-            inscriptos: inscriptos.cuerpo.datos
+            inscriptos: inscriptos.cuerpo.datos,
+            inscriptos_locales: locales
         });
     } catch (error) {
-        apiNoDisponible(res, error);
+        errorDeApi(res, error);
     }
 });
 
 // Solicita la inscripción. El navegador genera la Idempotency-Key y la
 // reutiliza si reintenta, así un reintento no duplica la reserva.
 app.post("/materias/:actividadId/inscripciones", async (req, res) => {
-    const ruta = `/v1/actividades/${encodeURIComponent(req.params.actividadId)}/reservas`;
-
     try {
-        reenviar(res, await llamarApi("POST", ruta, {
+        const respuesta = await api.llamar("solicitarReserva", {
+            parametros: { id: req.params.actividadId },
             cuerpo: { participante: req.body?.alumno },
             encabezados: {
                 "Idempotency-Key": req.get("idempotency-key") || randomUUID()
             }
-        }));
+        });
+
+        if (respuesta.status === 202 || respuesta.status === 200) {
+            await proyectar(respuesta.cuerpo);
+        }
+
+        reenviar(res, respuesta);
     } catch (error) {
-        apiNoDisponible(res, error);
+        errorDeApi(res, error);
     }
 });
 
 app.get("/inscripciones/:reservaId", async (req, res) => {
     try {
-        reenviar(res, await llamarApi(
-            "GET",
-            `/v1/reservas/${encodeURIComponent(req.params.reservaId)}`
-        ));
+        reenviar(res, await api.llamar("consultarReserva", {
+            parametros: { id: req.params.reservaId }
+        }));
     } catch (error) {
-        apiNoDisponible(res, error);
+        errorDeApi(res, error);
+    }
+});
+
+// Cancela la inscripción; el resultado llega por webhook o consultando.
+app.post("/inscripciones/:reservaId/cancelacion", async (req, res) => {
+    try {
+        reenviar(res, await api.llamar("cancelarReserva", {
+            parametros: { id: req.params.reservaId }
+        }));
+    } catch (error) {
+        errorDeApi(res, error);
     }
 });
 
@@ -207,5 +266,5 @@ app.use((error, req, res, next) => {
 });
 
 app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[AULA] Pagina disponible en puerto ${PORT}`);
+    console.log(`[AULA] Pagina disponible en puerto ${PORT} · contrato openapi.yaml ${api.contrato.version}`);
 });

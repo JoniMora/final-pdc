@@ -1,6 +1,13 @@
 FROM node:22-alpine
 
-WORKDIR /app
+# Aula valida sus llamadas y los webhooks con el mismo contrato que la API.
+WORKDIR /app/compartido
+COPY --from=compartido package.json package-lock.json ./
+RUN npm ci --omit=dev
+COPY --from=compartido src ./src
+COPY --from=contrato openapi.yaml asyncapi.yaml /app/contrato/
+
+WORKDIR /app/clientes/aula
 
 COPY package.json ./
 RUN npm install --omit=dev

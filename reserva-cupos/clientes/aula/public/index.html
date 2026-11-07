@@ -118,6 +118,12 @@
         </p>
 
         <pre id="inscripcion">Todavía no se solicitó una inscripción.</pre>
+
+        <button id="cancelar" disabled>Cancelar esta inscripción</button>
+        <p>
+            La cancelación también es asíncrona: la API responde 202 y el worker
+            devuelve el cupo. Aula se entera por un webhook firmado.
+        </p>
     </section>
 
     <section>
@@ -129,6 +135,7 @@
 
 <script>
     let actividadId = null;
+    let reservaId = null;
 
     function mostrar(destino, texto) {
         document.getElementById(destino).textContent = texto;
@@ -204,12 +211,16 @@
             }
 
             const nombres = data.inscriptos.map(reserva => `- ${reserva.participante}`);
+            const locales = data.inscriptos_locales === null
+                ? "Base de Aula no disponible"
+                : `${data.inscriptos_locales.length} (${data.inscriptos_locales.join(", ") || "ninguno"})`;
 
             mostrar(
                 "inscriptos",
                 `Cupos disponibles: ${data.cupos_disponibles} de ${data.capacidad}\n` +
-                `Inscriptos confirmados (${data.inscriptos.length}):\n` +
-                (nombres.join("\n") || "(ninguno)")
+                `Inscriptos confirmados según la API (${data.inscriptos.length}):\n` +
+                (nombres.join("\n") || "(ninguno)") +
+                `\n\nSegún la base de Aula, actualizada por webhooks: ${locales}`
             );
         } catch (error) {
             mostrar("inscriptos", `No se pudo completar la consulta: ${error.message}`);
@@ -224,7 +235,8 @@
             lineas.push(`GET estado → HTTP ${response.status}: ${data.estado}`);
             mostrar("inscripcion", lineas.join("\n"));
 
-            if (data.estado !== "pendiente") return;
+            if (data.estado !== "pendiente" && !lineas.esperandoCancelacion) return;
+            if (lineas.esperandoCancelacion && data.estado === "cancelada") return;
 
             const segundos = Number(response.headers.get("retry-after") || 1);
             await esperar(segundos * 1000);
@@ -284,12 +296,30 @@
             mostrar("inscripcion", lineas.join("\n"));
 
             if (response.status === 202 || response.status === 200) {
+                reservaId = data.id;
+                document.getElementById("cancelar").disabled = false;
                 await seguir(data.id, lineas);
                 verDetalle();
             }
         } catch (error) {
             mostrar("inscripcion", `No se pudo completar la consulta: ${error.message}`);
         }
+    };
+
+    document.getElementById("cancelar").onclick = async () => {
+        if (!reservaId) return;
+
+        const { response, data } = await pedir(`/inscripciones/${reservaId}/cancelacion`, { method: "POST" });
+        const lineas = [`POST cancelación → HTTP ${response.status}`, JSON.stringify(data, null, 2)];
+        lineas.esperandoCancelacion = true;
+
+        mostrar("inscripcion", lineas.join("\n"));
+
+        if (response.status === 202) {
+            await seguir(reservaId, lineas);
+        }
+
+        verDetalle();
     };
 
     consultar("/estado", "estado");
