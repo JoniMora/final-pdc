@@ -1,0 +1,281 @@
+name: reserva-cupos-infra
+
+services:
+  rabbitmq:
+    build:
+      context: ./Infraestructura/rabbitmq
+    hostname: rabbitmq
+
+    environment:
+      RABBITMQ_DEFAULT_USER: demo
+      RABBITMQ_DEFAULT_PASS: demo_local_2026
+
+    ports:
+      - "127.0.0.1:15672:15672"
+
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+
+    networks:
+      - interna
+
+    healthcheck:
+      test:
+        - CMD
+        - rabbitmq-diagnostics
+        - -q
+        - check_running
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./servicios/api
+
+    environment:
+      PORT: "3000"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: demo
+      RABBITMQ_PASSWORD: demo_local_2026
+
+    ports:
+      - "127.0.0.1:3000:3000"
+
+    networks:
+      - publica
+      - interna
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./servicios/worker
+
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: demo
+      RABBITMQ_PASSWORD: demo_local_2026
+
+    networks:
+      - interna
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+  mysql-primary:
+    build:
+      context: ./Infraestructura/mysql/primary
+
+    environment:
+      MYSQL_ROOT_PASSWORD: root_local_2026
+
+    volumes:
+      - mysql-primary-data:/var/lib/mysql
+
+    networks:
+      - interna
+
+    healthcheck:
+      test:
+        - CMD
+        - mysql
+        - -h
+        - "127.0.0.1"
+        - -uroot
+        - -proot_local_2026
+        - -e
+        - "SELECT 1"
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+
+    restart: unless-stopped
+
+  mysql-replica:
+    build:
+      context: ./Infraestructura/mysql/replica
+
+    environment:
+      MYSQL_ROOT_PASSWORD: root_local_2026
+
+    volumes:
+      - mysql-replica-data:/var/lib/mysql
+      - ./Infraestructura/mysql/replica/configurar-replica.sql:/configurar-replica.sql:ro
+
+    networks:
+      - interna
+
+    depends_on:
+      mysql-primary:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        - CMD
+        - mysql
+        - -h
+        - "127.0.0.1"
+        - -uroot
+        - -proot_local_2026
+        - -e
+        - "SELECT 1"
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+
+    restart: unless-stopped
+
+  aula-db:
+    image: postgres:16-alpine
+
+    environment:
+      POSTGRES_DB: aula
+      POSTGRES_USER: aula_admin
+      POSTGRES_PASSWORD: postgres_local_2026
+
+    volumes:
+      - aula-db-data:/var/lib/postgresql/data
+      - ./Infraestructura/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+
+    networks:
+      - tenant
+
+    healthcheck:
+      test:
+        - CMD
+        - pg_isready
+        - -h
+        - "127.0.0.1"
+        - -U
+        - aula_admin
+        - -d
+        - aula
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+    restart: unless-stopped
+
+  aula:
+    build:
+      context: ./clientes/aula
+
+    environment:
+      PORT: "3001"
+      API_URL: http://api:3000
+      PGHOST: aula-db
+      PGPORT: "5432"
+      PGDATABASE: aula
+      PGUSER: aula_app
+      PGPASSWORD: aula_local_2026
+
+    ports:
+      - "127.0.0.1:3001:3001"
+
+    networks:
+      - publica
+      - tenant
+
+    depends_on:
+      api:
+        condition: service_healthy
+      aula-db:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+    restart: unless-stopped
+
+  relay:
+    build:
+      context: ./servicios/relay
+
+    environment:
+      COMPONENTE: relay
+      DB_HOST: mysql-primary
+      DB_NAME: reservas
+      DB_USER: relay_app
+      DB_PASSWORD: relay_local_2026
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: demo
+      RABBITMQ_PASSWORD: demo_local_2026
+
+    networks:
+      - interna
+
+    depends_on:
+      mysql-primary:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+  notificador:
+    build:
+      context: ./servicios/notificador
+
+    environment:
+      COMPONENTE: notificador
+      DB_HOST: mysql-primary
+      DB_NAME: reservas
+      DB_USER: notificador_app
+      DB_PASSWORD: notificador_local_2026
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: demo
+      RABBITMQ_PASSWORD: demo_local_2026
+
+    networks:
+      - interna
+      - publica
+
+    depends_on:
+      mysql-primary:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+networks:
+  publica:
+  interna:
+  tenant:
+
+volumes:
+  rabbitmq-data:
+  mysql-primary-data:
+  mysql-replica-data:
+  aula-db-data:

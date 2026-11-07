@@ -1,0 +1,12 @@
+{
+  "name": "reserva-cupos-api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "5.1.0",
+    "amqplib": "0.10.8"
+  }
+}

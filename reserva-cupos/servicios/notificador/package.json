@@ -1,0 +1,12 @@
+{
+  "name": "reserva-cupos-notificador",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node src/main.js"
+  },
+  "dependencies": {
+    "mysql2": "3.14.3",
+    "amqplib": "0.10.8"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "reserva-cupos-worker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "node src/main.js"
+  },
+  "dependencies": {
+    "amqplib": "0.10.8"
+  }
+}

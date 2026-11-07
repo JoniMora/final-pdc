@@ -1,0 +1,82 @@
+# 06 · Independencia del worker
+# Ejecución: 08/10/2026 11:34 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+$ docker compose stop worker
+ Container reserva-cupos-infra-worker-1  Stopping
+ Container reserva-cupos-infra-worker-1  Stopped
+[código de salida: 0]
+
+$ curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/pruebas/mensajes -H 'Content-Type: application/json' -d '{"texto":"Con worker detenido 1"}'
+{"estado":"aceptado","id":"38339ddb-3d40-47b4-ab85-8f1fca04d947","texto":"Con worker detenido 1","creadoEn":"2026-10-08T14:34:33.285Z"}
+HTTP 202
+[código de salida: 0]
+
+$ curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/pruebas/mensajes -H 'Content-Type: application/json' -d '{"texto":"Con worker detenido 2"}'
+{"estado":"aceptado","id":"7f1bb319-3891-4980-aa75-8a377eb3d21a","texto":"Con worker detenido 2","creadoEn":"2026-10-08T14:34:33.320Z"}
+HTTP 202
+[código de salida: 0]
+
+$ curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/pruebas/mensajes -H 'Content-Type: application/json' -d '{"texto":"Con worker detenido 3"}'
+{"estado":"aceptado","id":"60c0f531-5451-40c1-be67-9801c877ba5b","texto":"Con worker detenido 3","creadoEn":"2026-10-08T14:34:33.352Z"}
+HTTP 202
+[código de salida: 0]
+
+$ docker compose exec -T rabbitmq rabbitmqctl list_queues name messages consumers
+Timeout: 60.0 seconds ...
+Listing queues for vhost / ...
+name	messages	consumers
+webhooks.espera.1m	0	0
+webhooks.espera.5m	0	0
+webhooks.espera.10s	0	0
+reservas.comandos.0	0	0
+reservas.dlq	0	0
+infraestructura.pruebas	3	0
+webhooks.entregas	0	0
+webhooks.dlq	0	0
+[código de salida: 0]
+
+$ docker compose start worker
+ Container reserva-cupos-infra-rabbitmq-1  Waiting
+ Container reserva-cupos-infra-rabbitmq-1  Healthy
+ Container reserva-cupos-infra-worker-1  Starting
+ Container reserva-cupos-infra-worker-1  Started
+[código de salida: 0]
+
+$ docker compose exec -T rabbitmq rabbitmqctl list_queues name messages consumers
+Timeout: 60.0 seconds ...
+Listing queues for vhost / ...
+name	messages	consumers
+webhooks.espera.1m	0	0
+webhooks.espera.5m	0	0
+webhooks.espera.10s	0	0
+reservas.comandos.0	0	0
+reservas.dlq	0	0
+infraestructura.pruebas	0	1
+webhooks.entregas	0	0
+webhooks.dlq	0	0
+[código de salida: 0]
+
+$ docker compose logs --no-log-prefix --since 2026-10-08T14:34:34Z worker
+
+> reserva-cupos-worker@0.1.0 start
+> node src/main.js
+
+[WORKER] Mensaje procesado: {
+  id: '38339ddb-3d40-47b4-ab85-8f1fca04d947',
+  texto: 'Con worker detenido 1',
+  creadoEn: '2026-10-08T14:34:33.285Z'
+}
+[WORKER] Esperando mensajes en infraestructura.pruebas
+[WORKER] Mensaje procesado: {
+  id: '7f1bb319-3891-4980-aa75-8a377eb3d21a',
+  texto: 'Con worker detenido 2',
+  creadoEn: '2026-10-08T14:34:33.320Z'
+}
+[WORKER] Mensaje procesado: {
+  id: '60c0f531-5451-40c1-be67-9801c877ba5b',
+  texto: 'Con worker detenido 3',
+  creadoEn: '2026-10-08T14:34:33.352Z'
+}
+[código de salida: 0]
+
