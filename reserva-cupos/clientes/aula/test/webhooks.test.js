@@ -4,7 +4,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const crypto = require("node:crypto");
-const { verificarFirma } = require("../src/webhooks");
+const { ErrorDeSecreto, secretoDesdeHex, verificarFirma } = require("../src/webhooks");
 const { crearContratoHttp } = require("../../../compartido/src/contrato");
 
 const SECRETO = crypto.randomBytes(32);
@@ -42,4 +42,28 @@ test("se rechazan la firma de otro secreto, el cuerpo alterado y la reinyección
     assert.match(verificarFirma(evento, firmaSegunContrato(SECRETO, evento, ahora - 301), SECRETO).motivo, /ventana/);
     assert.equal(verificarFirma(evento, undefined, SECRETO).valida, false);
     assert.equal(verificarFirma(evento, "t=1,v1=xyz", SECRETO).valida, false);
+});
+
+test("el receptor acepta el vector de prueba del contrato", () => {
+    // Valores tomados de contrato/openapi.yaml, no del notificador: el
+    // secreto llega en hexadecimal y la clave son sus 32 bytes.
+    const vector = contrato.operacion("recibirCambioDeReserva")["x-vector-de-prueba"];
+    const secreto = secretoDesdeHex(vector.secreto);
+
+    assert.deepEqual(verificarFirma(vector.cuerpo, vector["X-Firma"], secreto, vector.t), { valida: true });
+    // Usar el texto hexadecimal como clave da otra firma.
+    const conTexto = crypto.createHmac("sha256", vector.secreto).update(`${vector.t}.${vector.cuerpo}`).digest("hex");
+    assert.notEqual(`t=${vector.t},v1=${conTexto}`, vector["X-Firma"]);
+    assert.ok(contrato.validarEsquema("EventoReserva", JSON.parse(vector.cuerpo)));
+});
+
+test("sin un secreto de 32 bytes no se acepta ninguna firma", () => {
+    const vacio = Buffer.alloc(0);
+
+    assert.equal(verificarFirma(evento, firmaSegunContrato(vacio, evento, ahora), vacio).valida, false);
+    assert.throws(() => secretoDesdeHex(undefined), ErrorDeSecreto);
+    assert.throws(() => secretoDesdeHex(""), ErrorDeSecreto);
+    assert.throws(() => secretoDesdeHex("abcd"), ErrorDeSecreto);
+    assert.throws(() => secretoDesdeHex("z".repeat(64)), ErrorDeSecreto);
+    assert.equal(secretoDesdeHex("ab".repeat(32)).length, 32);
 });

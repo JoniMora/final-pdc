@@ -322,9 +322,16 @@ paths:
         única transacción, y responde `202`. El worker pasa la reserva a
         `cancelada` y, si estaba confirmada, devuelve el cupo.
 
-        La operación es idempotente por naturaleza: repetirla no genera un
-        segundo comando y, cuando la reserva ya está cancelada, responde `200`.
-        Por eso no requiere `Idempotency-Key`.
+        La operación es idempotente por naturaleza: cuando la reserva ya está
+        cancelada responde `200`, y repetirla dentro de los 30 segundos de un
+        pedido no genera un segundo comando. Por eso no requiere
+        `Idempotency-Key`.
+
+        **Confirmación.** El cliente consulta el resultado en `Location`
+        respetando `Retry-After`, igual que con la reserva. Si 30 segundos
+        después del pedido la reserva sigue activa, repetir la cancelación
+        vuelve a registrar el comando: así se recupera un comando perdido. El
+        worker ignora los comandos repetidos.
       responses:
         "202":
           description: Cancelación admitida; la reserva sigue activa hasta que el worker la procese.
@@ -636,21 +643,38 @@ webhooks:
         El notificador hace un `POST` a la URL registrada por el tenant por
         cada decisión del worker sobre una reserva.
 
-        **Firma.** `X-Firma: t=<unix>,v1=<hex>`, donde `v1` es el
-        HMAC-SHA256, con el secreto del tenant, de `<t>.<cuerpo>` (la marca de
-        tiempo, un punto y el cuerpo exacto recibido). El receptor recalcula la
-        firma, la compara en tiempo constante y descarta los mensajes con una
-        marca de tiempo de más de 5 minutos: así se impiden la falsificación y
-        la reinyección.
+        **Secreto.** Al registrar el webhook, el servicio genera para el tenant
+        un secreto de 32 bytes aleatorios y se lo entrega una sola vez,
+        codificado en hexadecimal (64 caracteres). La clave del HMAC son esos
+        32 bytes decodificados, **no** el texto hexadecimal.
+
+        **Firma.** `X-Firma: t=<unix>,v1=<hex>`, donde `t` es la marca de
+        tiempo Unix en segundos y `v1` es el HMAC-SHA256, con la clave del
+        tenant, de `<t>.<cuerpo>` (la marca de tiempo, un punto y el cuerpo
+        exacto recibido, en UTF-8), en hexadecimal en minúsculas. El receptor
+        recalcula la firma, la compara en tiempo constante y descarta los
+        mensajes con una marca de tiempo de más de 5 minutos: así se impiden la
+        falsificación y la reinyección.
+
+        **Vector de prueba.** `x-vector-de-prueba` trae un secreto, una marca
+        de tiempo, un cuerpo y la cabecera `X-Firma` que les corresponde. Una
+        implementación correcta del emisor obtiene esa cabecera, y una del
+        receptor la acepta (tomando `t` como hora actual). Usar el texto
+        hexadecimal como clave da otra firma.
 
         **Entrega al-menos-una-vez.** El mismo evento puede llegar más de una
         vez o fuera de orden. El receptor lo aplica solo si `entidad.version`
         es mayor que la que tiene guardada.
 
-        **Reintentos.** Ante una respuesta distinta de `2xx` o sin respuesta en
-        5 segundos, el notificador reintenta a los 10 s, 1 min y 5 min. Agotados
-        los intentos, el evento queda en una cola de mensajes fallidos y sigue
-        disponible en el feed.
+        **Reintentos.** Ante una respuesta distinta de `2xx`, o si la respuesta
+        no termina de llegar en 5 segundos, el notificador reintenta a los
+        10 s, 1 min y 5 min. Agotados los intentos, el evento queda en una cola
+        de mensajes fallidos y sigue disponible en el feed.
+      x-vector-de-prueba:
+        secreto: 5c0f8e2a9b7d4e61c3a85f0b2d9e7a14f6c2b8d05e3a9f71c4b6e2d8a0f5c3b9
+        t: 1794052805
+        cuerpo: '{"secuencia":42,"tipo":"reserva.confirmada","ocurrido_en":"2026-11-07T12:00:00.000Z","entidad":{"id":"019a5f3c-2b7e-7c41-9d0e-6f1a2b3c4d5e","actividad_id":"019a5f3b-9a10-7f22-8c3d-1e2f3a4b5c6d","participante":"alumno-7","estado":"confirmada","version":2,"metadata":null,"creado_en":"2026-11-07T11:59:59.000Z"}}'
+        X-Firma: t=1794052805,v1=aa174e714c7e4fc696991813aa46cdda33e1728a7991dfba335bcdfebe8a80d6
       security: []
       parameters:
         - name: X-Firma

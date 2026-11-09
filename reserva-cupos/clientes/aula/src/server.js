@@ -3,7 +3,7 @@ const { Pool } = require("pg");
 const { randomUUID } = require("node:crypto");
 const path = require("node:path");
 const { crearClienteApi, ErrorDeContrato } = require("./api");
-const { verificarFirma, aplicarReserva, aplicarEvento } = require("./webhooks");
+const { secretoDesdeHex, verificarFirma, aplicarReserva, aplicarEvento } = require("./webhooks");
 
 const app = express();
 app.disable("x-powered-by");
@@ -11,7 +11,17 @@ app.disable("x-powered-by");
 // La API se alcanza por el gateway: Aula no conoce sus instancias.
 const API_URL = process.env.API_URL || "http://traefik";
 const PORT = Number(process.env.PORT || 3001);
-const SECRETO_WEBHOOK = Buffer.from(process.env.WEBHOOK_SECRET || "", "hex");
+
+// Secreto del webhook, en hexadecimal como lo entrega el servicio. Sin él,
+// el receptor no podría verificar ninguna firma: Aula no arranca.
+let SECRETO_WEBHOOK;
+
+try {
+    SECRETO_WEBHOOK = secretoDesdeHex(process.env.WEBHOOK_SECRET);
+} catch (error) {
+    console.error(`[AULA] WEBHOOK_SECRET inválido: ${error.message}`);
+    process.exit(1);
+}
 
 const api = crearClienteApi({ baseUrl: API_URL, clave: process.env.API_KEY });
 

@@ -23,8 +23,28 @@ info:
     - Las entidades (`Reserva`, `Actividad`) y el evento de webhook se toman
       de `openapi.yaml`: hay una sola definición de cada una.
 
+    Origen de los mensajes. El outbox (tabla `cambios`) es interno al
+    servicio: la API y el worker escriben en él y solo el relay lo lee. Cada
+    tipo de cambio produce, como mucho, un mensaje de este contrato:
+
+    | Tipo de cambio en el outbox        | Lo escribe | Mensaje            |
+    |------------------------------------|------------|--------------------|
+    | `reserva.solicitada`               | API        | `reservar`         |
+    | `reserva.cancelacion_solicitada`   | API        | `cancelar`         |
+    | `reserva.confirmada`, `reserva.rechazada`, `reserva.cancelada`, `reserva.fallida` | worker | `entrega` (webhook) |
+    | `actividad.creada`, `actividad.actualizada` | API, worker | ninguno (solo feed) |
+
+    `reserva.cancelacion_solicitada` es un comando, no un cambio de estado:
+    no aparece en el feed `GET /v1/cambios`.
+
     Versionado: semántico sobre este documento, con los cambios registrados en
-    `CHANGELOG.md`.
+    `CHANGELOG.md`. Cada mensaje trae ejemplos (`examples`) que cubren todas
+    sus propiedades. Un cambio es compatible si los consumidores de la nueva
+    versión aceptan los ejemplos de la anterior (mensajes que pueden seguir en
+    las colas) y los de la versión anterior aceptan los de la nueva (durante
+    un despliegue conviven las dos); lo verifica el CI con
+    `pruebas/contrato/compatibilidad-mensajes.sh`. Un mensaje nuevo es
+    compatible si los consumidores se despliegan antes que los productores.
 
 defaultContentType: application/json
 
@@ -214,6 +234,22 @@ components:
         amqp:
           messageType: reservar
           bindingVersion: 0.3.0
+      examples:
+        - name: desde-el-outbox
+          summary: El relay publica el comando de un cambio reserva.solicitada.
+          payload:
+            comando: reservar
+            cambio_id: 1041
+            tenant_id: 01a1542d-7ee2-7d8b-b3b3-40474b8dec7e
+            reserva_id: 019a5f3c-2b7e-7c41-9d0e-6f1a2b3c4d5e
+            actividad_id: 019a5f3b-9a10-7f22-8c3d-1e2f3a4b5c6d
+        - name: del-barredor
+          summary: Republicación de una reserva pendiente cuyo comando se perdió; no lleva cambio_id.
+          payload:
+            comando: reservar
+            tenant_id: 01a1542d-7ee2-7d8b-b3b3-40474b8dec7e
+            reserva_id: 019a5f3c-2b7e-7c41-9d0e-6f1a2b3c4d5e
+            actividad_id: 019a5f3b-9a10-7f22-8c3d-1e2f3a4b5c6d
 
     ComandoCancelar:
       name: cancelar
@@ -225,6 +261,15 @@ components:
         amqp:
           messageType: cancelar
           bindingVersion: 0.3.0
+      examples:
+        - name: desde-el-outbox
+          summary: El relay publica el comando de un cambio reserva.cancelacion_solicitada.
+          payload:
+            comando: cancelar
+            cambio_id: 1077
+            tenant_id: 01a1542d-7ee2-7d8b-b3b3-40474b8dec7e
+            reserva_id: 019a5f3c-2b7e-7c41-9d0e-6f1a2b3c4d5e
+            actividad_id: 019a5f3b-9a10-7f22-8c3d-1e2f3a4b5c6d
 
     EntregaWebhook:
       name: entrega
@@ -243,6 +288,44 @@ components:
         amqp:
           messageType: entrega
           bindingVersion: 0.3.0
+      examples:
+        - name: reserva-confirmada
+          summary: Primera entrega de una decisión del worker.
+          payload:
+            cambio_id: 1042
+            tenant_id: 01a1542d-7ee2-7d8b-b3b3-40474b8dec7e
+            evento:
+              secuencia: 42
+              tipo: reserva.confirmada
+              ocurrido_en: "2026-11-07T12:00:00.000Z"
+              entidad:
+                id: 019a5f3c-2b7e-7c41-9d0e-6f1a2b3c4d5e
+                actividad_id: 019a5f3b-9a10-7f22-8c3d-1e2f3a4b5c6d
+                participante: alumno-7
+                estado: confirmada
+                version: 2
+                metadata: null
+                creado_en: "2026-11-07T11:59:59.000Z"
+        - name: reintento-de-cancelada
+          summary: Entrega reprogramada por el notificador después de un primer intento fallido.
+          headers:
+            x-intento: 1
+          payload:
+            cambio_id: 1078
+            tenant_id: 01a1542d-7ee2-7d8b-b3b3-40474b8dec7e
+            evento:
+              secuencia: 77
+              tipo: reserva.cancelada
+              ocurrido_en: "2026-11-07T12:03:10.000Z"
+              entidad:
+                id: 019a5f3c-2b7e-7c41-9d0e-6f1a2b3c4d5e
+                actividad_id: 019a5f3b-9a10-7f22-8c3d-1e2f3a4b5c6d
+                participante: alumno-7
+                estado: cancelada
+                version: 3
+                metadata:
+                  comision: A
+                creado_en: "2026-11-07T11:59:59.000Z"
 
   schemas:
     ComandoReservar:

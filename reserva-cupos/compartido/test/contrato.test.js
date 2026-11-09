@@ -74,3 +74,11 @@ test("el evento de webhook se valida como esquema del contrato", () => {
     assert.ok(contrato.validarEsquema("EventoReserva", evento));
     assert.throws(() => contrato.validarEsquema("EventoReserva", { ...evento, secuencia: 0 }), ErrorDeContrato);
 });
+
+test("la firma del webhook trae un vector de prueba en el contrato", () => {
+    const vector = crearContratoHttp().operacion("recibirCambioDeReserva")["x-vector-de-prueba"];
+
+    assert.match(vector.secreto, /^[0-9a-f]{64}$/);
+    assert.match(vector["X-Firma"], new RegExp(`^t=${vector.t},v1=[0-9a-f]{64}$`));
+    assert.ok(crearContratoHttp().validarEsquema("EventoReserva", JSON.parse(vector.cuerpo)));
+});

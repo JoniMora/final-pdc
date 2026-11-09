@@ -25,18 +25,20 @@ class ErrorDeContrato extends Error {
     }
 }
 
-function cargar(archivo) {
-    return yaml.load(fs.readFileSync(path.join(DIRECTORIO, archivo), "utf8"));
+// El directorio se puede indicar para cargar otra versión del contrato
+// (por ejemplo, la de main, al comparar la compatibilidad de los mensajes).
+function cargar(archivo, directorio = DIRECTORIO) {
+    return yaml.load(fs.readFileSync(path.join(directorio, archivo), "utf8"));
 }
 
 // Un solo motor de validación con los dos documentos registrados por su
 // nombre de archivo, así funcionan las referencias entre ellos
 // (asyncapi.yaml toma las entidades de openapi.yaml).
-function crearAjv() {
+function crearAjv(directorio = DIRECTORIO) {
     const ajv = new Ajv2020({ strict: false, allErrors: true });
     addFormats(ajv);
-    ajv.addSchema(cargar("openapi.yaml"), "openapi.yaml");
-    ajv.addSchema(cargar("asyncapi.yaml"), "asyncapi.yaml");
+    ajv.addSchema(cargar("openapi.yaml", directorio), "openapi.yaml");
+    ajv.addSchema(cargar("asyncapi.yaml", directorio), "asyncapi.yaml");
     return ajv;
 }
 
@@ -45,8 +47,8 @@ function puntero(...partes) {
 }
 
 // Mensajes de RabbitMQ: valida contra components.schemas de asyncapi.yaml.
-function crearValidadorDeMensajes() {
-    const ajv = crearAjv();
+function crearValidadorDeMensajes({ directorio = DIRECTORIO } = {}) {
+    const ajv = crearAjv(directorio);
     const compilados = new Map();
 
     return function validar(mensaje, datos) {
@@ -67,11 +69,29 @@ function crearValidadorDeMensajes() {
     };
 }
 
+// Ejemplos de cada mensaje de asyncapi.yaml (components.messages.*.examples),
+// con el esquema de su payload. Representan mensajes reales de esa versión
+// del contrato: se usan para verificar la compatibilidad entre versiones.
+function ejemplosDeMensajes({ directorio = DIRECTORIO } = {}) {
+    const documento = cargar("asyncapi.yaml", directorio);
+
+    return Object.entries(documento.components.messages).flatMap(([mensaje, definicion]) => {
+        const esquema = definicion.payload.$ref.split("/").pop();
+
+        return (definicion.examples || []).map(ejemplo => ({
+            mensaje,
+            esquema,
+            nombre: ejemplo.name,
+            payload: ejemplo.payload
+        }));
+    });
+}
+
 // Interfaz HTTP: rutas, respuestas y esquemas de openapi.yaml, indexados
 // por operationId (también los de la sección webhooks).
-function crearContratoHttp() {
-    const documento = cargar("openapi.yaml");
-    const ajv = crearAjv();
+function crearContratoHttp({ directorio = DIRECTORIO } = {}) {
+    const documento = cargar("openapi.yaml", directorio);
+    const ajv = crearAjv(directorio);
     const operaciones = new Map();
 
     for (const [seccion, entradas] of [["paths", documento.paths], ["webhooks", documento.webhooks || {}]]) {
@@ -148,10 +168,17 @@ function crearContratoHttp() {
         return datos;
     }
 
+    // Definición completa de una operación, con sus extensiones (por
+    // ejemplo, el vector de prueba de la firma del webhook).
+    function operacion(operationId) {
+        return buscar(operationId).operacion;
+    }
+
     return {
         version: documento.info.version,
         ruta,
         metodo,
+        operacion,
         validarRespuesta,
         validarEsquema
     };
@@ -161,5 +188,6 @@ module.exports = {
     DIRECTORIO,
     ErrorDeContrato,
     crearValidadorDeMensajes,
+    ejemplosDeMensajes,
     crearContratoHttp
 };
