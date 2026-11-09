@@ -8,7 +8,7 @@ Temática 7 — Plataforma de e-learning de alta concurrencia, generalizada a un
 | **Grupo N°** | 15 |
 | **Integrantes** | Jonathan Mora Colodrero · María Constanza Gigli |
 | **Repositorio** | https://github.com/JoniMora/final-pdc |
-| **Estado actual** | Entrega 4 — Contratos de interfaz y descubrimiento de servicios (`v4-middleware`), verificada el 07/11/2026 |
+| **Estado actual** | Entrega 4 — Contratos de interfaz y descubrimiento de servicios (`v4-middleware`), verificada el 09/11/2026 |
 
 | Entrega | Contenido | Tag |
 |---|---|---|
@@ -31,7 +31,7 @@ La aplicación está en [`reserva-cupos`](reserva-cupos/README.md). Sobre el rec
 - **Contratos formales** — [`openapi.yaml`](reserva-cupos/contrato/openapi.yaml) 1.1.0 para la API pública y los webhooks, y [`asyncapi.yaml`](reserva-cupos/contrato/asyncapi.yaml) 1.0.0 para los mensajes de RabbitMQ, con versionado semántico y [CHANGELOG](reserva-cupos/contrato/CHANGELOG.md). Una sola definición de cada entidad: AsyncAPI toma las de OpenAPI. Publicados en [GitHub Pages](https://jonimora.github.io/final-pdc/).
 - **Cada componente valida contra el contrato** — la API valida solicitudes y respuestas (`express-openapi-validator`); el relay, el worker y el notificador validan cada mensaje con JSON Schema; Aula arma cada llamada a partir del contrato y valida las respuestas.
 - **Descubrimiento de servicios** — Traefik descubre las instancias de la API por etiquetas de Docker, les hace health check y balancea: `--scale api=3` no requiere configuración.
-- **Desacople verificado en CI** — Aula se prueba contra un mock de Prism generado del contrato; la API real, con Schemathesis; oasdiff rechaza los cambios incompatibles y CODEOWNERS exige la revisión del otro integrante.
+- **Desacople verificado en CI** — Aula se prueba contra un mock de Prism generado del contrato; la API real, con Schemathesis; la firma de los webhooks, con un vector de prueba del contrato que el emisor y el receptor verifican por separado. Los cambios incompatibles se rechazan en los dos contratos (oasdiff para la API, ejemplos de cada mensaje para AsyncAPI), el check obligatorio exige que pasen todos los trabajos del CI y CODEOWNERS exige la revisión del otro integrante.
 - **Sobre esos contratos** — cancelación asíncrona (`POST /v1/reservas/{id}/cancelacion`), estado `fallida`, webhooks firmados con HMAC, reintentos escalonados y DLQ, protección SSRF y proyección local de Aula alimentada por webhooks.
 
 - [Certificación de la Entrega 4](docs/entrega-4/README.md): mapa de contratos, descubrimiento y cómo se verifica el desacople.

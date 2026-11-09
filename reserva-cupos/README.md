@@ -27,7 +27,7 @@ Incluye:
 - **Cancelación asíncrona:** `POST /v1/reservas/{id}/cancelacion` → comando `cancelar` → el worker devuelve el cupo.
 - **Webhooks firmados:** el notificador entrega cada decisión con `X-Firma`, reintenta a los 10 s, 1 min y 5 min, deriva a `webhooks.dlq` y protege contra SSRF. Aula verifica la firma y mantiene su proyección local.
 - **Estado `fallida`** para reservas cuyo comando falla por un error de datos después de los reintentos.
-- **Verificación automática del desacople:** pruebas `node:test` en cada componente, Aula contra un mock de Prism generado del contrato, Schemathesis contra la API real y oasdiff contra `main` en cada PR.
+- **Verificación automática del desacople:** pruebas `node:test` en cada componente, Aula contra un mock de Prism generado del contrato, Schemathesis contra la API real y, en cada PR, la compatibilidad de los dos contratos contra `main` (oasdiff para la API; los ejemplos de cada mensaje para AsyncAPI). La firma de los webhooks tiene un vector de prueba en el contrato que verifican, por separado, el notificador y Aula.
 
 Todavía no incluye: límite de tasa, autenticación de personas y permisos, TLS, contingencia y reconciliación de Aula (Entrega 5).
 
@@ -128,11 +128,19 @@ Para crear otro tenant (las pruebas de carga y Schemathesis usan uno propio):
 docker compose exec mysql-primary mysql -uroot -proot_local_2026 reservas -e "SET @nombre = 'Pruebas de carga'; SOURCE /crear-tenant.sql"
 ```
 
-El comando muestra `tenant_id`, `nombre` y `clave_api`. La clave se genera con 256 bits aleatorios y no vuelve a mostrarse:
+El comando muestra `tenant_id`, `nombre`, `webhook_secreto` y `clave_api`. La clave se genera con 256 bits aleatorios y no vuelve a mostrarse:
 
 ```bash
 export CLAVE=<clave_api mostrada>
 ```
+
+Para registrar además el webhook del tenant, se indica la URL del receptor:
+
+```shell
+docker compose exec mysql-primary mysql -uroot -proot_local_2026 reservas -e "SET @nombre = 'Mi tenant'; SET @webhook_url = 'https://tenant.ejemplo/webhooks'; SOURCE /crear-tenant.sql"
+```
+
+El secreto del webhook son 32 bytes aleatorios y se muestra una sola vez, en hexadecimal (64 caracteres). La clave del HMAC de `X-Firma` son esos 32 bytes, no el texto; el contrato trae un vector de prueba (`x-vector-de-prueba`) para comprobar una implementación.
 
 ## API v1
 
@@ -159,11 +167,11 @@ Traefik observa Docker y registra cada contenedor con la etiqueta `traefik.enabl
 
 ```shell
 docker compose up -d --scale api=3 --no-recreate api
-curl -s http://localhost:8080/api/http/services/api@docker
+pruebas/descubrimiento/instancias.sh --esperar 3
 for i in $(seq 1 9); do curl -s http://localhost:3000/health; echo; done
 ```
 
-El panel muestra tres servidores `UP` y `/health` informa la `instancia` que atendió cada solicitud. Si una instancia se detiene, Traefik deja de enviarle tráfico. Para volver a una instancia: `docker compose up -d --scale api=1 api`.
+`instancias.sh` consulta el panel de Traefik (`/api/http/services/api@docker`) y, con `--esperar 3`, espera a que haya tres servidores `UP`: una instancia nueva aparece cuando Docker la marca healthy, unos segundos después de arrancar. `/health` informa la `instancia` que atendió cada solicitud. Si una instancia se detiene, Traefik deja de enviarle tráfico. Para volver a una instancia: `docker compose up -d --scale api=1 api`.
 
 ## Cancelación y webhooks
 
@@ -176,7 +184,7 @@ curl -s -i -X POST http://localhost:3000/v1/reservas/$RESERVA/cancelacion -H "Au
 docker compose logs --tail=10 worker notificador aula
 ```
 
-El worker informa `cancelada, cupo devuelto`, el notificador `reserva.cancelada entregado a aula:3001 (204)` y Aula `Webhook N: reserva.cancelada v3 aplicado`.
+El worker informa `cancelada, cupo devuelto`, el notificador `reserva.cancelada entregado a aula:3001 (204)` y Aula `Webhook N: reserva.cancelada v3 aplicado`. Si 30 segundos después del pedido la reserva sigue activa, repetir la cancelación vuelve a registrar el comando (así lo establece el contrato).
 
 Reintentos: con `docker compose stop aula`, las entregas pasan por `webhooks.espera.10s`, `webhooks.espera.1m` y `webhooks.espera.5m` y, agotadas, quedan en `webhooks.dlq`:
 
@@ -206,20 +214,23 @@ docker rm -f prism-mock
 Con el entorno levantado y la clave de un tenant propio en `$CLAVE`:
 
 ```shell
-docker run --rm --network reserva-cupos-infra_publica \
+docker run --rm --network reserva-cupos-infra_publica -e SCHEMATHESIS_HOOKS=/config/hooks.py \
   -v "$PWD/contrato:/contrato:ro" -v "$PWD/pruebas/contrato:/config:ro" \
   schemathesis/schemathesis:4.33.1 --config-file /config/schemathesis.toml \
   run /contrato/openapi.yaml --url http://traefik -H "Authorization: Bearer $CLAVE" \
   --checks all --max-examples 25 --seed 2026 --generation-with-security-parameters false
 ```
 
-### Cambios incompatibles del contrato
+[`pruebas/contrato/hooks.py`](pruebas/contrato/hooks.py) usa una `Idempotency-Key` nueva en cada solicitud válida, y `schemathesis.toml` alarga las secuencias con estado a 30 pasos: así Schemathesis crea, consulta y cancela reservas reales.
+
+### Cambios incompatibles de los contratos
 
 ```shell
 pruebas/contrato/oasdiff.sh v3-comunicacion
+(cd compartido && npm ci) && pruebas/contrato/compatibilidad-mensajes.sh
 ```
 
-Compara `contrato/openapi.yaml` con el de otra versión (tag, rama o commit) y falla si encuentra un cambio incompatible. El CI lo ejecuta contra `main` en cada PR.
+`oasdiff.sh` compara `contrato/openapi.yaml` con el de otra versión (tag, rama o commit) y falla si encuentra un cambio incompatible. `compatibilidad-mensajes.sh` hace lo mismo con `contrato/asyncapi.yaml`: valida los ejemplos de cada versión contra los esquemas de la otra, porque durante un despliegue conviven consumidores y productores de las dos versiones. El CI ejecuta las dos comparaciones contra `main` en cada PR.
 
 ### Caso de concurrencia (Entrega 3)
 
@@ -238,10 +249,11 @@ La ráfaga verifica 10 confirmadas, 490 rechazadas, 0 pendientes y `cupos_dispon
 
 | Trabajo | Qué verifica |
 |---|---|
-| Contratos | OpenAPI y AsyncAPI válidos; sin cambios incompatibles respecto de `main` (oasdiff). |
+| Contratos | OpenAPI y AsyncAPI válidos; sin cambios incompatibles respecto de `main` (oasdiff y ejemplos de los mensajes). |
 | Pruebas | `npm test` en cada componente. |
 | Aula contra el mock del contrato | El consumidor funciona solo con el contrato (Prism). |
 | Integración | Schemathesis contra la API real detrás de Traefik y la ráfaga de 500 sobre 10 cupos. |
+| CI completo | Que todos los anteriores hayan terminado bien. Es el check obligatorio de `main`: GitHub cuenta como exitoso un job salteado, y con una prueba rota la integración no corre. |
 
 [`.github/workflows/documentacion.yml`](../.github/workflows/documentacion.yml) publica la documentación de los contratos en GitHub Pages cuando cambian en `main`.
 
@@ -275,7 +287,7 @@ docker compose up -d
 Exclusivamente para desarrollo local.
 
 - Clave de API de Aula: `rc_aula_5589268069a379faa72a98ae640f818c09fc6179adf5f2146bd97aadbb06bc42`.
-- Secreto del webhook de Aula: `WEBHOOK_SECRET` en `docker-compose.yml` (y su `UNHEX` en `03-tenants.sql`).
+- Secreto del webhook de Aula: `WEBHOOK_SECRET` en `docker-compose.yml`, en hexadecimal (y sus 32 bytes con `UNHEX` en `03-tenants.sql`). Aula no arranca si falta o no tiene 64 caracteres hexadecimales.
 - RabbitMQ: demo / demo_local_2026.
 - MySQL: root_local_2026; api_app, worker_app, relay_app, notificador_app y replicador con las contraseñas de `docker-compose.yml` y `02-usuarios.sql`.
 - PostgreSQL: aula_admin / postgres_local_2026; aula_app / aula_local_2026.
@@ -284,7 +296,7 @@ Exclusivamente para desarrollo local.
 
 - La admisión durable está acotada por el `COMMIT` semisíncrono: una ráfaga de 500 se admite completa en 8 a 16 segundos según la corrida. Agregar instancias de la API no la acelera; se mide en la Entrega 6.
 - Con dos workers sobre la misma cola no se garantiza el orden de llegada; el particionado por actividad se mide en la Entrega 6.
-- La URL y el secreto de webhook de un tenant se cargan por SQL; la API de administración llega en la Entrega 5.
+- La URL y el secreto de webhook de un tenant se registran con `crear-tenant.sql`; la API de administración llega en la Entrega 5.
 - El panel de Traefik (8080) no tiene autenticación y Traefik monta el socket de Docker en solo lectura; ambos se protegen en la Entrega 5. Sin TLS ni límite de tasa.
 - Aula guarda la última secuencia recibida por webhook; la reconciliación desde el feed y el modo contingencia llegan en la Entrega 5.
 - Todos los contenedores se ejecutan en un único equipo y el failover de MySQL es manual.

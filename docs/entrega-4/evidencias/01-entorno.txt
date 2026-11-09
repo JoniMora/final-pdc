@@ -1,5 +1,5 @@
 # 01 · Entorno: diez contenedores, gateway y contratos cargados
-# Ejecución: 07/11/2026 20:39 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Ejecución: 09/11/2026 19:56 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
 # Comandos ejecutados desde la carpeta reserva-cupos.
 
 Volúmenes vacíos: docker compose down -v, docker compose up --build -d y configuración de la réplica con /configurar-replica.sql (paso de reserva-cupos/README.md).
@@ -8,16 +8,16 @@ Volúmenes vacíos: docker compose down -v, docker compose up --build -d y confi
 
 $ docker compose ps -a
 NAME                                  IMAGE                               COMMAND                  SERVICE             CREATED              STATUS                        PORTS
-reserva-cupos-infra-api-1             reserva-cupos-infra-api             "docker-entrypoint.s…"   api                 About a minute ago   Up 47 seconds (healthy)       3000/tcp
-reserva-cupos-infra-aula-1            reserva-cupos-infra-aula            "docker-entrypoint.s…"   aula                About a minute ago   Up 36 seconds (healthy)       127.0.0.1:3001->3001/tcp
+reserva-cupos-infra-api-1             reserva-cupos-infra-api             "docker-entrypoint.s…"   api                 About a minute ago   Up 40 seconds (healthy)       3000/tcp
+reserva-cupos-infra-aula-1            reserva-cupos-infra-aula            "docker-entrypoint.s…"   aula                About a minute ago   Up 28 seconds (healthy)       127.0.0.1:3001->3001/tcp
 reserva-cupos-infra-aula-db-1         postgres:16-alpine                  "docker-entrypoint.s…"   aula-db             About a minute ago   Up About a minute (healthy)   5432/tcp
 reserva-cupos-infra-mysql-primary-1   reserva-cupos-infra-mysql-primary   "docker-entrypoint.s…"   mysql-primary       About a minute ago   Up About a minute (healthy)   3306/tcp, 33060/tcp
-reserva-cupos-infra-mysql-replica-1   reserva-cupos-infra-mysql-replica   "docker-entrypoint.s…"   mysql-replica       About a minute ago   Up 47 seconds (healthy)       3306/tcp, 33060/tcp
-reserva-cupos-infra-notificador-1     reserva-cupos-infra-notificador     "docker-entrypoint.s…"   notificador         About a minute ago   Up 46 seconds                 
+reserva-cupos-infra-mysql-replica-1   reserva-cupos-infra-mysql-replica   "docker-entrypoint.s…"   mysql-replica       About a minute ago   Up 40 seconds (healthy)       3306/tcp, 33060/tcp
+reserva-cupos-infra-notificador-1     reserva-cupos-infra-notificador     "docker-entrypoint.s…"   notificador         About a minute ago   Up 33 seconds                 
 reserva-cupos-infra-rabbitmq-1        reserva-cupos-infra-rabbitmq        "docker-entrypoint.s…"   rabbitmq            About a minute ago   Up About a minute (healthy)   4369/tcp, 5671-5672/tcp, 15671/tcp, 15691-15692/tcp, 25672/tcp, 127.0.0.1:15672->15672/tcp
-reserva-cupos-infra-relay-1           reserva-cupos-infra-relay           "docker-entrypoint.s…"   relay               About a minute ago   Up 47 seconds                 
+reserva-cupos-infra-relay-1           reserva-cupos-infra-relay           "docker-entrypoint.s…"   relay               About a minute ago   Up 33 seconds                 
 reserva-cupos-infra-traefik-1         traefik:v3.6                        "/entrypoint.sh --pr…"   traefik             About a minute ago   Up About a minute (healthy)   127.0.0.1:8080->8080/tcp, 127.0.0.1:3000->80/tcp
-reserva-cupos-infra-worker-1          reserva-cupos-infra-worker          "docker-entrypoint.s…"   worker              About a minute ago   Up 46 seconds                 
+reserva-cupos-infra-worker-1          reserva-cupos-infra-worker          "docker-entrypoint.s…"   worker              About a minute ago   Up 34 seconds                 
 [código de salida: 0]
 
 ## Réplica semisíncrona activa
@@ -31,21 +31,21 @@ mysql: [Warning] Using a password on the command line interface can be insecure.
 
 $ docker compose exec -T mysql-primary mysql -uroot -proot_local_2026 -N -e "SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_status'"
 mysql: [Warning] Using a password on the command line interface can be insecure.
-Rpl_semi_sync_source_status	ON
+Rpl_semi_sync_source_status	OFF
 [código de salida: 0]
 
 ## La API se alcanza solo por Traefik (puerto 3000 del host)
 
 $ curl -s -w '\n' http://localhost:3000/health
-{"servicio":"api","instancia":"67acb66cdce7","estado":"ok","mysql":"conectado"}
+{"servicio":"api","instancia":"ddd84270171e","estado":"ok","mysql":"conectado"}
 [código de salida: 0]
 
 ## Cada componente arranca con el contrato
 
 $ docker compose logs api aula worker relay notificador 2>&1 | grep -E 'contrato|Esperando|Entregando|Conectado'
+reserva-cupos-infra-worker-1  | [WORKER] Esperando comandos en reservas.comandos.0 (contrato de mensajería validado)
+reserva-cupos-infra-api-1     | [API] Escuchando en puerto 3000 · contrato /app/contrato/openapi.yaml
 reserva-cupos-infra-notificador-1  | [notificador] Entregando webhooks desde webhooks.entregas · hosts permitidos: aula
-reserva-cupos-infra-api-1          | [API] Escuchando en puerto 3000 · contrato /app/contrato/openapi.yaml
-reserva-cupos-infra-worker-1       | [WORKER] Esperando comandos en reservas.comandos.0 (contrato de mensajería validado)
 reserva-cupos-infra-aula-1         | [AULA] Pagina disponible en puerto 3001 · contrato openapi.yaml 1.1.0
 reserva-cupos-infra-relay-1        | [relay] Conectado a RabbitMQ
 [código de salida: 0]
@@ -54,3 +54,4 @@ $ grep -E '^  version' contrato/openapi.yaml contrato/asyncapi.yaml
 contrato/openapi.yaml:  version: 1.1.0
 contrato/asyncapi.yaml:  version: 1.0.0
 [código de salida: 0]
+

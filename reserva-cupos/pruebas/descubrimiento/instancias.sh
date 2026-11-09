@@ -39,7 +39,11 @@ if [ "$1" = "--esperar" ]; then
         segundos=$((segundos + 1))
     done
 
-    echo "Traefik tiene $esperadas instancias UP (esperó $segundos s)"
+    if [ "$esperadas" = 1 ]; then
+        echo "Traefik tiene 1 instancia UP (esperó $segundos s)"
+    else
+        echo "Traefik tiene $esperadas instancias UP (esperó $segundos s)"
+    fi
 fi
 
 servicio | python3 -c '

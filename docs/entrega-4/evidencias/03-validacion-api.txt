@@ -1,5 +1,5 @@
 # 03 · La API valida cada solicitud contra el contrato
-# Ejecución: 07/11/2026 20:39 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Ejecución: 09/11/2026 19:56 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
 # Comandos ejecutados desde la carpeta reserva-cupos.
 
 express-openapi-validator usa contrato/openapi.yaml: una solicitud fuera de contrato se rechaza antes de llegar a la ruta.
@@ -34,7 +34,7 @@ HTTP 400
 
 ## Falta la Idempotency-Key obligatoria: 400
 
-$ curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/v1/actividades/01a1b841-50b5-76de-9a8d-2ea04aafc9d8/reservas -H "Authorization: Bearer $CLAVE_AULA" -H 'Content-Type: application/json' -d '{"participante":"ana"}'
+$ curl -s -w '\nHTTP %{http_code}\n' -X POST http://localhost:3000/v1/actividades/019a5f3b-9a10-7f22-8c3d-1e2f3a4b5c6d/reservas -H "Authorization: Bearer $CLAVE_AULA" -H 'Content-Type: application/json' -d '{"participante":"ana"}'
 {"type":"urn:reserva-cupos:problema:solicitud-invalida","title":"Solicitud inválida","status":400,"detail":"/headers/idempotency-key: must have required property 'idempotency-key'"}
 HTTP 400
 [código de salida: 0]
@@ -64,11 +64,12 @@ HTTP 404
 ## Cada ruta implementada está en el contrato y viceversa (prueba de la API)
 
 $ cd servicios/api && npm test 2>&1 | grep -E '^(✔|✖|ℹ (tests|pass|fail))'
-✔ cada ruta de la API está en el contrato y viceversa (1.957814ms)
-✔ uuidv7 genera UUID versión 7 ordenados por tiempo (6.876672ms)
-✔ jsonCanonico no depende del orden de las claves (0.533624ms)
-✔ metadata acepta objetos de hasta 16 KB y rechaza el resto (4.209662ms)
+✔ cada ruta de la API está en el contrato y viceversa (1.993519ms)
+✔ uuidv7 genera UUID versión 7 ordenados por tiempo (10.049237ms)
+✔ jsonCanonico no depende del orden de las claves (0.437194ms)
+✔ metadata acepta objetos de hasta 16 KB y rechaza el resto (3.018309ms)
 ℹ tests 4
 ℹ pass 4
 ℹ fail 0
 [código de salida: 0]
+
