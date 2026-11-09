@@ -87,3 +87,37 @@ test("una firma vieja o con otro secreto se rechaza", async () => {
 test("la firma tiene el formato que define el contrato", () => {
     assert.match(firmar(SECRETO, "{}"), /^t=[0-9]+,v1=[0-9a-f]{64}$/);
 });
+
+test("el emisor reproduce el vector de prueba del contrato", () => {
+    // Valores tomados de contrato/openapi.yaml, no del receptor de Aula. El
+    // notificador recibe el secreto de MySQL como los 32 bytes.
+    const vector = contrato.operacion("recibirCambioDeReserva")["x-vector-de-prueba"];
+
+    assert.equal(firmar(Buffer.from(vector.secreto, "hex"), vector.cuerpo, vector.t), vector["X-Firma"]);
+});
+
+test("una respuesta que no termina de llegar a tiempo cuenta como falla", async () => {
+    // El receptor envía las cabeceras y después un byte cada 50 ms: sin un
+    // plazo total, la entrega quedaría retenida.
+    const goteos = new Set();
+    const servidor = http.createServer((req, res) => {
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        const goteo = setInterval(() => res.write("."), 50);
+        goteos.add(goteo);
+        res.on("close", () => clearInterval(goteo));
+    });
+
+    await new Promise(resolve => servidor.listen(0, "127.0.0.1", resolve));
+    const url = new URL(`http://127.0.0.1:${servidor.address().port}/webhooks`);
+    const inicio = Date.now();
+
+    await assert.rejects(
+        enviar(url, "{}", {}, { timeoutMs: 300, lookup: crearLookup(new Set(["127.0.0.1"])) }),
+        /Sin respuesta completa en 300 ms/
+    );
+
+    assert.ok(Date.now() - inicio < 2000);
+    for (const goteo of goteos) clearInterval(goteo);
+    servidor.closeAllConnections();
+    servidor.close();
+});

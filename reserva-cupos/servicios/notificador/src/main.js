@@ -17,6 +17,7 @@ const PREFETCH = 10;
 const TIMEOUT_MS = Number(process.env.WEBHOOK_TIMEOUT_MS || 5000);
 const CACHE_TENANTS_MS = 30000;
 const PAUSA_INFRAESTRUCTURA_MS = 5000;
+const BYTES_SECRETO = 32;
 
 const PERMITIDOS = new Set(
     (process.env.NOTIFICADOR_HOSTS_PERMITIDOS || "")
@@ -134,6 +135,14 @@ async function iniciar() {
         if (!tenant || !tenant.activo || !tenant.webhook_url || !tenant.webhook_secret) {
             // El tenant no registró webhook: sincroniza leyendo el feed.
             canal.ack(entrega);
+            return;
+        }
+
+        // El contrato fija un secreto de 32 bytes: con otro largo, el tenant
+        // no podría verificar la firma. Es un error de configuración.
+        if (tenant.webhook_secret.length !== BYTES_SECRETO) {
+            console.error(`[notificador] ${id}: el secreto del tenant no tiene ${BYTES_SECRETO} bytes, a webhooks.dlq`);
+            canal.nack(entrega, false, false);
             return;
         }
 

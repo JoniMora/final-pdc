@@ -22,6 +22,31 @@ test("se rechazan URLs con otro protocolo, credenciales o IP interna literal", (
     assert.equal(validarUrl("https://tenant.ejemplo.com/webhooks", permitidos).hostname, "tenant.ejemplo.com");
 });
 
+test("una IPv4 interna escrita como IPv6 también se rechaza", () => {
+    // El parser de URL normaliza [::ffff:127.0.0.1] a [::ffff:7f00:1], y
+    // Node no consulta el DNS para una IP literal: la validación de la URL
+    // es la única barrera.
+    const permitidos = new Set();
+    const internas = [
+        "http://[::ffff:127.0.0.1]/",           // IPv4 mapeada
+        "http://[::ffff:169.254.169.254]/",     // metadatos de una nube
+        "http://[::ffff:a00:1]/",               // 10.0.0.1 en hexadecimal
+        "http://[::127.0.0.1]/",                // IPv4 compatible
+        "http://[64:ff9b::a9fe:a9fe]/",         // NAT64 de 169.254.169.254
+        "http://[2002:ac12:3::1]/",             // 6to4 de 172.18.0.3
+        "http://[fd12:3456::1]/",
+        "http://[::]/"
+    ];
+
+    for (const url of internas) {
+        assert.throws(() => validarUrl(url, permitidos), ErrorDestino, url);
+    }
+
+    for (const url of ["http://[::ffff:8.8.8.8]/", "http://[64:ff9b::808:808]/", "http://[2800:3f0:4002::200e]/"]) {
+        assert.equal(validarUrl(url, permitidos).protocol, "http:", url);
+    }
+});
+
 test("un nombre que resuelve a una IP interna se rechaza al conectar, salvo que esté permitido", async () => {
     const resolver = (host, opciones, callback) => callback(null, [{ address: "172.18.0.7", family: 4 }]);
 
