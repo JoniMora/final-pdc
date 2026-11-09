@@ -90,9 +90,11 @@ async function conectarBroker() {
 
 // 1. Secuenciador: asigna números crecientes a los cambios confirmados
 // que todavía no tienen secuencia. Es la única instancia que lo hace y
-// lo hace en una sola transacción por lote, así la secuencia visible es
-// densa y un lector nunca ve aparecer después una menor (el índice
-// único sobre secuencia rechaza una segunda instancia por error).
+// lo hace en una sola transacción por lote, así la secuencia de la tabla
+// no tiene huecos y un lector nunca ve aparecer después una menor (el
+// índice único sobre secuencia rechaza una segunda instancia por error).
+// El feed de un tenant sí muestra saltos: solo incluye sus cambios y omite
+// los pedidos de cancelación, que son comandos.
 async function secuenciar() {
     const conexion = await pool.getConnection();
 

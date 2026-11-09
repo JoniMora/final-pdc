@@ -6,8 +6,8 @@
 [checks.positive_data_acceptance]
 # 409 y 422 son reglas de negocio documentadas, no rechazos de un dato
 # inválido: actividad cerrada, reserva activa del participante y
-# Idempotency-Key reutilizada con otro cuerpo (la fase con estado de
-# Schemathesis repite claves).
+# Idempotency-Key reutilizada con otro cuerpo (Schemathesis repite claves
+# si no se usa hooks.py).
 expected-statuses = ["2xx", "3xx", "401", "403", "404", "409", "422", "429", "5xx"]
 
 [[operations]]
@@ -15,3 +15,10 @@ expected-statuses = ["2xx", "3xx", "401", "403", "404", "409", "422", "429", "5x
 # cumple el esquema pero no es un cursor, y la API lo rechaza con 400.
 include-operation-id = "listarReservas"
 checks.positive_data_acceptance.expected-statuses = ["2xx", "3xx", "400", "401", "403", "404", "429", "5xx"]
+
+[phases.stateful]
+# Secuencias más largas que las 6 llamadas por defecto: crear una actividad,
+# reservar, consultar y cancelar es una cadena de varios links. Junto con
+# hooks.py (una Idempotency-Key nueva por solicitud), la fase con estado
+# llega a cancelar reservas reales.
+max-steps = 30

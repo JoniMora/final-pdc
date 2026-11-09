@@ -266,10 +266,9 @@ rutas.get("/reservas/:id", async (req, res) => {
 // Cancelación asíncrona: registra el pedido y su comando en el outbox y
 // responde 202; el worker cancela y, si estaba confirmada, devuelve el
 // cupo. Es idempotente: mientras haya un pedido reciente no se registra
-// otro, y una reserva ya cancelada responde 200.
+// otro, y una reserva ya cancelada responde 200. Un id que no es un UUID
+// no llega acá: el validador del contrato responde 400.
 rutas.post("/reservas/:id/cancelacion", async (req, res) => {
-    if (!esUuid(req.params.id)) throw problemas.noEncontrado();
-
     const resultado = await enTransaccion(async conexion => {
         // FOR SHARE alcanza: la API no modifica la reserva (no tiene
         // privilegio de UPDATE sobre ella), solo la lee de forma estable.
