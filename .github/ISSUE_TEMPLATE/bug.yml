@@ -1,0 +1,22 @@
+name: Error
+description: Algo que no funciona como dice el contrato o la documentación.
+labels: [bug]
+body:
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Cómo reproducirlo
+      placeholder: Comandos o pasos exactos.
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Qué se esperaba y qué pasó
+    validations:
+      required: true
+  - type: input
+    id: componente
+    attributes:
+      label: Componente
+      placeholder: api, worker, relay, notificador, aula, infraestructura

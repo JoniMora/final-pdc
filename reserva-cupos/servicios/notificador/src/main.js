@@ -1,11 +1,33 @@
 const mysql = require("mysql2/promise");
 const amqp = require("amqplib");
+const { crearValidadorDeMensajes } = require("../../../compartido/src/contrato");
+const { firmar } = require("./firma");
+const { ErrorDestino, validarUrl, crearLookup } = require("./destino");
+const { enviar } = require("./enviar");
 
-const componente = process.env.COMPONENTE;
+// Entrega los webhooks de los tenants. Consume webhooks.entregas, firma
+// cada evento y hace el POST descrito en contrato/openapi.yaml (sección
+// webhooks). Si el tenant no responde 2xx, reprograma la entrega en las
+// colas de espera (10 s, 1 min y 5 min); agotadas, va a webhooks.dlq. El
+// feed /v1/cambios sigue teniendo el evento: la DLQ no implica pérdida.
 
-if (!["relay", "notificador"].includes(componente)) {
-    throw new Error("COMPONENTE debe ser relay o notificador");
-}
+const COLA = "webhooks.entregas";
+const ESPERAS = ["webhooks.espera.10s", "webhooks.espera.1m", "webhooks.espera.5m"];
+const PREFETCH = 10;
+const TIMEOUT_MS = Number(process.env.WEBHOOK_TIMEOUT_MS || 5000);
+const CACHE_TENANTS_MS = 30000;
+const PAUSA_INFRAESTRUCTURA_MS = 5000;
+const BYTES_SECRETO = 32;
+
+const PERMITIDOS = new Set(
+    (process.env.NOTIFICADOR_HOSTS_PERMITIDOS || "")
+        .split(",")
+        .map(host => host.trim())
+        .filter(Boolean)
+);
+
+const lookup = crearLookup(PERMITIDOS);
+const validar = crearValidadorDeMensajes();
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
@@ -17,12 +39,30 @@ const pool = mysql.createPool({
 });
 
 function salir(error) {
-    console.error(
-        `[${componente}] Error de RabbitMQ:`,
-        error.message
+    console.error("[notificador]", error.message);
+    process.exit(1);
+}
+
+function esperar(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// URL y secreto del tenant, con una caché corta para no consultar MySQL en
+// cada entrega.
+const tenants = new Map();
+
+async function datosDelTenant(id) {
+    const enCache = tenants.get(id);
+    if (enCache && enCache.expira > Date.now()) return enCache.datos;
+
+    const [filas] = await pool.query(
+        "SELECT webhook_url, webhook_secret, activo FROM tenants WHERE id = ?",
+        [id]
     );
 
-    process.exit(1);
+    const datos = filas[0] || null;
+    tenants.set(id, { datos, expira: Date.now() + CACHE_TENANTS_MS });
+    return datos;
 }
 
 async function iniciar() {
@@ -34,65 +74,123 @@ async function iniciar() {
     });
 
     conexion.on("error", salir);
+    conexion.on("close", () => salir(new Error("Se perdió la conexión con RabbitMQ")));
 
-    conexion.on("close", () => {
-        salir(new Error("Conexion cerrada"));
-    });
-
-    const canal = await conexion.createChannel();
+    // Canal con confirmaciones: una reprogramación se confirma antes de
+    // descartar el mensaje original.
+    const canal = await conexion.createConfirmChannel();
 
     canal.on("error", salir);
+    canal.on("close", () => salir(new Error("Se cerró el canal de RabbitMQ")));
 
-    canal.on("close", () => {
-        salir(new Error("Canal cerrado"));
-    });
+    await canal.prefetch(PREFETCH);
 
-    await canal.assertQueue("infraestructura.pruebas", {
-        durable: true
-    });
+    async function reprogramar(entrega, motivo) {
+        const intento = Number(entrega.properties.headers?.["x-intento"] || 0);
+        const id = entrega.properties.messageId;
 
-    // Cada componente consulta una tabla permitida para su usuario.
-    const sql = componente === "relay"
-        ? `SELECT COUNT(*) AS cantidad
-       FROM cambios
-       WHERE publicado_comando = FALSE
-          OR publicado_webhook = FALSE`
+        if (intento >= ESPERAS.length) {
+            console.error(`[notificador] ${id}: ${motivo}. Sin más reintentos, a webhooks.dlq`);
+            canal.nack(entrega, false, false);
+            return;
+        }
 
-        : `SELECT COUNT(*) AS cantidad
-       FROM tenants
-       WHERE activo = TRUE
-         AND webhook_url IS NOT NULL`;
+        canal.sendToQueue(ESPERAS[intento], entrega.content, {
+            persistent: true,
+            contentType: "application/json",
+            messageId: id,
+            type: "entrega",
+            headers: { "x-intento": intento + 1 }
+        });
 
-    async function comprobar() {
+        await canal.waitForConfirms();
+        canal.ack(entrega);
+
+        console.error(`[notificador] ${id}: ${motivo}. Reintento ${intento + 1} en ${ESPERAS[intento]}`);
+    }
+
+    async function procesar(entrega) {
+        const id = entrega.properties.messageId;
+        let mensaje;
+
         try {
-            const [filas] = await pool.query({
-                sql,
-                timeout: 3000
-            });
-
-            const cola = await canal.checkQueue(
-                "infraestructura.pruebas"
-            );
-
-            console.log(`[${componente}]`, {
-                mysql: "conectado",
-                rabbitmq: "conectado",
-                registros: filas[0].cantidad,
-                mensajesEnEspera: cola.messageCount,
-                verificadoEn: new Date().toISOString()
-            });
+            mensaje = validar("EntregaWebhook", JSON.parse(entrega.content.toString("utf8")));
         } catch (error) {
-            console.error(
-                `[${componente}] Comprobacion fallida:`,
-                error.message
-            );
-        } finally {
-            // Repetimos después de terminar, sin superponer consultas.
-            setTimeout(comprobar, 10000);
+            console.error(`[notificador] ${id}: fuera de contrato, a webhooks.dlq: ${error.message}`);
+            canal.nack(entrega, false, false);
+            return;
+        }
+
+        let tenant;
+
+        try {
+            tenant = await datosDelTenant(mensaje.tenant_id);
+        } catch (error) {
+            console.error(`[notificador] MySQL no disponible, se reintentará: ${error.code || error.message}`);
+            await esperar(PAUSA_INFRAESTRUCTURA_MS);
+            canal.nack(entrega, false, true);
+            return;
+        }
+
+        if (!tenant || !tenant.activo || !tenant.webhook_url || !tenant.webhook_secret) {
+            // El tenant no registró webhook: sincroniza leyendo el feed.
+            canal.ack(entrega);
+            return;
+        }
+
+        // El contrato fija un secreto de 32 bytes: con otro largo, el tenant
+        // no podría verificar la firma. Es un error de configuración.
+        if (tenant.webhook_secret.length !== BYTES_SECRETO) {
+            console.error(`[notificador] ${id}: el secreto del tenant no tiene ${BYTES_SECRETO} bytes, a webhooks.dlq`);
+            canal.nack(entrega, false, false);
+            return;
+        }
+
+        let url;
+
+        try {
+            url = validarUrl(tenant.webhook_url, PERMITIDOS);
+        } catch (error) {
+            console.error(`[notificador] ${id}: destino rechazado, a webhooks.dlq: ${error.message}`);
+            canal.nack(entrega, false, false);
+            return;
+        }
+
+        const cuerpo = JSON.stringify(mensaje.evento);
+
+        try {
+            const estado = await enviar(url, cuerpo, {
+                "Content-Type": "application/json",
+                "User-Agent": "reserva-cupos-notificador/1.0",
+                "X-Firma": firmar(tenant.webhook_secret, cuerpo),
+                "X-Webhook-Id": String(mensaje.cambio_id)
+            }, { timeoutMs: TIMEOUT_MS, lookup });
+
+            if (estado >= 200 && estado < 300) {
+                console.log(`[notificador] ${id}: ${mensaje.evento.tipo} entregado a ${url.host} (${estado})`);
+                canal.ack(entrega);
+                return;
+            }
+
+            await reprogramar(entrega, `el tenant respondió ${estado}`);
+        } catch (error) {
+            if (error instanceof ErrorDestino) {
+                console.error(`[notificador] ${id}: destino rechazado, a webhooks.dlq: ${error.message}`);
+                canal.nack(entrega, false, false);
+                return;
+            }
+
+            await reprogramar(entrega, error.code || error.message);
         }
     }
 
-    comprobar();
+    await canal.consume(COLA, entrega => {
+        if (!entrega) return salir(new Error("RabbitMQ canceló el consumidor"));
+
+        procesar(entrega).catch(salir);
+    }, { noAck: false });
+
+    console.log(`[notificador] Entregando webhooks desde ${COLA} · hosts permitidos: ${[...PERMITIDOS].join(", ") || "ninguno"}`);
 }
 
 iniciar().catch(salir);

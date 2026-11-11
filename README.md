@@ -8,7 +8,7 @@ Temática 7 — Plataforma de e-learning de alta concurrencia, generalizada a un
 | **Grupo N°** | 15 |
 | **Integrantes** | Jonathan Mora Colodrero · María Constanza Gigli |
 | **Repositorio** | https://github.com/JoniMora/final-pdc |
-| **Estado actual** | Entrega 3 — Comunicación síncrona y asíncrona (`v3-comunicacion`), verificada el 19/10/2026 |
+| **Estado actual** | Entrega 4 — Contratos de interfaz y descubrimiento de servicios (`v4-middleware`), verificada el 09/11/2026 |
 
 | Entrega | Contenido | Tag |
 |---|---|---|
@@ -16,6 +16,7 @@ Temática 7 — Plataforma de e-learning de alta concurrencia, generalizada a un
 | 1 | Propuesta de arquitectura (modelo 4+1) | `v1.2-propuesta-arquitectura` (original: `v1-propuesta-arquitectura`) |
 | 2 | Infraestructura: nueve contenedores, tres redes, primario-réplica semisíncrono y RabbitMQ | `v2.1-infraestructura` (original: `v2-infraestructura`) |
 | 3 | Comunicación: API v1 síncrona, outbox → relay → RabbitMQ → worker asíncrono y caso de concurrencia demostrado | `v3-comunicacion` |
+| 4 | Middleware: contratos OpenAPI y AsyncAPI verificados en CI, descubrimiento de servicios con Traefik, cancelación y webhooks firmados | `v4-middleware` |
 
 > **Revisión 1 (17/09/2026)** — persistencia primario-réplica con replicación semi-sincrónica: el nodo único de MySQL era un punto único de falla.
 > **Revisión 2 (22/09/2026)** — ampliación de alcance a pedido de la cátedra: API pública multi-tenant para cualquier dominio con cupo y continuidad operativa de los sistemas consumidores ante la caída de su propia base de datos.
@@ -23,19 +24,21 @@ Temática 7 — Plataforma de e-learning de alta concurrencia, generalizada a un
 ---
 
 
-## Entrega 3: implementación actual
+## Entrega 4: implementación actual
 
-La aplicación está en [`reserva-cupos`](reserva-cupos/README.md), separada de la documentación de las entregas. Sobre la infraestructura de la Entrega 2 (nueve contenedores, tres redes, primario-réplica semisíncrono y RabbitMQ) se implementa el recorrido real de una reserva:
+La aplicación está en [`reserva-cupos`](reserva-cupos/README.md). Sobre el recorrido de la Entrega 3, esta entrega desacopla los componentes por **contrato explícito** y agrega **descubrimiento de servicios**:
 
-- **Canal síncrono** — API pública v1 por HTTP con autenticación por tenant, admisión `202` + `Location` con `Idempotency-Key`, consultas, listado paginado por cursor y feed `/v1/cambios`. Contrato en [`openapi.yaml`](reserva-cupos/contrato/openapi.yaml). Aula, el cliente de referencia, crea materias e inscribe alumnos por esta vía.
-- **Canal asíncrono** — outbox transaccional: la API y el worker escriben cada cambio en `cambios` dentro de su transacción; el relay lo secuencia y publica los comandos con *publisher confirms* en el exchange de hash consistente `reservas.comandos`; el worker los consume con `prefetch(1)` y `ack` posterior al `COMMIT`.
-- **Caso de concurrencia** — 500 solicitudes simultáneas sobre una actividad de 10 cupos terminan en exactamente 10 confirmadas, 490 rechazadas y 0 cupos negativos, con uno y con dos workers. En una comparación directa contra MySQL con 50 transacciones simultáneas, la variante ingenua (leer y después escribir) asigna 50 lugares sobre 10.
+- **Contratos formales** — [`openapi.yaml`](reserva-cupos/contrato/openapi.yaml) 1.1.0 para la API pública y los webhooks, y [`asyncapi.yaml`](reserva-cupos/contrato/asyncapi.yaml) 1.0.0 para los mensajes de RabbitMQ, con versionado semántico y [CHANGELOG](reserva-cupos/contrato/CHANGELOG.md). Una sola definición de cada entidad: AsyncAPI toma las de OpenAPI. Publicados en [GitHub Pages](https://jonimora.github.io/final-pdc/).
+- **Cada componente valida contra el contrato** — la API valida solicitudes y respuestas (`express-openapi-validator`); el relay, el worker y el notificador validan cada mensaje con JSON Schema; Aula arma cada llamada a partir del contrato y valida las respuestas.
+- **Descubrimiento de servicios** — Traefik descubre las instancias de la API por etiquetas de Docker, les hace health check y balancea: `--scale api=3` no requiere configuración.
+- **Desacople verificado en CI** — Aula se prueba contra un mock de Prism generado del contrato; la API real, con Schemathesis; la firma de los webhooks, con un vector de prueba del contrato que el emisor y el receptor verifican por separado. Los cambios incompatibles se rechazan en los dos contratos (oasdiff para la API, ejemplos de cada mensaje para AsyncAPI), el check obligatorio exige que pasen todos los trabajos del CI y CODEOWNERS exige la revisión del otro integrante.
+- **Sobre esos contratos** — cancelación asíncrona (`POST /v1/reservas/{id}/cancelacion`), estado `fallida`, webhooks firmados con HMAC, reintentos escalonados y DLQ, protección SSRF y proyección local de Aula alimentada por webhooks.
 
-- [Certificación de la Entrega 3](docs/entrega-3/README.md): justificación de cada semántica y cómo reproducir el caso de concurrencia.
-- [Evidencias de ejecución](docs/entrega-3/evidencias/README.md).
+- [Certificación de la Entrega 4](docs/entrega-4/README.md): mapa de contratos, descubrimiento y cómo se verifica el desacople.
+- [Evidencias de ejecución](docs/entrega-4/evidencias/README.md).
 - [Inicio local y pruebas](reserva-cupos/README.md).
 
-**Alcance:** todavía no se implementan la cancelación de reservas, el envío de webhooks, el límite de tasa ni la contingencia y reconciliación de Aula (Entregas 4 y 5). Tag de esta etapa: `v3-comunicacion`.
+**Alcance:** todavía no se implementan el límite de tasa, la autenticación de personas y los permisos, TLS, ni la contingencia y reconciliación de Aula (Entrega 5). Tag de esta etapa: `v4-middleware`.
 
 ## El problema
 
@@ -106,11 +109,12 @@ Claves de 256 bits guardadas como hash SHA-256; `tenant_id` derivado siempre de 
 
 ![Diagrama de despliegue](docs/entrega-1/arquitectura.png)
 
-Un host con **nueve contenedores en tres redes** de Docker Compose. Siete forman el servicio; dos simulan un sistema consumidor independiente.
+Un host con **diez contenedores en tres redes** de Docker Compose. Ocho forman el servicio; dos simulan un sistema consumidor independiente.
 
 | Contenedor | Rol | Redes | Expone |
 |---|---|---|---|
-| `api` (Node.js) | API pública v1: autenticación, admisión, consultas, listado y feed | pública, interna | Sí (HTTP) |
+| `traefik` | Gateway y descubrimiento de servicios: encuentra las instancias de la API y balancea (desde la Entrega 4) | pública | Sí (HTTP) |
+| `api` (Node.js) | API pública v1: autenticación, admisión, consultas, listado, cancelación y feed; valida contra el contrato | pública, interna | No (por Traefik) |
 | `relay` (Node.js) | Outbox: secuenciador del feed, publicador y barredor | interna | No |
 | `worker` (Node.js) | Comandos `reservar` y `cancelar`: asignación atómica de cupos | interna | No |
 | `notificador` (Node.js) | Webhooks salientes firmados con reintentos escalonados | interna, pública | No |
@@ -127,38 +131,44 @@ La red `publica` simula internet; la red `interna` contiene el broker y las base
 | Componente | Tecnología | Motivo |
 |---|---|---|
 | API, relay, worker y notificador | Node.js (Express · mysql2 · amqplib) | Un lenguaje para los cuatro servicios; E/S no bloqueante |
-| Contrato | OpenAPI 3.1 | Contrato verificable y documentación generada |
+| Contratos | OpenAPI 3.1 (REST y webhooks) · AsyncAPI 3.0 (mensajería) | Contratos verificables y documentación generada |
+| Verificación de contratos | express-openapi-validator · Ajv · Schemathesis · Prism · oasdiff | La API y los mensajes se validan en ejecución; el CI verifica proveedor, consumidor y compatibilidad |
+| Gateway y descubrimiento | Traefik (proveedor Docker) | Descubre las instancias sin configuración; el mismo gateway sirve para TLS (E5) y balanceo (E6) |
 | Broker | RabbitMQ + plugin de exchange de hash consistente | Colas durables, `ack` manual, `prefetch`, TTL y *dead-lettering* nativos; particionado por clave |
 | Base del servicio | MySQL 8 (InnoDB), primario + réplica semi-sincrónica | Transacciones ACID, bloqueo de fila, `CHECK`, columnas generadas, privilegios por columna, replicación sin pérdida de lo confirmado |
 | Cliente de referencia | Node.js + PostgreSQL | Demuestra independencia de motor y de esquema |
 | Pruebas de carga | k6 | Escenarios concurrentes reproducibles y métricas de latencia |
-| Orquestación | Docker Compose | Nueve contenedores y tres redes con un comando |
+| Orquestación | Docker Compose | Diez contenedores y tres redes con un comando |
+| Integración continua | GitHub Actions | Contratos, pruebas, consumidor contra el mock e integración en cada PR |
 
 ## Estructura del repositorio
 
 ```
 final-pdc/
+├── .github/                       # CI, publicación de los contratos, plantillas y CODEOWNERS (desde la Entrega 4)
 ├── reserva-cupos/                 # Aplicación (desde la Entrega 2)
-│   ├── docker-compose.yml         # Nueve contenedores, tres redes y cuatro volúmenes (+ k6 a pedido)
-│   ├── contrato/openapi.yaml      # Contrato de la API v1 (desde la Entrega 3)
+│   ├── docker-compose.yml         # Diez contenedores, tres redes y cuatro volúmenes (+ k6 a pedido)
+│   ├── contrato/                  # openapi.yaml, asyncapi.yaml, CHANGELOG y excepciones de oasdiff
+│   ├── compartido/                # Validación contra los contratos, usada por los componentes
 │   ├── Infraestructura/
 │   │   ├── mysql/primary/         # Primario: binlog, GTID, esquema, usuarios y semisync
 │   │   ├── mysql/replica/         # Réplica semisíncrona en solo lectura
 │   │   ├── postgres/              # Base propia de Aula
 │   │   └── rabbitmq/              # Broker con exchange de hash consistente
 │   ├── servicios/
-│   │   ├── api/                   # API pública v1: autenticación, admisión, consultas, listado y feed
-│   │   ├── worker/                # Comando reservar: decisión atómica e idempotente
+│   │   ├── api/                   # API pública v1, validada contra openapi.yaml
+│   │   ├── worker/                # Comandos reservar y cancelar
 │   │   ├── relay/                 # Topología, secuenciador del feed, publicador y barredor
-│   │   └── notificador/           # Comprobaciones de conexión (webhooks en la Entrega 4)
+│   │   └── notificador/           # Webhooks firmados con reintentos y protección SSRF
 │   ├── clientes/
-│   │   └── aula/                  # Cliente de referencia con PostgreSQL propio
-│   └── pruebas/carga/             # k6: ráfaga sobre una actividad y duplicados simultáneos
+│   │   └── aula/                  # Cliente de referencia: cliente derivado del contrato y receptor de webhooks
+│   └── pruebas/
+│       ├── carga/                 # k6: ráfaga sobre una actividad y duplicados simultáneos
+│       └── contrato/              # Schemathesis y oasdiff
 └── docs/                          # Documentación por entrega
-    ├── entrega-0/
-    ├── entrega-1/
-    ├── entrega-2/                 # Evidencias de la infraestructura
-    └── entrega-3/                 # Certificación y evidencias de comunicación
+    ├── api/                       # Sitio de los contratos (GitHub Pages)
+    ├── entrega-0/ … entrega-3/
+    └── entrega-4/                 # Certificación y evidencias de contratos y descubrimiento
 ```
 
 > **Nota:** la estructura objetivo, con los módulos compartidos y las pruebas de fallos, se describe en la vista de desarrollo de la [Entrega 1](docs/entrega-1/informe.md); esas carpetas se incorporan en las entregas siguientes.
@@ -175,7 +185,9 @@ final-pdc/
 - [`docs/entrega-2/evidencias/`](docs/entrega-2/evidencias/README.md) — salida de los comandos de verificación y capturas de Aula.
 - [`docs/entrega-3/README.md`](docs/entrega-3/README.md) — certificación de la Entrega 3: canales, justificación de cada semántica y caso de concurrencia.
 - [`docs/entrega-3/evidencias/`](docs/entrega-3/evidencias/README.md) — salida de las pruebas de comunicación y concurrencia.
-- [`reserva-cupos/contrato/openapi.yaml`](reserva-cupos/contrato/openapi.yaml) — contrato OpenAPI 3.1 de la API v1.
+- [`docs/entrega-4/README.md`](docs/entrega-4/README.md) — certificación de la Entrega 4: mapa de contratos, descubrimiento de servicios y verificación del desacople.
+- [`docs/entrega-4/evidencias/`](docs/entrega-4/evidencias/README.md) — salida de las verificaciones de contratos, descubrimiento, cancelación y webhooks.
+- [`reserva-cupos/contrato/`](reserva-cupos/contrato/) — contratos OpenAPI 3.1 (API v1 y webhooks) y AsyncAPI 3.0 (mensajería), publicados en [GitHub Pages](https://jonimora.github.io/final-pdc/).
 
 ## Escenario de validación
 

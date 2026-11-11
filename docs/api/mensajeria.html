@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mensajería interna · Reserva de cupos</title>
+    <link rel="stylesheet" href="https://unpkg.com/@asyncapi/react-component@3.2.3/styles/default.min.css">
+    <style>body { margin: 0; background: #fff; }</style>
+</head>
+<body>
+<div id="asyncapi"></div>
+<script src="https://unpkg.com/@asyncapi/react-component@3.2.3/browser/standalone/index.js"></script>
+<script>
+    AsyncApiStandalone.render({
+        schema: { url: "asyncapi.yaml" },
+        config: { show: { sidebar: true } }
+    }, document.getElementById("asyncapi"));
+</script>
+</body>
+</html>

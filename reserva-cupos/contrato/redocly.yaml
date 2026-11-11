@@ -1,0 +1,8 @@
+# Reglas de Redocly para el contrato. Se desactivan dos avisos que no
+# aplican a un servicio que se ejecuta en un entorno local de Docker Compose.
+extends:
+  - recommended
+
+rules:
+  info-license: off
+  no-server-example.com: off

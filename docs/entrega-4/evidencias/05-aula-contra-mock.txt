@@ -1,0 +1,38 @@
+# 05 · Verificación del consumidor: Aula contra un mock generado del contrato (Prism)
+# Ejecución: 09/11/2026 19:56 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+Aula usa la API solo a través de contrato/openapi.yaml: su cliente arma cada llamada por operationId y valida cada respuesta. Acá se prueba contra un mock de Prism generado del mismo contrato, sin la API real. Prism responde 422 con la cabecera sl-violations a cualquier solicitud que no cumpla el contrato. Las pruebas del receptor de webhooks usan el vector de prueba del contrato, no el código del notificador.
+
+$ docker run -d --name prism-mock -p 4010:4010 -v "$PWD/contrato:/contrato:ro" stoplight/prism:5 mock -d -m false -h 0.0.0.0 /contrato/openapi.yaml && sleep 6
+fd985ff57ab6790d590e8f54bcfc0683f4bac05a2b75b9c6c7dd48fc99ab3cfa
+[código de salida: 0]
+
+$ cd clientes/aula && PRISM_URL=http://localhost:4010 npm test
+
+> reserva-cupos-aula@0.2.0 test
+> node --test
+
+✔ crear una materia usa crearActividad según el contrato (866.60111ms)
+✔ consultar una materia y sus inscriptos (316.765392ms)
+✔ inscribirse con Idempotency-Key y consultar el resultado (324.086909ms)
+✔ cancelar una inscripción (89.77251ms)
+✔ el mock rechaza una solicitud fuera de contrato antes de que llegue a una API real (141.140193ms)
+✔ un evento firmado según el contrato se acepta y cumple el esquema (74.341545ms)
+✔ se rechazan la firma de otro secreto, el cuerpo alterado y la reinyección (1.309961ms)
+✔ el receptor acepta el vector de prueba del contrato (0.81989ms)
+✔ sin un secreto de 32 bytes no se acepta ninguna firma (1.150229ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2411.496486
+[código de salida: 0]
+
+$ docker rm -f prism-mock
+prism-mock
+[código de salida: 0]
+

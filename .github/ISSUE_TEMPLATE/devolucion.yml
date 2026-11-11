@@ -1,0 +1,22 @@
+name: Devolución de la cátedra
+description: Una observación de la corrección de una entrega, para resolverla antes de la final.
+labels: [devolucion]
+body:
+  - type: input
+    id: entrega
+    attributes:
+      label: Entrega
+      placeholder: E4 · Contratos y descubrimiento
+    validations:
+      required: true
+  - type: textarea
+    id: observacion
+    attributes:
+      label: Observación
+      description: Texto de la devolución, tal como la escribió la cátedra.
+    validations:
+      required: true
+  - type: textarea
+    id: resolucion
+    attributes:
+      label: Cómo se resuelve

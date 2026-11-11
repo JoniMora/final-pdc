@@ -2,8 +2,8 @@ openapi: 3.1.0
 
 info:
   title: Servicio multi-tenant de reserva de cupos
-  version: 1.0.0
-  summary: API pública v1 (Entrega 3)
+  version: 1.1.0
+  summary: API pública v1 (Entrega 4)
   description: |
     Contrato de la API pública. Cada organización consumidora es un tenant
     que se autentica con su propia clave; el tenant se deriva siempre de la
@@ -16,10 +16,18 @@ info:
     rechaza después. El cliente consulta el resultado en `Location`
     respetando `Retry-After`.
 
+    La cancelación sigue el mismo modelo: `POST /v1/reservas/{id}/cancelacion`
+    registra el pedido y responde `202`; el worker devuelve el cupo.
+
+    Cada decisión del worker sobre una reserva se notifica al tenant con un
+    webhook firmado (sección `webhooks`). El webhook es un mecanismo de baja
+    latencia; la garantía la da el feed `GET /v1/cambios`.
+
     Los errores se devuelven como Problem Details (RFC 9457).
 
-    `DELETE /v1/reservas/{id}` (cancelación) y el límite de tasa (`429`) se
-    incorporan en entregas siguientes y no forman parte de esta versión.
+    Versionado: semántico sobre este documento (`info.version`). Los cambios
+    compatibles suben la versión menor y se registran en `CHANGELOG.md`; un
+    cambio incompatible exige una versión mayor y una ruta `/v2`.
 
 servers:
   - url: http://localhost:3000
@@ -58,10 +66,29 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Actividad"
+          links:
+            ConsultarActividad:
+              operationId: consultarActividad
+              parameters:
+                id: $response.body#/id
+            CambiarEstado:
+              operationId: cambiarEstadoActividad
+              parameters:
+                id: $response.body#/id
+            SolicitarReserva:
+              operationId: solicitarReserva
+              parameters:
+                id: $response.body#/id
+            ListarReservas:
+              operationId: listarReservas
+              parameters:
+                id: $response.body#/id
         "400":
           $ref: "#/components/responses/SolicitudInvalida"
         "401":
           $ref: "#/components/responses/NoAutenticado"
+        "415":
+          $ref: "#/components/responses/TipoNoSoportado"
         "503":
           $ref: "#/components/responses/NoDisponible"
 
@@ -79,6 +106,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Actividad"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
         "401":
           $ref: "#/components/responses/NoAutenticado"
         "404":
@@ -113,6 +142,8 @@ paths:
           $ref: "#/components/responses/NoAutenticado"
         "404":
           $ref: "#/components/responses/NoEncontrado"
+        "415":
+          $ref: "#/components/responses/TipoNoSoportado"
         "503":
           $ref: "#/components/responses/NoDisponible"
 
@@ -157,6 +188,15 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Reserva"
+          links:
+            ConsultarReserva:
+              operationId: consultarReserva
+              parameters:
+                id: $response.body#/id
+            CancelarReserva:
+              operationId: cancelarReserva
+              parameters:
+                id: $response.body#/id
         "200":
           description: Repetición idempotente; devuelve la reserva en su estado actual.
           headers:
@@ -184,6 +224,8 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problema"
+        "415":
+          $ref: "#/components/responses/TipoNoSoportado"
         "503":
           $ref: "#/components/responses/NoDisponible"
     get:
@@ -200,6 +242,7 @@ paths:
           description: Valor de `siguiente_cursor` de la página anterior.
           schema:
             type: string
+            minLength: 1
         - name: limite
           in: query
           schema:
@@ -253,10 +296,72 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Reserva"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
         "401":
           $ref: "#/components/responses/NoAutenticado"
         "404":
           $ref: "#/components/responses/NoEncontrado"
+        "503":
+          $ref: "#/components/responses/NoDisponible"
+
+  /v1/reservas/{id}/cancelacion:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags: [reservas]
+      operationId: cancelarReserva
+      summary: Solicitar la cancelación de una reserva (asíncrona)
+      description: |
+        Registra el pedido de cancelación y su comando en el outbox, en una
+        única transacción, y responde `202`. El worker pasa la reserva a
+        `cancelada` y, si estaba confirmada, devuelve el cupo.
+
+        La operación es idempotente por naturaleza: cuando la reserva ya está
+        cancelada responde `200`, y repetirla dentro de los 30 segundos de un
+        pedido no genera un segundo comando. Por eso no requiere
+        `Idempotency-Key`.
+
+        **Confirmación.** El cliente consulta el resultado en `Location`
+        respetando `Retry-After`, igual que con la reserva. Si 30 segundos
+        después del pedido la reserva sigue activa, repetir la cancelación
+        vuelve a registrar el comando: así se recupera un comando perdido. El
+        worker ignora los comandos repetidos.
+      responses:
+        "202":
+          description: Cancelación admitida; la reserva sigue activa hasta que el worker la procese.
+          headers:
+            Location:
+              $ref: "#/components/headers/Location"
+            Retry-After:
+              $ref: "#/components/headers/RetryAfter"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reserva"
+        "200":
+          description: La reserva ya estaba cancelada.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reserva"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: La reserva fue rechazada o falló; no hay cupo que devolver.
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problema"
         "503":
           $ref: "#/components/responses/NoDisponible"
 
@@ -278,6 +383,7 @@ paths:
           schema:
             type: integer
             minimum: 0
+            maximum: 9007199254740991
             default: 0
         - name: limite
           in: query
@@ -354,6 +460,12 @@ components:
             $ref: "#/components/schemas/Problema"
     NoEncontrado:
       description: El recurso no existe o pertenece a otro tenant.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problema"
+    TipoNoSoportado:
+      description: El cuerpo no se envió como `application/json`.
       content:
         application/problem+json:
           schema:
@@ -462,12 +574,18 @@ components:
           type: integer
         tipo:
           type: string
-          enum:
+          description: |
+            Tipo de cambio. Es una enumeración extensible: versiones menores
+            del contrato pueden agregar tipos nuevos, y el lector debe aplicar
+            la instantánea por su versión e ignorar los tipos que no conoce.
+          x-extensible-enum:
             - actividad.creada
             - actividad.actualizada
             - reserva.solicitada
             - reserva.confirmada
             - reserva.rechazada
+            - reserva.cancelada
+            - reserva.fallida
         ocurrido_en:
           type: string
           format: date-time
@@ -476,6 +594,30 @@ components:
           oneOf:
             - $ref: "#/components/schemas/Actividad"
             - $ref: "#/components/schemas/Reserva"
+
+    EventoReserva:
+      description: |
+        Cuerpo de cada webhook. Tiene la misma forma que un elemento del feed,
+        restringida a las decisiones del worker sobre una reserva.
+      type: object
+      required: [secuencia, tipo, ocurrido_en, entidad]
+      properties:
+        secuencia:
+          type: integer
+          minimum: 1
+          description: Secuencia del cambio en el feed del tenant.
+        tipo:
+          type: string
+          enum:
+            - reserva.confirmada
+            - reserva.rechazada
+            - reserva.cancelada
+            - reserva.fallida
+        ocurrido_en:
+          type: string
+          format: date-time
+        entidad:
+          $ref: "#/components/schemas/Reserva"
 
     Problema:
       description: Problem Details (RFC 9457).
@@ -491,3 +633,72 @@ components:
           type: integer
         detail:
           type: string
+
+webhooks:
+  cambioDeReserva:
+    post:
+      operationId: recibirCambioDeReserva
+      summary: Notificación de una decisión sobre una reserva
+      description: |
+        El notificador hace un `POST` a la URL registrada por el tenant por
+        cada decisión del worker sobre una reserva.
+
+        **Secreto.** Al registrar el webhook, el servicio genera para el tenant
+        un secreto de 32 bytes aleatorios y se lo entrega una sola vez,
+        codificado en hexadecimal (64 caracteres). La clave del HMAC son esos
+        32 bytes decodificados, **no** el texto hexadecimal.
+
+        **Firma.** `X-Firma: t=<unix>,v1=<hex>`, donde `t` es la marca de
+        tiempo Unix en segundos y `v1` es el HMAC-SHA256, con la clave del
+        tenant, de `<t>.<cuerpo>` (la marca de tiempo, un punto y el cuerpo
+        exacto recibido, en UTF-8), en hexadecimal en minúsculas. El receptor
+        recalcula la firma, la compara en tiempo constante y descarta los
+        mensajes con una marca de tiempo de más de 5 minutos: así se impiden la
+        falsificación y la reinyección.
+
+        **Vector de prueba.** `x-vector-de-prueba` trae un secreto, una marca
+        de tiempo, un cuerpo y la cabecera `X-Firma` que les corresponde. Una
+        implementación correcta del emisor obtiene esa cabecera, y una del
+        receptor la acepta (tomando `t` como hora actual). Usar el texto
+        hexadecimal como clave da otra firma.
+
+        **Entrega al-menos-una-vez.** El mismo evento puede llegar más de una
+        vez o fuera de orden. El receptor lo aplica solo si `entidad.version`
+        es mayor que la que tiene guardada.
+
+        **Reintentos.** Ante una respuesta distinta de `2xx`, o si la respuesta
+        no termina de llegar en 5 segundos, el notificador reintenta a los
+        10 s, 1 min y 5 min. Agotados los intentos, el evento queda en una cola
+        de mensajes fallidos y sigue disponible en el feed.
+      x-vector-de-prueba:
+        secreto: 5c0f8e2a9b7d4e61c3a85f0b2d9e7a14f6c2b8d05e3a9f71c4b6e2d8a0f5c3b9
+        t: 1794052805
+        cuerpo: '{"secuencia":42,"tipo":"reserva.confirmada","ocurrido_en":"2026-11-07T12:00:00.000Z","entidad":{"id":"019a5f3c-2b7e-7c41-9d0e-6f1a2b3c4d5e","actividad_id":"019a5f3b-9a10-7f22-8c3d-1e2f3a4b5c6d","participante":"alumno-7","estado":"confirmada","version":2,"metadata":null,"creado_en":"2026-11-07T11:59:59.000Z"}}'
+        X-Firma: t=1794052805,v1=aa174e714c7e4fc696991813aa46cdda33e1728a7991dfba335bcdfebe8a80d6
+      security: []
+      parameters:
+        - name: X-Firma
+          in: header
+          required: true
+          schema:
+            type: string
+            pattern: "^t=[0-9]+,v1=[0-9a-f]{64}$"
+        - name: X-Webhook-Id
+          in: header
+          required: true
+          description: Identificador del evento; se repite en cada reintento.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventoReserva"
+      responses:
+        "200":
+          description: Evento recibido.
+        "204":
+          description: Evento recibido.
+        "401":
+          description: Firma inválida o vencida. El notificador reintenta; el feed sigue disponible.

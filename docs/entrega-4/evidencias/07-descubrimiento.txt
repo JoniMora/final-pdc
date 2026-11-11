@@ -1,0 +1,101 @@
+# 07 · Descubrimiento de servicios: Traefik encuentra las instancias de la API sin configuración
+# Ejecución: 09/11/2026 20:08 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+Traefik observa Docker (proveedor docker, socket en solo lectura) y registra cada contenedor con la etiqueta traefik.enable. Nadie le indica cuántas instancias hay ni sus direcciones: las descubre, les hace health check en /health cada 5 s y balancea entre las sanas. El panel (puerto 8080) expone lo descubierto en /api/http/services; pruebas/descubrimiento/instancias.sh lo consulta y, con --esperar N, espera a que Traefik tenga N instancias UP (una instancia nueva aparece cuando Docker la marca healthy).
+
+## Una instancia
+
+$ pruebas/descubrimiento/instancias.sh
+servicio api@docker: enabled
+  http://172.21.0.6:3000 → UP
+[código de salida: 0]
+
+## Escalar a tres instancias: no se toca ninguna configuración
+
+$ docker compose up -d --scale api=3 --no-recreate api 2>&1 | grep -v Running
+ Container reserva-cupos-infra-api-6  Creating
+ Container reserva-cupos-infra-api-7  Creating
+ Container reserva-cupos-infra-api-6  Created
+ Container reserva-cupos-infra-api-7  Created
+ Container reserva-cupos-infra-mysql-primary-1  Waiting
+ Container reserva-cupos-infra-mysql-primary-1  Healthy
+ Container reserva-cupos-infra-api-6  Starting
+ Container reserva-cupos-infra-api-6  Started
+ Container reserva-cupos-infra-api-7  Starting
+ Container reserva-cupos-infra-api-7  Started
+[código de salida: 0]
+
+$ pruebas/descubrimiento/instancias.sh --esperar 3
+Traefik tiene 3 instancias UP (esperó 12 s)
+servicio api@docker: enabled
+  http://172.21.0.5:3000 → UP
+  http://172.21.0.6:3000 → UP
+  http://172.21.0.7:3000 → UP
+[código de salida: 0]
+
+$ docker compose ps api
+NAME                        IMAGE                     COMMAND                  SERVICE             CREATED              STATUS                    PORTS
+reserva-cupos-infra-api-5   reserva-cupos-infra-api   "docker-entrypoint.s…"   api                 About a minute ago   Up 58 seconds (healthy)   3000/tcp
+reserva-cupos-infra-api-6   reserva-cupos-infra-api   "docker-entrypoint.s…"   api                 15 seconds ago       Up 13 seconds (healthy)   3000/tcp
+reserva-cupos-infra-api-7   reserva-cupos-infra-api   "docker-entrypoint.s…"   api                 15 seconds ago       Up 13 seconds (healthy)   3000/tcp
+[código de salida: 0]
+
+## Nueve solicitudes por el gateway se reparten entre las tres instancias
+
+$ for i in $(seq 1 9); do curl -s http://localhost:3000/health | python3 -c 'import json,sys; print(json.load(sys.stdin)["instancia"])'; done | sort | uniq -c
+   3 219394fdb734
+   3 608ed47c5335
+   3 791b3fefaff3
+[código de salida: 0]
+
+## Una instancia se detiene: Traefik la retira y las solicitudes siguen respondiendo
+
+$ docker stop reserva-cupos-infra-api-7
+reserva-cupos-infra-api-7
+[código de salida: 0]
+
+$ pruebas/descubrimiento/instancias.sh --esperar 2
+Traefik tiene 2 instancias UP (esperó 1 s)
+servicio api@docker: enabled
+  http://172.21.0.5:3000 → UP
+  http://172.21.0.6:3000 → UP
+[código de salida: 0]
+
+$ for i in $(seq 1 9); do curl -s http://localhost:3000/health | python3 -c 'import json,sys; print(json.load(sys.stdin)["instancia"])'; done | sort | uniq -c
+   4 219394fdb734
+   5 608ed47c5335
+[código de salida: 0]
+
+## La instancia detenida vuelve a arrancar: Traefik la agrega de nuevo
+
+$ docker start reserva-cupos-infra-api-7
+reserva-cupos-infra-api-7
+[código de salida: 0]
+
+$ pruebas/descubrimiento/instancias.sh --esperar 3
+Traefik tiene 3 instancias UP (esperó 10 s)
+servicio api@docker: enabled
+  http://172.21.0.5:3000 → UP
+  http://172.21.0.6:3000 → UP
+  http://172.21.0.7:3000 → UP
+[código de salida: 0]
+
+## Vuelve a una instancia
+
+$ docker compose up -d --scale api=1 --no-recreate api 2>&1 | grep -v Running
+ Container reserva-cupos-infra-mysql-primary-1  Waiting
+ Container reserva-cupos-infra-mysql-primary-1  Healthy
+[código de salida: 0]
+
+$ pruebas/descubrimiento/instancias.sh --esperar 1
+Traefik tiene 1 instancia UP (esperó 0 s)
+servicio api@docker: enabled
+  http://172.21.0.5:3000 → UP
+[código de salida: 0]
+
+$ docker compose ps api
+NAME                        IMAGE                     COMMAND                  SERVICE             CREATED             STATUS                    PORTS
+reserva-cupos-infra-api-6   reserva-cupos-infra-api   "docker-entrypoint.s…"   api                 31 seconds ago      Up 30 seconds (healthy)   3000/tcp
+[código de salida: 0]
+

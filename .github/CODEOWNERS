@@ -1,0 +1,19 @@
+# Responsables de cada parte. GitHub pide la revisión de un responsable en
+# cada PR que toque estos archivos; como el autor no puede aprobar su
+# propia PR, siempre la aprueba el otro integrante. El primero de cada
+# línea es el responsable principal según el reparto del proyecto.
+
+*                                       @JoniMora @Mariaubp
+
+# Contratos: cualquier cambio lo revisan los dos.
+/reserva-cupos/contrato/                @Mariaubp @JoniMora
+/reserva-cupos/compartido/              @JoniMora @Mariaubp
+
+/reserva-cupos/servicios/api/           @Mariaubp @JoniMora
+/reserva-cupos/servicios/notificador/   @Mariaubp @JoniMora
+/reserva-cupos/servicios/worker/        @JoniMora @Mariaubp
+/reserva-cupos/servicios/relay/         @JoniMora @Mariaubp
+/reserva-cupos/clientes/aula/           @JoniMora @Mariaubp
+/reserva-cupos/Infraestructura/         @JoniMora @Mariaubp
+/reserva-cupos/docker-compose.yml       @JoniMora @Mariaubp
+/.github/                               @JoniMora @Mariaubp

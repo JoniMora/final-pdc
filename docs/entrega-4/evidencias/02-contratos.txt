@@ -1,0 +1,104 @@
+# 02 · Contratos formales: válidos, versionados y sin cambios incompatibles
+# Ejecución: 09/11/2026 19:56 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+## OpenAPI 3.1 de la API pública y los webhooks (Redocly CLI)
+
+$ npx --yes @redocly/cli@2.76.0 lint contrato/openapi.yaml --config contrato/redocly.yaml
+validating contrato/openapi.yaml...
+contrato/openapi.yaml: validated in 281ms
+
+Woohoo! Your API description is valid. 🎉
+
+[código de salida: 0]
+
+## AsyncAPI 3.0 de la mensajería interna (AsyncAPI CLI)
+
+$ npx --yes @asyncapi/cli@6.3.0 validate contrato/asyncapi.yaml
+
+File contrato/asyncapi.yaml is valid but has (itself and/or referenced documents) governance issues.
+Information 
+contrato/asyncapi.yaml
+ 1:11  information  asyncapi-latest-version  The latest version of AsyncAPi is not used. It is recommended update to the "3.1.0" version.  asyncapi
+
+✖ 1 problem (0 errors, 0 warnings, 1 info, 0 hints)
+
+[código de salida: 0]
+
+## API: 1.1.0 contra 1.0.0 (tag v3-comunicacion), con oasdiff
+
+El aviso sobre desde no bloquea: documenta un límite que la API ya aplicaba. Las dos excepciones de esta versión (el minLength de cursor y los tipos nuevos del feed) están justificadas en contrato/CHANGELOG.md.
+
+$ pruebas/contrato/oasdiff.sh v3-comunicacion
+1 changes: 0 error, 1 warning, 0 info
+warning	[request-parameter-max-set] at /specs/nuevo.yaml	
+	in API GET /v1/cambios
+		for the 'query' request parameter 'desde', the max was set to '9007199254740991.00'
+		This is a warning because sometimes it is required to be set because of security reasons or current error in specification. But good clients should be checked to support this restriction before such change in specification.
+
+
+[código de salida: 0]
+
+## Un cambio incompatible simulado en la API se detecta: bajar el máximo de capacidad de 100000 a 1000
+
+$ sed 's/          maximum: 100000/          maximum: 1000/' contrato/openapi.yaml > /tmp/contrato-roto.yaml && diff -u contrato/openapi.yaml /tmp/contrato-roto.yaml | tail -n +3
+@@ -496,7 +496,7 @@
+         capacidad:
+           type: integer
+           minimum: 1
+-          maximum: 100000
++          maximum: 1000
+         metadata:
+           $ref: "#/components/schemas/Metadata"
+ 
+[código de salida: 0]
+
+$ pruebas/contrato/oasdiff.sh v3-comunicacion /tmp/contrato-roto.yaml
+2 changes: 1 error, 1 warning, 0 info
+error	[request-property-max-decreased] at /specs/nuevo.yaml	
+	in API POST /v1/actividades
+		the 'capacidad' request property's max was decreased to '1000.00'
+
+warning	[request-parameter-max-set] at /specs/nuevo.yaml	
+	in API GET /v1/cambios
+		for the 'query' request parameter 'desde', the max was set to '9007199254740991.00'
+		This is a warning because sometimes it is required to be set because of security reasons or current error in specification. But good clients should be checked to support this restriction before such change in specification.
+
+
+[código de salida: 1]
+
+## Mensajes: compatibilidad entre versiones de asyncapi.yaml
+
+oasdiff no compara AsyncAPI, y asyncapi diff clasifica los cambios en los esquemas de los mensajes como unclassified. pruebas/contrato/compatibilidad-mensajes.sh valida los ejemplos de cada versión contra los esquemas de la otra: los consumidores nuevos tienen que aceptar los mensajes que siguen en las colas, y los anteriores, los de la versión nueva. La Entrega 3 no tenía contrato de mensajería; acá se compara la versión actual consigo misma (HEAD) y con un cambio simulado.
+
+$ pruebas/contrato/compatibilidad-mensajes.sh v3-comunicacion
+v3-comunicacion no tiene contrato de mensajería: no hay una versión anterior con la que comparar.
+[código de salida: 0]
+
+$ pruebas/contrato/compatibilidad-mensajes.sh HEAD
+asyncapi.yaml 1.0.0 → 1.0.0: 10 ejemplos comparados en los dos sentidos
+Sin cambios incompatibles
+[código de salida: 0]
+
+## Un cambio incompatible simulado en los mensajes se detecta: el comando cancelar exige un campo nuevo
+
+$ mkdir -p /tmp/mensajes-rotos && cp contrato/openapi.yaml /tmp/mensajes-rotos/ && sed '/^    ComandoCancelar:$/,/^    EntregaWebhook:$/ s/required: \[comando, tenant_id, reserva_id, actividad_id\]/required: [comando, tenant_id, reserva_id, actividad_id, motivo]/' contrato/asyncapi.yaml > /tmp/mensajes-rotos/asyncapi.yaml && diff -u contrato/asyncapi.yaml /tmp/mensajes-rotos/asyncapi.yaml | tail -n +3
+@@ -353,7 +353,7 @@
+     ComandoCancelar:
+       type: object
+       additionalProperties: false
+-      required: [comando, tenant_id, reserva_id, actividad_id]
++      required: [comando, tenant_id, reserva_id, actividad_id, motivo]
+       properties:
+         comando:
+           type: string
+[código de salida: 0]
+
+$ pruebas/contrato/compatibilidad-mensajes.sh HEAD /tmp/mensajes-rotos
+asyncapi.yaml 1.0.0 → 1.0.0: 10 ejemplos comparados en los dos sentidos
+Incompatible: Un consumidor de la versión nueva rechaza un mensaje de la anterior: ComandoCancelar (ejemplo desde-el-outbox). El mensaje ComandoCancelar no cumple el contrato: / must have required property 'motivo'
+1 cambio(s) incompatible(s): requiere una versión mayor del contrato de mensajería
+[código de salida: 1]
+
+El CI ejecuta las dos comparaciones contra main en cada PR: un cambio así no se puede mergear sin una versión mayor.
+

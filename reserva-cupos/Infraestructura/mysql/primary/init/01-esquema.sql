@@ -136,6 +136,9 @@ CREATE TABLE cambios (
 
                          KEY ix_webhooks_pendientes (publicado_webhook, id),
 
+                         -- La API busca si una reserva ya tiene un pedido de cancelación.
+                         KEY ix_cambios_entidad (entidad_id, tipo),
+
                          CONSTRAINT fk_cambio_tenant
                              FOREIGN KEY (tenant_id)
                                  REFERENCES tenants(id),

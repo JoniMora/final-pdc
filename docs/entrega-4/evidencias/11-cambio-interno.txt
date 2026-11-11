@@ -1,0 +1,79 @@
+# 11 · Cambios internos sin romper el contrato
+# Ejecución: 09/11/2026 19:58 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+Entre la Entrega 3 y esta cambió la implementación de la API (validador de contrato, cancelación), del worker (comando cancelar, fallida, validación de mensajes), del relay y del despliegue (gateway y varias instancias). El cliente de carga de la Entrega 3, escrito contra el contrato 1.0.0, no cambió y sigue obteniendo el mismo resultado, ahora con dos instancias de la API detrás de Traefik.
+
+$ git diff --stat v3-comunicacion -- servicios/api/src servicios/worker/src servicios/relay/src docker-compose.yml | tail -1
+ 11 files changed, 622 insertions(+), 122 deletions(-)
+[código de salida: 0]
+
+$ git diff --stat v3-comunicacion -- pruebas/carga; echo "(sin cambios en el cliente de carga)"
+(sin cambios en el cliente de carga)
+[código de salida: 0]
+
+$ docker compose up -d --scale api=2 --no-recreate api 2>&1 | grep -v Running
+ Container reserva-cupos-infra-api-3  Creating
+ Container reserva-cupos-infra-api-3  Created
+ Container reserva-cupos-infra-mysql-primary-1  Waiting
+ Container reserva-cupos-infra-mysql-primary-1  Healthy
+ Container reserva-cupos-infra-api-3  Starting
+ Container reserva-cupos-infra-api-3  Started
+[código de salida: 0]
+
+$ pruebas/descubrimiento/instancias.sh --esperar 2
+Traefik tiene 2 instancias UP (esperó 10 s)
+servicio api@docker: enabled
+  http://172.21.0.3:3000 → UP
+  http://172.21.0.6:3000 → UP
+[código de salida: 0]
+
+$ docker compose run --rm -T k6 run -q -e API_KEY=$CLAVE /pruebas/carga/rafaga.js
+time="2026-11-09T22:58:18Z" level=info msg="Actividad 01a1c288-a8c1-7077-ace7-da8a7902fe20: 10 cupos, 500 solicitudes simultáneas" source=console
+time="2026-11-09T22:58:42Z" level=info msg="Resultado (sin pendientes tras 11.1 s de espera): confirmadas=10 rechazadas=490 pendientes=0 cupos_disponibles=0" source=console
+
+
+  █ THRESHOLDS 
+
+    checks
+    ✓ 'rate==1' rate=100.00%
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......................: 1004    41.274858/s
+    checks_succeeded...................: 100.00% 1004 out of 1004
+    checks_failed......................: 0.00%   0 out of 1004
+
+    ✓ admisión responde 202
+    ✓ admisión devuelve Location
+    ✓ 0 pendientes
+    ✓ exactamente 10 confirmadas
+    ✓ exactamente 490 rechazadas
+    ✓ cupos_disponibles = 0
+
+    HTTP
+    http_req_duration.......................................................: min=4.45ms   med=8.3s  avg=7.14s p(95)=12.19s max=12.69s
+      { expected_response:true }............................................: min=4.45ms   med=8.3s  avg=7.14s p(95)=12.19s max=12.69s
+    http_req_failed.........................................................: 0.00%  0 out of 564
+    http_reqs...............................................................: 564    23.186275/s
+
+    EXECUTION
+    iteration_duration......................................................: min=241.43ms med=9.22s avg=8.28s p(95)=12.31s max=13.02s
+    iterations..............................................................: 500    20.555208/s
+    vus.....................................................................: 0      min=0        max=495
+    vus_max.................................................................: 500    min=500      max=500
+
+    NETWORK
+    data_received...........................................................: 1.3 MB 54 kB/s
+    data_sent...............................................................: 189 kB 7.8 kB/s
+
+
+
+[código de salida: 0]
+
+$ docker compose up -d --scale api=1 --no-recreate api 2>&1 | grep -v Running
+ Container reserva-cupos-infra-mysql-primary-1  Waiting
+ Container reserva-cupos-infra-mysql-primary-1  Healthy
+[código de salida: 0]
+

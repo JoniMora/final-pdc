@@ -1,9 +1,10 @@
 {
   "name": "reserva-cupos-relay",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
-    "start": "node src/configurar-colas.js && node src/main.js"
+    "start": "node src/configurar-colas.js && node src/main.js",
+    "test": "node --test"
   },
   "dependencies": {
     "mysql2": "3.14.3",

@@ -1,0 +1,88 @@
+# 04 · Verificación del proveedor: la API real cumple el contrato (Schemathesis)
+# Ejecución: 09/11/2026 19:58 -03 · macOS 13.7.8 · Docker Engine 24.0.2 · Docker Compose version v2.18.1
+# Comandos ejecutados desde la carpeta reserva-cupos.
+
+Schemathesis genera solicitudes a partir de contrato/openapi.yaml (casos de cobertura, fuzzing y secuencias con estado siguiendo los links) y verifica cada respuesta: códigos documentados, cabeceras, esquemas, que rechace lo inválido y acepte lo válido. Se ejecuta contra la API detrás de Traefik con un tenant propio, igual que en el CI. La configuración (pruebas/contrato/schemathesis.toml) declara las reglas de negocio documentadas que no son rechazos de datos (409, 422 y el cursor opaco) y alarga las secuencias a 30 pasos; pruebas/contrato/hooks.py usa una Idempotency-Key nueva en cada solicitud válida, así la fase con estado crea, consulta y cancela reservas reales.
+
+$ docker run --rm --network reserva-cupos-infra_publica -e SCHEMATHESIS_HOOKS=/config/hooks.py -v "$PWD/contrato:/contrato:ro" -v "$PWD/pruebas/contrato:/config:ro" schemathesis/schemathesis:4.33.1 --config-file /config/schemathesis.toml run /contrato/openapi.yaml --url http://traefik -H "Authorization: Bearer $CLAVE_CONTRATO" --checks all --max-examples 25 --seed 2026 --generation-with-security-parameters false
+Schemathesis v4.33.1
+━━━━━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from /contrato/openapi.yaml (in 2.54s)
+
+     Base URL:         http://traefik
+     Specification:    Open API 3.1.0
+     Operations:       8 selected / 8 total
+     Configuration:    /config/schemathesis.toml
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✘
+     Accepts backslash and control characters in URL paths:    ✓
+
+ ⏭   Examples (in 0.03s)
+
+     ⏭  8 skipped
+
+ ✅  Coverage (in 8.76s)
+
+     ✅ 8 passed
+
+ ✅  Fuzzing (in 5.28s)
+
+     ✅ 8 passed
+
+ ✅  Stateful (in 13.27s)
+
+     Scenarios:    28
+     API Links:    24 covered / 33 selected / 33 total (27 inferred)
+
+     ✅ 28 passed
+
+=================================== WARNINGS ===================================
+
+Schema validation mismatch: 1 operation mostly rejected generated data due to validation errors, indicating schema constraints don't match API validation
+
+  - GET /v1/actividades/{id}/reservas
+
+💡 Check your schema constraints - API validation may be stricter than documented
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 8/8
+  Tested: 8
+
+Test Phases:
+  ⏭  Examples
+  ✅ Coverage
+  ✅ Fuzzing
+  ✅ Stateful
+
+Warnings:
+  ⚠️ Schema validation mismatch: 1 operation mostly rejected generated data
+
+Test cases:
+  1093 generated, 1093 passed
+
+Seed: 2026
+
+============================= 1 warning in 27.70s ==============================
+[código de salida: 0]
+
+## Lo que Schemathesis hizo en la base: también canceló reservas reales
+
+$ docker compose exec -T mysql-primary mysql -uroot -proot_local_2026 reservas -e "SELECT c.tipo, COUNT(*) AS cambios FROM cambios c JOIN tenants t ON t.id = c.tenant_id WHERE t.nombre = 'Verificación del contrato' GROUP BY c.tipo ORDER BY c.tipo"
+mysql: [Warning] Using a password on the command line interface can be insecure.
+tipo	cambios
+actividad.actualizada	97
+actividad.creada	68
+reserva.cancelacion_solicitada	9
+reserva.cancelada	7
+reserva.confirmada	13
+reserva.rechazada	5
+reserva.solicitada	18
+[código de salida: 0]
+
+Aviso esperable: el listado rechaza cursores inventados porque el cursor es opaco (lo entrega la propia API); está declarado en schemathesis.toml.
+
