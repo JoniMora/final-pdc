@@ -1,0 +1,6 @@
+Verificación local: 2026-11-14T02:26:41.655436-03:00
+Compose combinado válido; puertos cifrados; CA privada no montada.
+Sintaxis Node correcta: 30 archivos.
+Siete certificados verificados con la CA local.
+Enlaces de documentación verificados.
+Docker Engine: no accesible desde el entorno del asistente. Integración pendiente.

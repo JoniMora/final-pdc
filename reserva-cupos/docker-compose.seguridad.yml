@@ -1,0 +1,115 @@
+# Aplicar junto al compose base. Requiere Docker Compose >= 2.24.4 (!override).
+x-certificados: &ca
+  type: bind
+  source: ./seguridad/local/ca.crt
+  target: /tls/ca.crt
+  read_only: true
+x-cliente: &cliente
+  DB_SSL_CA: /tls/ca.crt
+  TLS_CA: /tls/ca.crt
+  NODE_EXTRA_CA_CERTS: /tls/ca.crt
+  RABBITMQ_TLS: "true"
+
+services:
+  traefik:
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedByDefault=false
+      - --providers.docker.network=reserva-cupos-infra_publica
+      - --providers.file.filename=/etc/traefik/tls.yml
+      - --entryPoints.websecure.address=:443
+      - --ping=true
+    ports: !override
+      - "127.0.0.1:3000:443"
+    volumes:
+      - ./Infraestructura/tls/traefik.yml:/etc/traefik/tls.yml:ro
+      - *ca
+      - ./seguridad/local/traefik.crt:/tls/traefik.crt:ro
+      - ./seguridad/local/traefik.key:/tls/traefik.key:ro
+  api:
+    environment:
+      <<: *cliente
+      TLS_CERT: /tls/api.crt
+      TLS_KEY: /tls/api.key
+    labels:
+      traefik.http.routers.api.entrypoints: websecure
+      traefik.http.routers.api.tls: "true"
+      traefik.http.services.api.loadbalancer.server.scheme: https
+      traefik.http.services.api.loadbalancer.serverstransport: api-tls@file
+      traefik.http.services.api.loadbalancer.healthcheck.scheme: https
+    volumes:
+      - *ca
+      - ./seguridad/local/api.crt:/tls/api.crt:ro
+      - ./seguridad/local/api.key:/tls/api.key:ro
+    healthcheck:
+      test: [CMD, node, -e, "fetch('https://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+  aula:
+    environment:
+      <<: *cliente
+      TLS_CERT: /tls/aula.crt
+      TLS_KEY: /tls/aula.key
+      PGSSLROOTCERT: /tls/ca.crt
+      API_URL: https://traefik
+      USUARIOS_ARCHIVO: /seguridad/usuarios.json
+      COOKIE_SECURE: "true"
+    volumes:
+      - *ca
+      - ./seguridad/local/aula.crt:/tls/aula.crt:ro
+      - ./seguridad/local/aula.key:/tls/aula.key:ro
+      - ./seguridad/local/usuarios.json:/seguridad/usuarios.json:ro
+    healthcheck:
+      test: [CMD, node, -e, "fetch('https://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+  worker:
+    environment:
+      <<: *cliente
+    volumes:
+      - *ca
+  relay:
+    environment:
+      <<: *cliente
+    volumes:
+      - *ca
+  notificador:
+    environment:
+      <<: *cliente
+      EXIGIR_TLS: "true"
+    volumes:
+      - *ca
+  rabbitmq:
+    ports: !override
+      - "127.0.0.1:15672:15671"
+    volumes:
+      - *ca
+      - ./seguridad/local/rabbitmq.crt:/tls/rabbitmq.crt:ro
+      - ./seguridad/local/rabbitmq.key:/tls/rabbitmq.key:ro
+      - ./Infraestructura/tls/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+  mysql-primary:
+    command: [mysqld, --ssl-ca=/tls/ca.crt, --ssl-cert=/tls/mysql-primary.crt, --ssl-key=/tls/mysql-primary.key, --require-secure-transport=ON, "--tls-version=TLSv1.2,TLSv1.3"]
+    volumes:
+      - *ca
+      - ./seguridad/local/mysql-primary.crt:/tls/mysql-primary.crt:ro
+      - ./seguridad/local/mysql-primary.key:/tls/mysql-primary.key:ro
+  mysql-replica:
+    command: [mysqld, --ssl-ca=/tls/ca.crt, --ssl-cert=/tls/mysql-replica.crt, --ssl-key=/tls/mysql-replica.key, --require-secure-transport=ON, "--tls-version=TLSv1.2,TLSv1.3"]
+    volumes:
+      - *ca
+      - ./seguridad/local/mysql-replica.crt:/tls/mysql-replica.crt:ro
+      - ./seguridad/local/mysql-replica.key:/tls/mysql-replica.key:ro
+      - ./Infraestructura/mysql/replica/activar-tls.sql:/activar-tls.sql:ro
+  aula-db:
+    # PostgreSQL requiere permisos 0600 en la clave: se copia dentro del
+    # contenedor porque un bind de Windows no conserva permisos POSIX.
+    entrypoint: [sh, -c]
+    command:
+      - "cp /certificados/aula-db.key /tmp/aula-db.key && chown postgres:postgres /tmp/aula-db.key && chmod 600 /tmp/aula-db.key && exec /usr/local/bin/docker-entrypoint.sh postgres -c ssl=on -c ssl_cert_file=/tls/aula-db.crt -c ssl_key_file=/tmp/aula-db.key -c hba_file=/etc/postgresql/pg_hba.conf"
+    volumes:
+      - *ca
+      - ./seguridad/local/aula-db.crt:/tls/aula-db.crt:ro
+      - ./seguridad/local/aula-db.key:/certificados/aula-db.key:ro
+      - ./Infraestructura/tls/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+  k6:
+    environment:
+      API_URL: https://traefik
+      SSL_CERT_FILE: /tls/ca.crt
+    volumes:
+      - *ca

@@ -1,3 +1,7 @@
+> **Entrega 5 (rama en preparación):** para usar login, roles y cifrado completo,
+> seguir [la guía de seguridad](../docs/entrega-5/README.md). Los comandos HTTP
+> y el compose base de abajo documentan la entrega 4; no acreditan TLS.
+
 # Reserva de cupos — Entrega 4: contratos de interfaz y descubrimiento de servicios
 
 Proyecto final de Programación Distribuida y Componentes.

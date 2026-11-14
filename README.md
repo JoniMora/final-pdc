@@ -8,7 +8,7 @@ Temática 7 — Plataforma de e-learning de alta concurrencia, generalizada a un
 | **Grupo N°** | 15 |
 | **Integrantes** | Jonathan Mora Colodrero · María Constanza Gigli |
 | **Repositorio** | https://github.com/JoniMora/final-pdc |
-| **Estado actual** | Entrega 4 — Contratos de interfaz y descubrimiento de servicios (`v4-middleware`), verificada el 09/11/2026 |
+| **Estado actual** | Entrega 5 — Seguridad y confiabilidad, verificada localmente el 14/11/2026 |
 
 | Entrega | Contenido | Tag |
 |---|---|---|
@@ -23,6 +23,13 @@ Temática 7 — Plataforma de e-learning de alta concurrencia, generalizada a un
 
 ---
 
+
+## Entrega 5: seguridad y confiabilidad
+
+Usuarios, sesiones y permisos de Aula, configuración TLS y recuperación mediante
+el feed. Ver [guía de entrega 5](docs/entrega-5/README.md),
+[amenazas](docs/entrega-5/amenazas.md) y [evidencias](docs/entrega-5/evidencias/README.md).
+Integración Docker verificada el 14/11/2026: 20 comprobaciones aprobadas.
 
 ## Entrega 4: implementación actual
 

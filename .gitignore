@@ -68,3 +68,6 @@ docs/entrega-4/*.pdf
 docs/entrega-5/*.pdf
 docs/entrega-6/*.pdf
 docs/final/*.pdf
+
+# Claves, CA y credenciales generadas para Entrega 5
+reserva-cupos/seguridad/local/

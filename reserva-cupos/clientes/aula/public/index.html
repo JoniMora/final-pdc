@@ -68,15 +68,22 @@
 <body>
 <main>
     <h1>Aula</h1>
-    <p>Cliente de referencia del servicio de reserva de cupos (Entrega 3).</p>
+    <p>Cliente de referencia · Entrega 5: seguridad y recuperación.</p>
 
+    <section>
+        <h2>Acceso a Aula</h2>
+        <form id="login"><label>Usuario<input id="usuario" autocomplete="username" required></label>
+        <label>Contraseña<input id="password" type="password" autocomplete="current-password" required></label>
+        <button>Iniciar sesión</button></form>
+        <p id="sesion">Sin sesión</p><button id="salir" hidden>Cerrar sesión</button>
+    </section>
     <section>
         <h2>Estado de las conexiones</h2>
         <button id="actualizar">Actualizar estado</button>
         <pre id="estado">Consultando...</pre>
     </section>
 
-    <section>
+    <section id="solo-admin" hidden>
         <h2>Crear materia</h2>
         <p>
             Aula crea la actividad en el servicio por HTTP
@@ -134,6 +141,7 @@
 </main>
 
 <script>
+    let usuarioActual=null, csrf=null, operacionPendiente=null;
     let actividadId = null;
     let reservaId = null;
 
@@ -142,7 +150,8 @@
     }
 
     async function pedir(url, opciones = {}) {
-        const response = await fetch(url, opciones);
+        const response = await fetch(url, {...opciones, headers:{...opciones.headers,
+            ...(csrf && opciones.method && opciones.method!=='GET' ? {'X-CSRF-Token':csrf} : {})}});
         return { response, data: await response.json() };
     }
 
@@ -274,19 +283,23 @@
         }
 
         mostrar("inscripcion", "Procesando...");
+        const alumno=document.getElementById('alumno').value;
+        const identidad=JSON.stringify([actividadId,alumno]);
+        if(operacionPendiente?.identidad!==identidad) operacionPendiente={identidad,clave:crypto.randomUUID()};
 
         try {
             const { response, data } = await pedir(`/materias/${actividadId}/inscripciones`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "Idempotency-Key": crypto.randomUUID()
+                    "Idempotency-Key": operacionPendiente.clave
                 },
                 body: JSON.stringify({
                     alumno: document.getElementById("alumno").value
                 })
             });
 
+            if(response.status<500) operacionPendiente=null;
             const lineas = [
                 `POST inscripción → HTTP ${response.status}`,
                 `Location: ${response.headers.get("location") || "-"}`,
@@ -322,8 +335,29 @@
         verDetalle();
     };
 
-    consultar("/estado", "estado");
-    listar();
+    function mostrarSesion(data) {
+        usuarioActual=data.usuario; csrf=data.csrf;
+        mostrar('sesion',`${usuarioActual.usuario} · ${usuarioActual.rol}`);
+        document.getElementById('login').hidden=true;
+        document.getElementById('salir').hidden=false;
+        document.getElementById('solo-admin').hidden=usuarioActual.rol!=='administrador';
+        document.getElementById('alumno').readOnly=usuarioActual.rol==='alumno';
+        document.getElementById('alumno').value=usuarioActual.participante || '';
+        consultar('/estado','estado'); listar();
+    }
+    document.getElementById('login').onsubmit=async event=>{
+        event.preventDefault();
+        try {
+            const {response,data}=await pedir('/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({usuario:document.getElementById('usuario').value,password:document.getElementById('password').value})});
+            document.getElementById('password').value='';
+            if(response.ok) mostrarSesion(data); else mostrar('sesion',data.error);
+        } catch { mostrar('sesion','No se pudo iniciar sesión'); }
+    };
+    document.getElementById('salir').onclick=async()=>{
+        const {response}=await pedir('/auth/logout',{method:'POST'});
+        if(response.ok) location.reload();
+    };
+    pedir('/auth/me').then(({response,data})=>{if(response.ok) mostrarSesion(data);}).catch(()=>{});
 </script>
 </body>
 </html>
