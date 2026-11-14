@@ -57,8 +57,16 @@ async function main(){
         const ins2=await pedir(`/materias/${id}/inscripciones`,{...otro,metodo:'POST',cuerpo:{alumno:'alumno-2'}});assert.equal(ins2.status,202);
         await hasta(async()=>{const r=await pedir('/inscripciones/'+ins2.data.id,otro);return r.data?.estado==='confirmada';});ok('Se admite y decide reserva durante caída de PostgreSQL');
         docker('start','aula-db');pgDetenido=false;
-        await hasta(async()=>{const r=await pedir('/reconciliacion',{...admin,metodo:'POST'});return r.data.modo==='normal';});
-        const consulta=docker('exec','-T','aula-db','psql','-U','aula_admin','-d','aula','-At','-c',`SELECT estado FROM inscripciones WHERE reserva_id='${ins2.data.id}';`);assert.match(consulta,/confirmada/);ok('Reconciliación recupera inscripción de la caída');
+        // El worker puede haber confirmado antes de que el relay publique ese
+        // cambio en el feed. Un ciclo normal no prueba que esa reserva ya llegó.
+        // Verificamos el efecto persistido y repetimos dentro del límite de hasta.
+        await hasta(async()=>{
+            const r=await pedir('/reconciliacion',{...admin,metodo:'POST'});
+            if(r.status!==200 || r.data?.modo!=='normal') return false;
+            const consulta=docker('exec','-T','aula-db','psql','-U','aula_admin','-d','aula','-At','-c',`SELECT estado FROM inscripciones WHERE reserva_id='${ins2.data.id}';`);
+            return consulta.trim()==='confirmada';
+        });
+        ok('Reconciliación recupera inscripción de la caída');
         // TLS: prueba positiva y negativa a nivel de cada protocolo.
         const health=await pedir('/health',{puerto:3000});assert.equal(health.status,200);
         ok('HTTPS Aula y API validan CA e identidad (sin omitir verificación)');

@@ -179,6 +179,11 @@ jobs:
         run: |
           node scripts/entrega5.js levantar
           node scripts/entrega5.js migrar
+      - name: Limpiar evidencias anteriores del checkout
+        run: |
+          # Los artefactos deben contener resultados de esta ejecución del CI.
+          rm -f ../docs/entrega-5/evidencias/integracion.txt
+          rm -f ../docs/entrega-6/evidencias/01-recorrido.txt ../docs/entrega-6/evidencias/02-carga-escalado.txt ../docs/entrega-6/evidencias/03-seguridad-recuperacion.txt
       - name: Acceso, cifrado y recuperación ante caída
         run: node scripts/entrega5.js pruebas
       - name: Recorrido funcional final
