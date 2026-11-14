@@ -1,6 +1,7 @@
 const mysql = require("mysql2/promise");
 const amqp = require("amqplib");
 const { crearValidadorDeMensajes } = require("../../../compartido/src/contrato");
+const { opcionesMysql, conexionRabbit } = require("../../../compartido/src/tls");
 const { firmar } = require("./firma");
 const { ErrorDestino, validarUrl, crearLookup } = require("./destino");
 const { enviar } = require("./enviar");
@@ -18,6 +19,9 @@ const TIMEOUT_MS = Number(process.env.WEBHOOK_TIMEOUT_MS || 5000);
 const CACHE_TENANTS_MS = 30000;
 const PAUSA_INFRAESTRUCTURA_MS = 5000;
 const BYTES_SECRETO = 32;
+// Desde la Entrega 5 los webhooks viajan cifrados: una URL http:// va a la
+// DLQ sin intentar la conexión. Solo las pruebas fuera de Docker lo apagan.
+const EXIGIR_HTTPS = process.env.WEBHOOK_EXIGIR_HTTPS !== "false";
 
 const PERMITIDOS = new Set(
     (process.env.NOTIFICADOR_HOSTS_PERMITIDOS || "")
@@ -31,10 +35,7 @@ const validar = crearValidadorDeMensajes();
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
-        ...(process.env.DB_SSL_CA ? {ssl:{
-            ca:require('node:fs').readFileSync(process.env.DB_SSL_CA),
-            rejectUnauthorized:true,verifyIdentity:true
-        }} : {}),
+    ...opcionesMysql(),
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
@@ -70,14 +71,7 @@ async function datosDelTenant(id) {
 }
 
 async function iniciar() {
-    const conexion = await amqp.connect({
-        protocol: process.env.RABBITMQ_TLS === 'true' ? 'amqps' : 'amqp',
-            port: process.env.RABBITMQ_TLS === 'true' ? 5671 : 5672,
-            hostname: process.env.RABBITMQ_HOST,
-        username: process.env.RABBITMQ_USER,
-        password: process.env.RABBITMQ_PASSWORD,
-        heartbeat: 10
-    }, process.env.RABBITMQ_TLS === 'true' ? {ca:[require('node:fs').readFileSync(process.env.TLS_CA)],rejectUnauthorized:true,servername:process.env.RABBITMQ_HOST} : {});
+    const conexion = await amqp.connect(...conexionRabbit({ heartbeat: 10 }));
 
     conexion.on("error", salir);
     conexion.on("close", () => salir(new Error("Se perdió la conexión con RabbitMQ")));
@@ -155,8 +149,7 @@ async function iniciar() {
         let url;
 
         try {
-            url = validarUrl(tenant.webhook_url, PERMITIDOS);
-            if(process.env.EXIGIR_TLS === 'true' && url.protocol !== 'https:') throw new ErrorDestino('Se requiere HTTPS');
+            url = validarUrl(tenant.webhook_url, PERMITIDOS, { exigirHttps: EXIGIR_HTTPS });
         } catch (error) {
             console.error(`[notificador] ${id}: destino rechazado, a webhooks.dlq: ${error.message}`);
             canal.nack(entrega, false, false);

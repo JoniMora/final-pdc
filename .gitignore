@@ -69,5 +69,9 @@ docs/entrega-5/*.pdf
 docs/entrega-6/*.pdf
 docs/final/*.pdf
 
-# Claves, CA y credenciales generadas para Entrega 5
+# Certificación de la Entrega 5 completada (uso personal; ya la cubre
+# docs/entrega-5/*.pdf, se nombra para que quede explícito)
+docs/entrega-5/Entrega5-Seguridad.pdf
+
+# CA, claves privadas y credenciales que genera scripts/preparar-seguridad.js
 reserva-cupos/seguridad/local/

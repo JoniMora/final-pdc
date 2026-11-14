@@ -1,18 +1,12 @@
 const amqp = require("amqplib");
+const { conexionRabbit } = require("../../../compartido/src/tls");
 
 async function configurar() {
     let conexion;
     let canal;
 
     try {
-        conexion = await amqp.connect({
-            protocol: process.env.RABBITMQ_TLS === 'true' ? 'amqps' : 'amqp',
-            port: process.env.RABBITMQ_TLS === 'true' ? 5671 : 5672,
-            hostname: process.env.RABBITMQ_HOST,
-            username: process.env.RABBITMQ_USER,
-            password: process.env.RABBITMQ_PASSWORD,
-            heartbeat: 10
-        }, process.env.RABBITMQ_TLS === 'true' ? {ca:[require('node:fs').readFileSync(process.env.TLS_CA)],rejectUnauthorized:true,servername:process.env.RABBITMQ_HOST} : {});
+        conexion = await amqp.connect(...conexionRabbit({ heartbeat: 10 }));
 
         conexion.on("error", error => {
             console.error("[colas]", error.message);

@@ -22,6 +22,13 @@ test("se rechazan URLs con otro protocolo, credenciales o IP interna literal", (
     assert.equal(validarUrl("https://tenant.ejemplo.com/webhooks", permitidos).hostname, "tenant.ejemplo.com");
 });
 
+test("con exigirHttps, una URL en texto plano se rechaza aunque el host esté permitido", () => {
+    const permitidos = new Set(["aula"]);
+
+    assert.throws(() => validarUrl("http://aula:3001/webhooks/reservas", permitidos, { exigirHttps: true }), ErrorDestino);
+    assert.equal(validarUrl("https://aula:3001/webhooks/reservas", permitidos, { exigirHttps: true }).hostname, "aula");
+});
+
 test("una IPv4 interna escrita como IPv6 también se rechaza", () => {
     // El parser de URL normaliza [::ffff:127.0.0.1] a [::ffff:7f00:1], y
     // Node no consulta el DNS para una IP literal: la validación de la URL

@@ -83,8 +83,10 @@ function esDireccionInterna(ip) {
     return true;
 }
 
-// Valida la URL registrada antes de intentar la conexión.
-function validarUrl(texto, permitidos) {
+// Valida la URL registrada antes de intentar la conexión. Con exigirHttps,
+// una URL en texto plano se rechaza: el evento y su firma no pueden viajar
+// sin cifrar.
+function validarUrl(texto, permitidos, { exigirHttps = false } = {}) {
     let url;
 
     try {
@@ -95,6 +97,10 @@ function validarUrl(texto, permitidos) {
 
     if (url.protocol !== "http:" && url.protocol !== "https:") {
         throw new ErrorDestino(`Protocolo no permitido: ${url.protocol}`);
+    }
+
+    if (exigirHttps && url.protocol !== "https:") {
+        throw new ErrorDestino("Se requiere HTTPS para entregar el webhook");
     }
 
     if (url.username || url.password) {

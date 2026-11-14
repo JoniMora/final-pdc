@@ -1,6 +1,7 @@
 const mysql = require("mysql2/promise");
 const amqp = require("amqplib");
 const { crearValidadorDeMensajes } = require("../../../compartido/src/contrato");
+const { opcionesMysql, conexionRabbit } = require("../../../compartido/src/tls");
 const { COMANDOS, ESQUEMAS, comandoDesdeCambio, entregaDesdeCambio } = require("./mensajes");
 
 // Único proceso que lee el outbox (tabla cambios) y publica.
@@ -38,10 +39,7 @@ function cumpleContrato(esquema, mensaje, cambioId) {
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
-        ...(process.env.DB_SSL_CA ? {ssl:{
-            ca:require('node:fs').readFileSync(process.env.DB_SSL_CA),
-            rejectUnauthorized:true,verifyIdentity:true
-        }} : {}),
+    ...opcionesMysql(),
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
@@ -56,14 +54,7 @@ let canal = null;
 // reconecta en segundo plano y el publicador espera mientras tanto.
 async function conectarBroker() {
     try {
-        const conexion = await amqp.connect({
-            protocol: process.env.RABBITMQ_TLS === 'true' ? 'amqps' : 'amqp',
-            port: process.env.RABBITMQ_TLS === 'true' ? 5671 : 5672,
-            hostname: process.env.RABBITMQ_HOST,
-            username: process.env.RABBITMQ_USER,
-            password: process.env.RABBITMQ_PASSWORD,
-            heartbeat: 10
-        }, process.env.RABBITMQ_TLS === 'true' ? {ca:[require('node:fs').readFileSync(process.env.TLS_CA)],rejectUnauthorized:true,servername:process.env.RABBITMQ_HOST} : {});
+        const conexion = await amqp.connect(...conexionRabbit({ heartbeat: 10 }));
 
         conexion.on("error", error => {
             console.error("[relay] RabbitMQ:", error.message);

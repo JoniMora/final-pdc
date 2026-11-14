@@ -6,6 +6,7 @@
 
 const mysql = require("mysql2/promise");
 const amqp = require("amqplib");
+const { opcionesMysql, conexionRabbit } = require("../../../compartido/src/tls");
 
 async function reenviar() {
     const reservaId = process.argv[2];
@@ -16,7 +17,7 @@ async function reenviar() {
 
     const conexionDb = await mysql.createConnection({
         host: process.env.DB_HOST,
-        ...(process.env.DB_SSL_CA ? {ssl:{ca:require('node:fs').readFileSync(process.env.DB_SSL_CA),rejectUnauthorized:true,verifyIdentity:true}} : {}),
+        ...opcionesMysql(),
         user: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
         database: process.env.DB_NAME
@@ -36,13 +37,7 @@ async function reenviar() {
 
         const reserva = filas[0];
 
-        conexion = await amqp.connect({
-            protocol: process.env.RABBITMQ_TLS === 'true' ? 'amqps' : 'amqp',
-            port: process.env.RABBITMQ_TLS === 'true' ? 5671 : 5672,
-            hostname: process.env.RABBITMQ_HOST,
-            username: process.env.RABBITMQ_USER,
-            password: process.env.RABBITMQ_PASSWORD
-        }, process.env.RABBITMQ_TLS === 'true' ? {ca:[require('node:fs').readFileSync(process.env.TLS_CA)],rejectUnauthorized:true,servername:process.env.RABBITMQ_HOST} : {});
+        conexion = await amqp.connect(...conexionRabbit());
 
         const canal = await conexion.createConfirmChannel();
 
