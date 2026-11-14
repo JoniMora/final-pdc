@@ -1,19 +1,21 @@
+const fs = require("node:fs");
+const http = require("node:http");
+const https = require("node:https");
+const path = require("node:path");
+const { randomUUID } = require("node:crypto");
 const express = require("express");
 const { Pool } = require("pg");
-const { randomUUID } = require("node:crypto");
-const path = require("node:path");
 const { crearClienteApi, ErrorDeContrato } = require("./api");
 const { secretoDesdeHex, verificarFirma, aplicarReserva, aplicarEvento } = require("./webhooks");
+const { crearSeguridad, puedeVer } = require("./seguridad");
+const { crearRecuperacion } = require("./recuperacion");
+const { leerCa } = require("../../../compartido/src/tls");
 
-const { crearSeguridad, puedeVer } = require('./seguridad');
-const { crearRecuperacion } = require('./recuperacion');
-const fs = require('node:fs');
-const https = require('node:https');
 const app = express();
 app.disable("x-powered-by");
 
 // La API se alcanza por el gateway: Aula no conoce sus instancias.
-const API_URL = process.env.API_URL || "http://traefik";
+const API_URL = process.env.API_URL || "https://traefik";
 const PORT = Number(process.env.PORT || 3001);
 
 // Secreto del webhook, en hexadecimal como lo entrega el servicio. Sin él,
@@ -29,12 +31,14 @@ try {
 
 const api = crearClienteApi({ baseUrl: API_URL, clave: process.env.API_KEY });
 
-// Lee PGHOST, PGUSER, PGPASSWORD y PGDATABASE del entorno.
+// Lee PGHOST, PGUSER, PGPASSWORD y PGDATABASE del entorno. Con la CA
+// local, la conexión es TLS y verifica que el certificado sea de aula-db.
+const ca = leerCa();
 const pool = new Pool({
     connectionTimeoutMillis: 2000,
     query_timeout: 3000,
     max: 5,
-    ...(process.env.PGSSLROOTCERT ? {ssl:{ca:fs.readFileSync(process.env.PGSSLROOTCERT),rejectUnauthorized:true}} : {})
+    ...(ca ? { ssl: { ca, rejectUnauthorized: true } } : {})
 });
 
 pool.on("error", error => {
@@ -77,16 +81,31 @@ app.post("/webhooks/reservas", express.raw({ type: "application/json", limit: "6
 app.use(express.json({ limit: "16kb" }));
 app.use(express.static(path.join(__dirname, "../public")));
 
-const seguridad = crearSeguridad({
-    archivo: process.env.USUARIOS_ARCHIVO || '/seguridad/usuarios.json',
-    secure: process.env.COOKIE_SECURE !== 'false'
-});
+// Login y sesiones de las personas. Sin TLS (pruebas fuera de Docker) la
+// cookie no lleva Secure; el entorno de docker-compose.yml siempre usa TLS.
+const TLS = Boolean(process.env.TLS_CERT);
+const USUARIOS = process.env.USUARIOS_ARCHIVO || "/seguridad/usuarios.json";
+
+if (!fs.existsSync(USUARIOS)) {
+    console.error(`[AULA] No existe ${USUARIOS}: nadie puede iniciar sesión (ver scripts/preparar-seguridad.js)`);
+}
+
+const seguridad = crearSeguridad({ archivo: USUARIOS, secure: TLS });
 seguridad.montar(app);
-app.use(['/materias','/inscripciones','/estado','/reconciliacion'], seguridad.exigirTransporte, seguridad.autenticar);
+
+app.use(["/materias", "/inscripciones", "/estado", "/reconciliacion"], seguridad.exigirTransporte, seguridad.autenticar);
+
 const recuperacion = crearRecuperacion({ pool, api });
 recuperacion.iniciar();
-app.get('/reconciliacion', (req,res)=>res.json(recuperacion.estado));
-app.post('/reconciliacion', seguridad.administrador, async(req,res)=>res.json(await recuperacion.sincronizar()));
+
+// Estado y disparo manual de la reconciliación: solo para el administrador.
+app.get("/reconciliacion", seguridad.administrador, (req, res) => {
+    res.json(recuperacion.estado);
+});
+
+app.post("/reconciliacion", seguridad.administrador, async (req, res) => {
+    res.json(await recuperacion.sincronizar());
+});
 
 // Reenvía al navegador la respuesta de la API con sus cabeceras útiles.
 function reenviar(res, respuesta) {
@@ -140,7 +159,7 @@ app.get("/estado", async (req, res) => {
         aula: "ok",
         contrato: `openapi.yaml ${api.contrato.version}`,
         postgresql: base.status === "fulfilled" ? "conectado" : "no disponible",
-        recuperacion: recuperacion.estado,
+        recuperacion: recuperacion.estado.modo,
         api: servicio.status === "fulfilled" ? `conectada (instancia ${servicio.value.instancia})` : "no disponible"
     });
 });
@@ -159,10 +178,17 @@ app.get("/materias", async (req, res) => {
     } catch (error) {
         console.error("[AULA] Consulta:", error.message);
 
+        // Contingencia: el catálogo se arma desde el feed de la API.
         try {
             await recuperacion.actualizarCatalogo();
-            res.set('X-Aula-Modo','contingencia').json([...recuperacion.catalogo.values()]);
-        } catch (fallo) { errorDeApi(res,fallo); }
+            const materias = [...recuperacion.catalogo.values()]
+                .sort((a, b) => b.creado_en.localeCompare(a.creado_en))
+                .slice(0, 20);
+
+            res.set("X-Aula-Modo", "contingencia").json(materias);
+        } catch (fallo) {
+            errorDeApi(res, fallo);
+        }
     }
 });
 
@@ -196,8 +222,8 @@ app.post("/materias", seguridad.administrador, async (req, res) => {
             [randomUUID(), actividad.id, actividad.nombre, actividad.capacidad, actividad.version]
         );
     } catch (error) {
-        // La actividad ya existe en el servicio; la reconciliación con
-        // el feed de cambios se incorpora en la Entrega 5.
+        // La actividad ya existe en el servicio: la reconciliación por feed
+        // la agrega a la base de Aula cuando vuelva a responder.
         console.error("[AULA] Escritura:", error.message);
     }
 
@@ -235,14 +261,21 @@ app.get("/materias/:actividadId", async (req, res) => {
             // La base de Aula no está disponible: se informa solo la API.
         }
 
-        if (inscriptos.status !== 200) return reenviar(res,inscriptos);
-        const propios = inscriptos.cuerpo.datos.filter(r=>puedeVer(req.usuario,r));
+        if (inscriptos.status !== 200) {
+            return reenviar(res, inscriptos);
+        }
+
+        // Un alumno ve solo su propia inscripción. La lista conserva la
+        // paginación de la API: no es una exportación completa.
+        const esAdministrador = req.usuario.rol === "administrador";
+
         res.json({
             ...actividad.cuerpo,
-            inscriptos: propios,
+            inscriptos: inscriptos.cuerpo.datos.filter(reserva => puedeVer(req.usuario, reserva)),
             siguiente_cursor: inscriptos.cuerpo.siguiente_cursor,
-            inscriptos_locales: req.usuario.rol === 'administrador' ? locales
-                : locales?.filter(alumno=>alumno===req.usuario.participante) ?? null
+            inscriptos_locales: esAdministrador
+                ? locales
+                : locales?.filter(alumno => alumno === req.usuario.participante) ?? null
         });
     } catch (error) {
         errorDeApi(res, error);
@@ -250,12 +283,16 @@ app.get("/materias/:actividadId", async (req, res) => {
 });
 
 // Solicita la inscripción. El navegador genera la Idempotency-Key y la
-// reutiliza si reintenta, así un reintento no duplica la reserva.
+// reutiliza si reintenta, así un reintento no duplica la reserva. Un alumno
+// solo puede inscribirse a sí mismo: el participante sale de su sesión.
 app.post("/materias/:actividadId/inscripciones", async (req, res) => {
-    const alumno = req.usuario.rol === 'alumno' ? req.usuario.participante : req.body?.alumno;
-    if (req.usuario.rol === 'alumno' && req.body?.alumno && req.body.alumno !== alumno) {
-        return res.status(403).json({error:'No puede inscribir a otra persona'});
+    const esAlumno = req.usuario.rol === "alumno";
+    const alumno = esAlumno ? req.usuario.participante : req.body?.alumno;
+
+    if (esAlumno && req.body?.alumno && req.body.alumno !== alumno) {
+        return res.status(403).json({ error: "No puede inscribir a otra persona" });
     }
+
     try {
         const respuesta = await api.llamar("solicitarReserva", {
             parametros: { id: req.params.actividadId },
@@ -275,11 +312,18 @@ app.post("/materias/:actividadId/inscripciones", async (req, res) => {
     }
 });
 
+// Una reserva de otro alumno responde igual que una inexistente: 404.
 app.get("/inscripciones/:reservaId", async (req, res) => {
     try {
-        const r = await api.llamar('consultarReserva',{parametros:{id:req.params.reservaId}});
-        if (r.status===200 && !puedeVer(req.usuario,r.cuerpo)) return res.status(404).json({error:'Inscripción no encontrada'});
-        reenviar(res,r);
+        const respuesta = await api.llamar("consultarReserva", {
+            parametros: { id: req.params.reservaId }
+        });
+
+        if (respuesta.status === 200 && !puedeVer(req.usuario, respuesta.cuerpo)) {
+            return res.status(404).json({ error: "Inscripción no encontrada" });
+        }
+
+        reenviar(res, respuesta);
     } catch (error) {
         errorDeApi(res, error);
     }
@@ -288,9 +332,18 @@ app.get("/inscripciones/:reservaId", async (req, res) => {
 // Cancela la inscripción; el resultado llega por webhook o consultando.
 app.post("/inscripciones/:reservaId/cancelacion", async (req, res) => {
     try {
-        const previa = await api.llamar('consultarReserva',{parametros:{id:req.params.reservaId}});
-        if(previa.status!==200) return reenviar(res,previa);
-        if(!puedeVer(req.usuario,previa.cuerpo)) return res.status(404).json({error:'Inscripción no encontrada'});
+        const previa = await api.llamar("consultarReserva", {
+            parametros: { id: req.params.reservaId }
+        });
+
+        if (previa.status !== 200) {
+            return reenviar(res, previa);
+        }
+
+        if (!puedeVer(req.usuario, previa.cuerpo)) {
+            return res.status(404).json({ error: "Inscripción no encontrada" });
+        }
+
         reenviar(res, await api.llamar("cancelarReserva", {
             parametros: { id: req.params.reservaId }
         }));
@@ -305,9 +358,19 @@ app.use((error, req, res, next) => {
     });
 });
 
-const servidor = process.env.TLS_CERT
-    ? https.createServer({cert:fs.readFileSync(process.env.TLS_CERT),key:fs.readFileSync(process.env.TLS_KEY),minVersion:'TLSv1.2'},app)
-    : require('node:http').createServer(app);
+// Aula atiende por HTTPS al navegador y al notificador (webhooks).
+const servidor = TLS
+    ? https.createServer({
+        cert: fs.readFileSync(process.env.TLS_CERT),
+        key: fs.readFileSync(process.env.TLS_KEY),
+        minVersion: "TLSv1.2"
+    }, app)
+    : http.createServer(app);
+
+if (!TLS) {
+    console.warn("[AULA] Sin TLS_CERT: atiende por HTTP, solo para pruebas fuera de Docker");
+}
+
 servidor.listen(PORT, "0.0.0.0", () => {
     console.log(`[AULA] Pagina disponible en puerto ${PORT} · contrato openapi.yaml ${api.contrato.version}`);
 });
