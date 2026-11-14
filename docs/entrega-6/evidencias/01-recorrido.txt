@@ -1,0 +1,10 @@
+Fecha: 2026-11-14T13:02:05.983Z
+Resultado: APROBADA
+OK: No se accede a materias sin sesión
+OK: Administrador y alumno se autentican por HTTPS
+OK: El alumno no puede crear materias
+OK: El administrador crea una materia de un cupo
+OK: La primera reserva se confirma y consume el cupo
+OK: La segunda reserva se rechaza sin sobreasignar
+OK: El alumno cancela su reserva y se devuelve el cupo
+OK: El lugar liberado puede asignarse a otro participante

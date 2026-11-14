@@ -28,16 +28,47 @@ app.use(express.json({ limit: "24kb" }));
 // Salud del proceso. Informa la base sin fallar si no responde. La
 // instancia permite ver a qué réplica llegó cada solicitud detrás del
 // gateway.
+// Pool exclusivo para salud: no espera detrás de las reservas.
+// Conserva la verificación TLS cuando el entorno seguro está activo.
+const poolSalud = require("mysql2/promise").createPool({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    connectionLimit: 1,
+    waitForConnections: false,
+    connectTimeout: 1000,
+    ...(process.env.DB_SSL_CA
+        ? {
+            ssl: {
+                ca: require("node:fs").readFileSync(
+                    process.env.DB_SSL_CA
+                ),
+                rejectUnauthorized: true,
+                verifyIdentity: true
+            }
+        }
+        : {})
+});
+
 app.get("/health", async (req, res) => {
     let mysql = "conectado";
 
     try {
-        await pool.query({ sql: "SELECT 1", timeout: 2000 });
-    } catch (_) {
+        await poolSalud.query({
+            sql: "SELECT 1",
+            timeout: 500
+        });
+    } catch {
         mysql = "no disponible";
     }
 
-    res.json({ servicio: "api", instancia: INSTANCIA, estado: "ok", mysql });
+    res.json({
+        servicio: "api",
+        instancia: INSTANCIA,
+        estado: "ok",
+        mysql
+    });
 });
 
 // El tenant se autentica antes de validar: una solicitud sin clave
@@ -113,7 +144,12 @@ app.use((error, req, res, next) => {
     enviarProblema(res, new Problema(500, null, "Error interno"));
 });
 
-const servidor = app.listen(PORT, "0.0.0.0", () => {
+const servidor = process.env.TLS_CERT
+    ? require('node:https').createServer({
+        cert:require('node:fs').readFileSync(process.env.TLS_CERT),
+        key:require('node:fs').readFileSync(process.env.TLS_KEY),minVersion:'TLSv1.2'
+    },app) : require('node:http').createServer(app);
+servidor.listen(PORT, "0.0.0.0", () => {
     console.log(`[API] Escuchando en puerto ${PORT} · contrato ${CONTRATO}`);
 });
 

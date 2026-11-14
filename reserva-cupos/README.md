@@ -1,4 +1,29 @@
-# Reserva de cupos — Entrega 4: contratos de interfaz y descubrimiento de servicios
+# Reserva de cupos — versión integrada
+
+La documentación actual es la [Entrega 6](../docs/entrega-6/README.md).
+Preparación, usuarios y TLS: [Entrega 5](../docs/entrega-5/README.md).
+Demo: [paso a paso](../docs/entrega-6/demo.md).
+
+Desde la raíz del repositorio, con Docker Desktop abierto:
+
+```powershell
+node reserva-cupos/scripts/entrega5.js preparar
+node reserva-cupos/scripts/entrega5.js levantar
+node reserva-cupos/scripts/entrega5.js migrar
+node reserva-cupos/scripts/entrega5.js estado
+```
+
+Ejecutar por separado. Abrir https://localhost:3001. Los accesos generados son
+locales y están excluidos de Git. No borrar volúmenes para actualizar el sistema.
+El script conserva el nombre entrega5 porque prepara el entorno seguro que E6 integra.
+
+Ver [evidencias finales y comandos de prueba](../docs/entrega-6/evidencias/README.md).
+El compose base y los ejemplos HTTP siguientes son referencia de E4;
+para la integración final se utiliza además `docker-compose.seguridad.yml`.
+
+---
+
+## Referencia de la Entrega 4: contratos y descubrimiento
 
 Proyecto final de Programación Distribuida y Componentes.
 Grupo 15: Jonathan Mora Colodrero y María Constanza Gigli.

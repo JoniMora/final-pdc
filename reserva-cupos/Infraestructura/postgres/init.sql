@@ -40,3 +40,8 @@ INSERT INTO punto_control (id) VALUES (1);
 
 GRANT SELECT, INSERT, UPDATE ON TABLE inscripciones TO aula_app;
 GRANT SELECT, UPDATE ON TABLE punto_control TO aula_app;
+
+-- Entrega 5: el cursor del feed es independiente de los webhooks.
+ALTER TABLE materias ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE punto_control ADD COLUMN ultima_secuencia_feed BIGINT NOT NULL DEFAULT 0;
+GRANT UPDATE ON TABLE materias TO aula_app;

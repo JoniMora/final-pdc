@@ -8,7 +8,7 @@ Temática 7 — Plataforma de e-learning de alta concurrencia, generalizada a un
 | **Grupo N°** | 15 |
 | **Integrantes** | Jonathan Mora Colodrero · María Constanza Gigli |
 | **Repositorio** | https://github.com/JoniMora/final-pdc |
-| **Estado actual** | Entrega 4 — Contratos de interfaz y descubrimiento de servicios (`v4-middleware`), verificada el 09/11/2026 |
+| **Estado actual** | Entrega 6 — Integración final; pruebas locales aprobadas el 14/11/2026; cierre y publicación pendientes |
 
 | Entrega | Contenido | Tag |
 |---|---|---|
@@ -17,6 +17,8 @@ Temática 7 — Plataforma de e-learning de alta concurrencia, generalizada a un
 | 2 | Infraestructura: nueve contenedores, tres redes, primario-réplica semisíncrono y RabbitMQ | `v2.1-infraestructura` (original: `v2-infraestructura`) |
 | 3 | Comunicación: API v1 síncrona, outbox → relay → RabbitMQ → worker asíncrono y caso de concurrencia demostrado | `v3-comunicacion` |
 | 4 | Middleware: contratos OpenAPI y AsyncAPI verificados en CI, descubrimiento de servicios con Traefik, cancelación y webhooks firmados | `v4-middleware` |
+| 5 | [Seguridad y recuperación](docs/entrega-5/README.md) | `v5-seguridad` (publicación por verificar) |
+| 6 | [Integración final, demo y defensa](docs/entrega-6/README.md) | `v6-final` (previsto) |
 
 > **Revisión 1 (17/09/2026)** — persistencia primario-réplica con replicación semi-sincrónica: el nodo único de MySQL era un punto único de falla.
 > **Revisión 2 (22/09/2026)** — ampliación de alcance a pedido de la cátedra: API pública multi-tenant para cualquier dominio con cupo y continuidad operativa de los sistemas consumidores ante la caída de su propia base de datos.
@@ -24,7 +26,32 @@ Temática 7 — Plataforma de e-learning de alta concurrencia, generalizada a un
 ---
 
 
-## Entrega 4: implementación actual
+## Entrega 6: integración final
+
+La versión integrada conserva las capas anteriores y agrega la verificación del
+recorrido completo y del escalado. En cada ráfaga de 500 solicitudes sobre diez
+cupos se obtuvieron diez confirmadas, 490 rechazadas y cero pendientes.
+Se verificaron tres API detrás de Traefik y dos workers sobre una misma cola.
+
+- [Informe final y límites](docs/entrega-6/README.md).
+- [Demo paso a paso](docs/entrega-6/demo.md).
+- [Defensa y mapa del código](docs/entrega-6/defensa.md).
+- [Evidencias](docs/entrega-6/evidencias/README.md).
+- [Pendientes de certificación y publicación](docs/entrega-6/certificacion-texto.md).
+
+La plantilla final corresponde a **Entrega 6**. Cualquier planificación anterior
+que ubique el cierre en una entrega 7 queda como antecedente histórico.
+Los tags `v5-seguridad` y `v6-final` son identificadores previstos: comprobarlos
+antes de entregar. El ensayo oral y el CI final no se acreditan con pruebas locales.
+
+## Entrega 5: seguridad y confiabilidad
+
+Usuarios, sesiones y permisos de Aula, configuración TLS y recuperación mediante
+el feed. Ver [guía de entrega 5](docs/entrega-5/README.md),
+[amenazas](docs/entrega-5/amenazas.md) y [evidencias](docs/entrega-5/evidencias/README.md).
+Integración Docker verificada el 14/11/2026: 20 comprobaciones aprobadas.
+
+## Entrega 4: base de middleware
 
 La aplicación está en [`reserva-cupos`](reserva-cupos/README.md). Sobre el recorrido de la Entrega 3, esta entrega desacopla los componentes por **contrato explícito** y agrega **descubrimiento de servicios**:
 
@@ -38,7 +65,7 @@ La aplicación está en [`reserva-cupos`](reserva-cupos/README.md). Sobre el rec
 - [Evidencias de ejecución](docs/entrega-4/evidencias/README.md).
 - [Inicio local y pruebas](reserva-cupos/README.md).
 
-**Alcance:** todavía no se implementan el límite de tasa, la autenticación de personas y los permisos, TLS, ni la contingencia y reconciliación de Aula (Entrega 5). Tag de esta etapa: `v4-middleware`.
+**Alcance histórico de E4:** la autenticación de personas, permisos, TLS y recuperación se incorporaron en E5. El límite de intentos implementado se aplica al login; no equivale a un límite general de tasa de la API. La referencia de versión de E4 es `v4-middleware`; verificar su publicación en GitHub.
 
 ## El problema
 

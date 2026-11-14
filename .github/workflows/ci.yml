@@ -157,6 +157,59 @@ jobs:
         if: always()
         run: docker compose down -v
 
+  seguridad:
+    name: Seguridad, recuperación e integración final TLS
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: reserva-cupos
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Preparar certificados y usuarios locales
+        run: node scripts/entrega5.js preparar
+      - name: Pruebas TLS y de rutas reales de Aula
+        run: |
+          (cd compartido && npm ci)
+          (cd clientes/aula && npm ci)
+          node --test clientes/aula/test/*.test.js pruebas/seguridad/tls.test.js
+      - name: Levantar entorno cifrado y migrar
+        run: |
+          node scripts/entrega5.js levantar
+          node scripts/entrega5.js migrar
+      - name: Limpiar evidencias anteriores del checkout
+        run: |
+          # Los artefactos deben contener resultados de esta ejecución del CI.
+          rm -f ../docs/entrega-5/evidencias/integracion.txt
+          rm -f ../docs/entrega-6/evidencias/01-recorrido.txt ../docs/entrega-6/evidencias/02-carga-escalado.txt ../docs/entrega-6/evidencias/03-seguridad-recuperacion.txt
+      - name: Acceso, cifrado y recuperación ante caída
+        run: node scripts/entrega5.js pruebas
+      - name: Recorrido funcional final
+        run: node pruebas/final/recorrido.js
+      - name: Conservar evidencia de seguridad para el cierre
+        run: |
+          mkdir -p ../docs/entrega-6/evidencias
+          cp ../docs/entrega-5/evidencias/integracion.txt ../docs/entrega-6/evidencias/03-seguridad-recuperacion.txt
+      - name: Carga, balanceo y escalado final
+        run: node pruebas/final/carga-escalado.js
+      - name: Registros ante una falla
+        if: failure()
+        run: docker compose -f docker-compose.yml -f docker-compose.seguridad.yml logs --tail=50
+      - name: Guardar evidencia de integración (sin claves)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidencia-integracion-final
+          path: |
+            docs/entrega-5/evidencias/integracion.txt
+            docs/entrega-6/evidencias/*.txt
+          if-no-files-found: ignore
+      - name: Detener entorno efímero del CI
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.seguridad.yml down -v
+
   # Único check obligatorio de main. GitHub cuenta como exitoso un job
   # salteado: si falla una prueba, la integración no corre y, sin este job,
   # la PR quedaría habilitada para el merge. Acá se exige que cada job haya
@@ -164,7 +217,7 @@ jobs:
   resultado:
     name: CI completo
     runs-on: ubuntu-latest
-    needs: [contratos, pruebas, consumidor, integracion]
+    needs: [contratos, pruebas, consumidor, integracion, seguridad]
     if: always()
     steps:
       - name: Todos los jobs terminaron bien
@@ -173,9 +226,10 @@ jobs:
           PRUEBAS: ${{ needs.pruebas.result }}
           CONSUMIDOR: ${{ needs.consumidor.result }}
           INTEGRACION: ${{ needs.integracion.result }}
+          SEGURIDAD: ${{ needs.seguridad.result }}
         run: |
           echo "contratos: $CONTRATOS · pruebas: $PRUEBAS · consumidor: $CONSUMIDOR · integración: $INTEGRACION"
-          for resultado in "$CONTRATOS" "$PRUEBAS" "$CONSUMIDOR" "$INTEGRACION"; do
+          for resultado in "$CONTRATOS" "$PRUEBAS" "$CONSUMIDOR" "$INTEGRACION" "$SEGURIDAD"; do
             if [ "$resultado" != success ]; then
               echo "::error::Hay un job que no terminó bien: la PR no se puede mergear"
               exit 1

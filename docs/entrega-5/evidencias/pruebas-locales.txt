@@ -1,0 +1,339 @@
+Ejecución local real. API simulada y fixtures donde lo indica el nombre. Prism no configurado.
+Comando: node --test (todos los tests de componentes y TLS)
+TAP version 13
+# Subtest: crear una materia usa crearActividad según el contrato
+ok 1 - crear una materia usa crearActividad según el contrato # SKIP PRISM_URL no definida: requiere el mock de Prism
+  ---
+  duration_ms: 1.7221
+  type: 'test'
+  ...
+# Subtest: consultar una materia y sus inscriptos
+ok 2 - consultar una materia y sus inscriptos # SKIP PRISM_URL no definida: requiere el mock de Prism
+  ---
+  duration_ms: 0.2546
+  type: 'test'
+  ...
+# Subtest: inscribirse con Idempotency-Key y consultar el resultado
+ok 3 - inscribirse con Idempotency-Key y consultar el resultado # SKIP PRISM_URL no definida: requiere el mock de Prism
+  ---
+  duration_ms: 0.1937
+  type: 'test'
+  ...
+# Subtest: cancelar una inscripción
+ok 4 - cancelar una inscripción # SKIP PRISM_URL no definida: requiere el mock de Prism
+  ---
+  duration_ms: 0.1831
+  type: 'test'
+  ...
+# Subtest: el mock rechaza una solicitud fuera de contrato antes de que llegue a una API real
+ok 5 - el mock rechaza una solicitud fuera de contrato antes de que llegue a una API real # SKIP PRISM_URL no definida: requiere el mock de Prism
+  ---
+  duration_ms: 0.2964
+  type: 'test'
+  ...
+# [AULA] Reconciliación pendiente: PG caído
+# Subtest: feed acepta saltos por tenant y confirma datos y checkpoint juntos
+ok 6 - feed acepta saltos por tenant y confirma datos y checkpoint juntos
+  ---
+  duration_ms: 3.4714
+  type: 'test'
+  ...
+# Subtest: fallo de aplicación revierte y no avanza el checkpoint
+ok 7 - fallo de aplicación revierte y no avanza el checkpoint
+  ---
+  duration_ms: 1.2394
+  type: 'test'
+  ...
+# Subtest: feed fuera de orden o checkpoint inválido se rechaza
+ok 8 - feed fuera de orden o checkpoint inválido se rechaza
+  ---
+  duration_ms: 0.3885
+  type: 'test'
+  ...
+# Subtest: sin PostgreSQL el catálogo se reconstruye desde la API
+ok 9 - sin PostgreSQL el catálogo se reconstruye desde la API
+  ---
+  duration_ms: 2.4845
+  type: 'test'
+  ...
+# Subtest: backend real Aula: login, propiedad de reservas, CSRF y rol (API simulada)
+ok 10 - backend real Aula: login, propiedad de reservas, CSRF y rol (API simulada)
+  ---
+  duration_ms: 1699.5096
+  type: 'test'
+  ...
+# Subtest: contraseñas: sal aleatoria, hash y rechazo de credencial incorrecta
+ok 11 - contraseñas: sal aleatoria, hash y rechazo de credencial incorrecta
+  ---
+  duration_ms: 373.2817
+  type: 'test'
+  ...
+# Subtest: sesiones, CSRF y roles se comprueban por HTTP en el servidor
+ok 12 - sesiones, CSRF y roles se comprueban por HTTP en el servidor
+  ---
+  duration_ms: 504.5099
+  type: 'test'
+  ...
+# Subtest: autorización de reserva: un alumno solo ve su identidad; admin puede gestionar
+ok 13 - autorización de reserva: un alumno solo ve su identidad; admin puede gestionar
+  ---
+  duration_ms: 0.2553
+  type: 'test'
+  ...
+# Subtest: limitación de intentos de login
+ok 14 - limitación de intentos de login
+  ---
+  duration_ms: 678.8471
+  type: 'test'
+  ...
+# Subtest: un evento firmado según el contrato se acepta y cumple el esquema
+ok 15 - un evento firmado según el contrato se acepta y cumple el esquema
+  ---
+  duration_ms: 14.1161
+  type: 'test'
+  ...
+# Subtest: se rechazan la firma de otro secreto, el cuerpo alterado y la reinyección
+ok 16 - se rechazan la firma de otro secreto, el cuerpo alterado y la reinyección
+  ---
+  duration_ms: 0.9691
+  type: 'test'
+  ...
+# Subtest: el receptor acepta el vector de prueba del contrato
+ok 17 - el receptor acepta el vector de prueba del contrato
+  ---
+  duration_ms: 0.877
+  type: 'test'
+  ...
+# Subtest: sin un secreto de 32 bytes no se acepta ninguna firma
+ok 18 - sin un secreto de 32 bytes no se acepta ninguna firma
+  ---
+  duration_ms: 0.9491
+  type: 'test'
+  ...
+# Subtest: cada ejemplo de asyncapi.yaml cumple el esquema de su mensaje
+ok 19 - cada ejemplo de asyncapi.yaml cumple el esquema de su mensaje
+  ---
+  duration_ms: 123.7939
+  type: 'test'
+  ...
+# Subtest: los ejemplos cubren cada mensaje y cada una de sus propiedades
+ok 20 - los ejemplos cubren cada mensaje y cada una de sus propiedades
+  ---
+  duration_ms: 4.2905
+  type: 'test'
+  ...
+# Subtest: el contrato es compatible consigo mismo
+ok 21 - el contrato es compatible consigo mismo
+  ---
+  duration_ms: 125.7162
+  type: 'test'
+  ...
+# Subtest: un campo obligatorio nuevo rompe a los mensajes que siguen en las colas
+ok 22 - un campo obligatorio nuevo rompe a los mensajes que siguen en las colas
+  ---
+  duration_ms: 103.6459
+  type: 'test'
+  ...
+# Subtest: un campo opcional nuevo rompe a los consumidores que todavía no se actualizaron
+ok 23 - un campo opcional nuevo rompe a los consumidores que todavía no se actualizaron
+  ---
+  duration_ms: 67.5394
+  type: 'test'
+  ...
+# Subtest: quitar un mensaje es incompatible y agregar uno solo se informa
+ok 24 - quitar un mensaje es incompatible y agregar uno solo se informa
+  ---
+  duration_ms: 92.235
+  type: 'test'
+  ...
+# Subtest: un comando reservar válido cumple el contrato de mensajería
+ok 25 - un comando reservar válido cumple el contrato de mensajería
+  ---
+  duration_ms: 117.5655
+  type: 'test'
+  ...
+# Subtest: un comando sin reserva_id o con campos de más se rechaza
+ok 26 - un comando sin reserva_id o con campos de más se rechaza
+  ---
+  duration_ms: 62.8696
+  type: 'test'
+  ...
+# Subtest: la entrega de webhook reutiliza el evento definido en openapi.yaml
+ok 27 - la entrega de webhook reutiliza el evento definido en openapi.yaml
+  ---
+  duration_ms: 50.7942
+  type: 'test'
+  ...
+# Subtest: las rutas se arman desde las plantillas del contrato
+ok 28 - las rutas se arman desde las plantillas del contrato
+  ---
+  duration_ms: 35.7392
+  type: 'test'
+  ...
+# Subtest: una respuesta que no cumple el esquema documentado se detecta
+ok 29 - una respuesta que no cumple el esquema documentado se detecta
+  ---
+  duration_ms: 42.2561
+  type: 'test'
+  ...
+# Subtest: el evento de webhook se valida como esquema del contrato
+ok 30 - el evento de webhook se valida como esquema del contrato
+  ---
+  duration_ms: 33.3942
+  type: 'test'
+  ...
+# Subtest: la firma del webhook trae un vector de prueba en el contrato
+ok 31 - la firma del webhook trae un vector de prueba en el contrato
+  ---
+  duration_ms: 51.0438
+  type: 'test'
+  ...
+# Subtest: TLS real: CA correcta permite conexión y CA no confiable la rechaza
+ok 32 - TLS real: CA correcta permite conexión y CA no confiable la rechaza
+  ---
+  duration_ms: 188.4949
+  type: 'test'
+  ...
+# Subtest: cada ruta de la API está en el contrato y viceversa
+ok 33 - cada ruta de la API está en el contrato y viceversa
+  ---
+  duration_ms: 1.5003
+  type: 'test'
+  ...
+# Subtest: uuidv7 genera UUID versión 7 ordenados por tiempo
+ok 34 - uuidv7 genera UUID versión 7 ordenados por tiempo
+  ---
+  duration_ms: 8.3393
+  type: 'test'
+  ...
+# Subtest: jsonCanonico no depende del orden de las claves
+ok 35 - jsonCanonico no depende del orden de las claves
+  ---
+  duration_ms: 2.1077
+  type: 'test'
+  ...
+# Subtest: metadata acepta objetos de hasta 16 KB y rechaza el resto
+ok 36 - metadata acepta objetos de hasta 16 KB y rechaza el resto
+  ---
+  duration_ms: 3.6741
+  type: 'test'
+  ...
+# Subtest: las direcciones privadas, de loopback y link-local se reconocen como internas
+ok 37 - las direcciones privadas, de loopback y link-local se reconocen como internas
+  ---
+  duration_ms: 12.1781
+  type: 'test'
+  ...
+# Subtest: se rechazan URLs con otro protocolo, credenciales o IP interna literal
+ok 38 - se rechazan URLs con otro protocolo, credenciales o IP interna literal
+  ---
+  duration_ms: 2.7336
+  type: 'test'
+  ...
+# Subtest: una IPv4 interna escrita como IPv6 también se rechaza
+ok 39 - una IPv4 interna escrita como IPv6 también se rechaza
+  ---
+  duration_ms: 1.3849
+  type: 'test'
+  ...
+# Subtest: un nombre que resuelve a una IP interna se rechaza al conectar, salvo que esté permitido
+ok 40 - un nombre que resuelve a una IP interna se rechaza al conectar, salvo que esté permitido
+  ---
+  duration_ms: 0.934
+  type: 'test'
+  ...
+# Subtest: el webhook firmado cumple el contrato y el receptor lo acepta
+ok 41 - el webhook firmado cumple el contrato y el receptor lo acepta
+  ---
+  duration_ms: 46.4952
+  type: 'test'
+  ...
+# Subtest: una firma vieja o con otro secreto se rechaza
+ok 42 - una firma vieja o con otro secreto se rechaza
+  ---
+  duration_ms: 13.7692
+  type: 'test'
+  ...
+# Subtest: la firma tiene el formato que define el contrato
+ok 43 - la firma tiene el formato que define el contrato
+  ---
+  duration_ms: 0.8128
+  type: 'test'
+  ...
+# Subtest: el emisor reproduce el vector de prueba del contrato
+ok 44 - el emisor reproduce el vector de prueba del contrato
+  ---
+  duration_ms: 0.3946
+  type: 'test'
+  ...
+# Subtest: una respuesta que no termina de llegar a tiempo cuenta como falla
+ok 45 - una respuesta que no termina de llegar a tiempo cuenta como falla
+  ---
+  duration_ms: 318.485
+  type: 'test'
+  ...
+# Subtest: los pedidos del outbox se convierten en comandos que cumplen el contrato
+ok 46 - los pedidos del outbox se convierten en comandos que cumplen el contrato
+  ---
+  duration_ms: 10.1012
+  type: 'test'
+  ...
+# Subtest: las decisiones del worker se convierten en entregas de webhook válidas
+ok 47 - las decisiones del worker se convierten en entregas de webhook válidas
+  ---
+  duration_ms: 12.11
+  type: 'test'
+  ...
+# Subtest: un cambio que no es una decisión sobre una reserva no cumple el contrato de webhook
+ok 48 - un cambio que no es una decisión sobre una reserva no cumple el contrato de webhook
+  ---
+  duration_ms: 0.725
+  type: 'test'
+  ...
+# Subtest: un comando válido se ejecuta y se confirma
+ok 49 - un comando válido se ejecuta y se confirma
+  ---
+  duration_ms: 8.122
+  type: 'test'
+  ...
+# Subtest: un mensaje fuera de contrato va a la DLQ sin ejecutarse
+ok 50 - un mensaje fuera de contrato va a la DLQ sin ejecutarse
+  ---
+  duration_ms: 1.1752
+  type: 'test'
+  ...
+# Subtest: un error de infraestructura reencola sin consumir reintentos
+ok 51 - un error de infraestructura reencola sin consumir reintentos
+  ---
+  duration_ms: 0.4281
+  type: 'test'
+  ...
+# Subtest: una reserva inexistente va a la DLQ sin reintentos
+ok 52 - una reserva inexistente va a la DLQ sin reintentos
+  ---
+  duration_ms: 0.5055
+  type: 'test'
+  ...
+# Subtest: agotados los reintentos, un reservar deja la reserva fallida
+ok 53 - agotados los reintentos, un reservar deja la reserva fallida
+  ---
+  duration_ms: 0.6785
+  type: 'test'
+  ...
+# Subtest: agotados los reintentos, un cancelar va a la DLQ y no se marca fallida
+ok 54 - agotados los reintentos, un cancelar va a la DLQ y no se marca fallida
+  ---
+  duration_ms: 4.3317
+  type: 'test'
+  ...
+1..54
+# tests 54
+# suites 0
+# pass 49
+# fail 0
+# cancelled 0
+# skipped 5
+# todo 0
+# duration_ms 2276.6894
+
+Código de salida: 0

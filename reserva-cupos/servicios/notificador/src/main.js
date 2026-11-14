@@ -31,6 +31,10 @@ const validar = crearValidadorDeMensajes();
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
+        ...(process.env.DB_SSL_CA ? {ssl:{
+            ca:require('node:fs').readFileSync(process.env.DB_SSL_CA),
+            rejectUnauthorized:true,verifyIdentity:true
+        }} : {}),
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
@@ -67,11 +71,13 @@ async function datosDelTenant(id) {
 
 async function iniciar() {
     const conexion = await amqp.connect({
-        hostname: process.env.RABBITMQ_HOST,
+        protocol: process.env.RABBITMQ_TLS === 'true' ? 'amqps' : 'amqp',
+            port: process.env.RABBITMQ_TLS === 'true' ? 5671 : 5672,
+            hostname: process.env.RABBITMQ_HOST,
         username: process.env.RABBITMQ_USER,
         password: process.env.RABBITMQ_PASSWORD,
         heartbeat: 10
-    });
+    }, process.env.RABBITMQ_TLS === 'true' ? {ca:[require('node:fs').readFileSync(process.env.TLS_CA)],rejectUnauthorized:true,servername:process.env.RABBITMQ_HOST} : {});
 
     conexion.on("error", salir);
     conexion.on("close", () => salir(new Error("Se perdió la conexión con RabbitMQ")));
@@ -150,6 +156,7 @@ async function iniciar() {
 
         try {
             url = validarUrl(tenant.webhook_url, PERMITIDOS);
+            if(process.env.EXIGIR_TLS === 'true' && url.protocol !== 'https:') throw new ErrorDestino('Se requiere HTTPS');
         } catch (error) {
             console.error(`[notificador] ${id}: destino rechazado, a webhooks.dlq: ${error.message}`);
             canal.nack(entrega, false, false);

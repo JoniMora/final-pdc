@@ -1,0 +1,22 @@
+2026-11-14T13:37:01.399Z
+Resultado: APROBADA
+OK: Sin sesión: 401
+OK: Contraseña inválida: 401
+OK: Alumno no puede crear materias: 403
+OK: Sin CSRF no se modifica estado: 403
+OK: No se puede suplantar alumno en el cuerpo: 403
+OK: Otro alumno no puede consultar ni cancelar reserva ajena
+OK: Listado de alumno no revela inscripciones ajenas
+OK: Feed reconstruye materia local perdida
+OK: Catálogo disponible con PostgreSQL detenido
+OK: Sesión sigue válida sin PostgreSQL
+OK: Se admite y decide reserva durante caída de PostgreSQL
+OK: Reconciliación recupera inscripción de la caída
+OK: HTTPS Aula y API validan CA e identidad (sin omitir verificación)
+OK: MySQL acepta conexión TLS verificada
+OK: MySQL rechaza conexión TCP sin TLS
+OK: PostgreSQL utiliza TLS verificado
+OK: PostgreSQL rechaza red sin TLS
+OK: RabbitMQ solo expone AMQPS para mensajes
+OK: Replicación activa con TLS y verificación de certificado
+OK: Logout invalida sesión

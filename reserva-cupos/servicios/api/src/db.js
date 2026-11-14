@@ -2,6 +2,10 @@ const mysql = require("mysql2/promise");
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
+        ...(process.env.DB_SSL_CA ? {ssl:{
+            ca:require('node:fs').readFileSync(process.env.DB_SSL_CA),
+            rejectUnauthorized:true,verifyIdentity:true
+        }} : {}),
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
