@@ -11,16 +11,25 @@ const { sha256 } = require("./modelo");
 
 // El tenant se deriva siempre de la clave, nunca de la ruta ni del cuerpo.
 // Se leen además sus permisos y su límite de tasa.
-function crearAutenticacion(pool) {
+//
+// Con un limitador, una clave cuyo balde ya está vacío recibe 429 antes de
+// consultar MySQL: un tenant que inunda la API no le cuesta a la base una
+// consulta por cada solicitud que de todos modos se rechaza.
+function crearAutenticacion(pool, limitador) {
     return async function autenticar(req, res, next) {
         const clave = claveBearer(req);
 
         if (!clave) throw problemas.noAutenticado();
 
+        const hash = sha256(clave);
+        req.claveHash = hash.toString("hex");
+
+        limitador?.rechazarSiAgotado(req.claveHash);
+
         const [filas] = await pool.query(
             `SELECT id, scopes, limite_por_segundo, limite_rafaga
                FROM tenants WHERE api_key_hash = ? AND activo = TRUE`,
-            [sha256(clave)]
+            [hash]
         );
 
         if (filas.length === 0) throw problemas.noAutenticado();
@@ -63,33 +72,57 @@ function crearExigirPermisos(contrato) {
     };
 }
 
-// Token bucket por tenant, en memoria de cada instancia. Con N instancias
-// detrás de Traefik el límite efectivo es hasta N veces el configurado; la
-// Entrega 6 lo lleva a Redis para que sea global.
+// Token bucket por clave de tenant (por su hash), en memoria de cada
+// instancia. Con N instancias detrás de Traefik el límite efectivo es hasta
+// N veces el configurado; la Entrega 6 lo lleva a Redis para que sea global.
+//
+// limitar es el middleware que descuenta una ficha una vez autenticado el
+// tenant (con su límite propio o el de la plataforma). rechazarSiAgotado lo
+// usa la autenticación para responder 429 sin tocar la base cuando el balde
+// de esa clave ya está vacío.
 function crearLimitador({ porSegundo, rafaga, reloj = Date.now }) {
     const baldes = new Map();
 
-    return function limitar(req, res, next) {
+    function recargar(balde, ahora) {
+        balde.fichas = Math.min(balde.rafaga, balde.fichas + (ahora - balde.ultimo) / 1000 * balde.porSegundo);
+        balde.ultimo = ahora;
+    }
+
+    function rechazar(balde) {
+        const segundos = Math.max(1, Math.ceil((1 - balde.fichas) / balde.porSegundo));
+        throw problemas.demasiadasSolicitudes(segundos);
+    }
+
+    function limitar(req, res, next) {
+        const clave = req.claveHash ?? req.tenantId;
         const limite = req.limite || { porSegundo, rafaga };
         const ahora = reloj();
-        let balde = baldes.get(req.tenantId);
+        let balde = baldes.get(clave);
 
         if (!balde || balde.rafaga !== limite.rafaga || balde.porSegundo !== limite.porSegundo) {
             balde = { fichas: limite.rafaga, ultimo: ahora, ...limite };
-            baldes.set(req.tenantId, balde);
+            baldes.set(clave, balde);
         }
 
-        balde.fichas = Math.min(balde.rafaga, balde.fichas + (ahora - balde.ultimo) / 1000 * balde.porSegundo);
-        balde.ultimo = ahora;
+        recargar(balde, ahora);
 
-        if (balde.fichas < 1) {
-            const segundos = Math.max(1, Math.ceil((1 - balde.fichas) / balde.porSegundo));
-            throw problemas.demasiadasSolicitudes(segundos);
-        }
+        if (balde.fichas < 1) rechazar(balde);
 
         balde.fichas -= 1;
         next();
+    }
+
+    limitar.rechazarSiAgotado = clave => {
+        const balde = baldes.get(clave);
+
+        if (!balde) return;
+
+        recargar(balde, reloj());
+
+        if (balde.fichas < 1) rechazar(balde);
     };
+
+    return limitar;
 }
 
 // --- Operador de la plataforma -------------------------------------------

@@ -73,7 +73,7 @@ app.get("/health", async (req, res) => {
 // responde 401 aunque además sea inválida. Después se descuenta del límite
 // de tasa del tenant, también antes de validar: una ráfaga de solicitudes
 // inválidas consume el cupo igual que una de válidas.
-app.use("/v1", crearAutenticacion(pool), limitar);
+app.use("/v1", crearAutenticacion(pool, limitar), limitar);
 app.use("/admin", crearAutenticacionAdministrador(pool, hashAdministrador));
 
 app.use(OpenApiValidator.middleware({

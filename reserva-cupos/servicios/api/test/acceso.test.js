@@ -4,6 +4,7 @@ const path = require("node:path");
 const fs = require("node:fs");
 const yaml = require("js-yaml");
 const {
+    crearAutenticacion,
     crearExigirPermisos,
     crearLimitador,
     crearAutenticacionAdministrador,
@@ -62,6 +63,22 @@ test("un tenant saturado no consume el cupo de otro", async () => {
     assert.equal(await ejecutar(limitar, { tenantId: "a", limite: null }), "siguiente");
     await assert.rejects(ejecutar(limitar, { tenantId: "a", limite: null }), error => error.status === 429);
     assert.equal(await ejecutar(limitar, { tenantId: "b", limite: null }), "siguiente");
+});
+
+test("con el balde agotado, la clave recibe 429 sin consultar la base", async () => {
+    const limitar = crearLimitador({ porSegundo: 1, rafaga: 1, reloj: () => 0 });
+    let consultas = 0;
+    const pool = { query: async () => { consultas++; return [[{ id: "t", scopes: "lectura" }]]; } };
+    const autenticar = crearAutenticacion(pool, limitar);
+    const pedido = () => ({ get: () => "Bearer rc_saturado" });
+
+    const primero = pedido();
+    assert.equal(await ejecutar(autenticar, primero), "siguiente");
+    assert.equal(await ejecutar(limitar, primero), "siguiente");
+    assert.equal(consultas, 1);
+
+    await assert.rejects(ejecutar(autenticar, pedido()), error => error.status === 429);
+    assert.equal(consultas, 1);
 });
 
 test("el límite propio del tenant reemplaza al de la plataforma", async () => {

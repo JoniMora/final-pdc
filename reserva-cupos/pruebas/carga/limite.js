@@ -53,6 +53,10 @@ export function saturado() {
 
     if (respuesta.status === 429) respuestas429.add(1);
 
+    if (respuesta.status !== 200 && respuesta.status !== 429) {
+        console.warn(`saturado: HTTP ${respuesta.status} ${respuesta.error || ""} ${String(respuesta.body).slice(0, 160)}`);
+    }
+
     check(respuesta, {
         "saturado: 200 o 429": r => r.status === 200 || r.status === 429,
         "429 trae Retry-After": r => r.status !== 429 || Number(r.headers["Retry-After"]) >= 1
@@ -62,7 +66,10 @@ export function saturado() {
 export function vecino() {
     const respuesta = feed(__ENV.CLAVE_VECINO);
 
-    if (respuesta.status !== 200) vecinoRechazado.add(1);
+    if (respuesta.status !== 200) {
+        vecinoRechazado.add(1);
+        console.warn(`vecino: HTTP ${respuesta.status} ${respuesta.error || ""} ${String(respuesta.body).slice(0, 160)}`);
+    }
 
     check(respuesta, { "vecino: siempre 200": r => r.status === 200 });
 }
