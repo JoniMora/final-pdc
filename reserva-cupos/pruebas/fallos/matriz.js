@@ -23,7 +23,7 @@ const {
     sesionAula, aula, esperar, esperarHasta, Evidencia
 } = require("../comun");
 const {
-    cronometro, segundos, detener, iniciar, esperarSaludable, colas, rafaga, resumenRafaga,
+    cronometro, segundos, detener, iniciar, esperarSaludable, esperarEntornoSano, colas, rafaga, resumenRafaga,
     listar, verificarInvariantes, resumenInvariantes
 } = require("./arnes");
 
@@ -165,8 +165,15 @@ async function escenarioApi({ ok, dato }) {
     dato(`Errores que vio el cliente antes de reintentar: ${errores || "ninguno"}; peor admisión: ${peor.toFixed(1)} s`);
     dato(`La ráfaga terminó ${segundos(caida())} después de la caída`);
 
+    // Vuelve a una instancia y espera a que Traefik la tenga UP: el
+    // escenario siguiente no puede empezar sin API.
     dockerDirecto(["start", victima]);
     docker(["up", "-d", "--no-recreate", "--scale", "api=1", "api"]);
+    await esperarHasta(async () => {
+        const panel = await pedir("https://localhost:8080/api/http/services/api@docker").catch(() => null);
+        const estados = Object.values(panel?.datos?.serverStatus || {});
+        return estados.length === 1 && estados[0] === "UP";
+    }, { plazoMs: 120000, descripcion: "una instancia de la API UP en Traefik" });
 
     return {
         efecto: `Solicitudes en curso en la instancia caída: 502/504 (${errores || "ninguno"}); el resto, atendido por la otra`,
@@ -531,6 +538,7 @@ async function main() {
         const evidencia = new Evidencia(`fallos/${nombre}.txt`, `Matriz de fallos · ${TITULOS[nombre]}`);
 
         try {
+            await esperarEntornoSano();
             const fila = await ESCENARIOS[nombre](evidencia);
             evidencia.guardar();
             filas.push({ nombre, ...fila, resultado: "Aprobado" });

@@ -10,7 +10,7 @@
 //   - cronómetro y comandos de Docker.
 
 const crypto = require("node:crypto");
-const { docker, dockerAsync, dockerDirecto, api, esperar, esperarHasta } = require("../comun");
+const { docker, dockerAsync, dockerDirecto, api, pedir, esperar, esperarHasta } = require("../comun");
 
 function cronometro() {
     const inicio = Date.now();
@@ -38,6 +38,22 @@ async function esperarSaludable(servicio, plazoMs = 180000) {
             "{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}", id]).trim();
         return estado.startsWith("running") && !/starting|unhealthy/.test(estado);
     }, { plazoMs, intervaloMs: 1000, descripcion: `que ${servicio} esté en marcha` });
+}
+
+// Antes de cada escenario: la API responde por el gateway y Aula también.
+// Un escenario anterior puede haber dejado un componente arrancando.
+async function esperarEntornoSano() {
+    await esperarHasta(async () => {
+        try {
+            const [api, aula] = await Promise.all([
+                pedir("https://localhost:3000/health", { timeoutMs: 5000 }),
+                pedir("https://localhost:3001/health", { timeoutMs: 5000 })
+            ]);
+            return api.status === 200 && aula.status === 200;
+        } catch (_) {
+            return false;
+        }
+    }, { plazoMs: 180000, intervaloMs: 1000, descripcion: "que la API y Aula respondan" });
 }
 
 function colas() {
@@ -77,7 +93,12 @@ async function reservarConReintentos(cliente, actividadId, participante, { plazo
                 return respuesta.datos;
             }
 
-            if (status !== 429 && status < 500) {
+            // Un 404 en texto plano no es de la API (que responde Problem
+            // Details): es Traefik sin ninguna instancia sana registrada,
+            // por ejemplo mientras una vuelve a arrancar. Es transitorio.
+            const sinRuta = status === 404 && typeof respuesta.datos === "string";
+
+            if (status !== 429 && status < 500 && !sinRuta) {
                 throw new Error(`Respuesta definitiva inesperada: HTTP ${status} ${JSON.stringify(respuesta.datos)}`);
             }
         } catch (error) {
@@ -211,6 +232,7 @@ module.exports = {
     detener,
     iniciar,
     esperarSaludable,
+    esperarEntornoSano,
     colas,
     rafaga,
     resumenRafaga,
