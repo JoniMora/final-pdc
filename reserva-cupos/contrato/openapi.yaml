@@ -2,8 +2,8 @@ openapi: 3.1.0
 
 info:
   title: Servicio multi-tenant de reserva de cupos
-  version: 1.1.0
-  summary: API pública v1 (Entrega 4)
+  version: 1.2.0
+  summary: API pública v1 y administración de tenants (Entrega 5)
   description: |
     Contrato de la API pública. Cada organización consumidora es un tenant
     que se autentica con su propia clave; el tenant se deriva siempre de la
@@ -25,13 +25,33 @@ info:
 
     Los errores se devuelven como Problem Details (RFC 9457).
 
+    **Permisos (scopes).** Cada clave tiene una lista de permisos y cada
+    operación declara en `security` el que necesita: `actividades:escribir`
+    (crear, abrir y cerrar actividades), `reservas:escribir` (solicitar y
+    cancelar reservas), `lectura` (consultar actividades y reservas) y
+    `cambios:leer` (feed). Una clave válida sin el permiso responde `403`.
+    Un tenant creado sin indicar permisos recibe los cuatro, así que los
+    clientes de 1.1.0 no notan el cambio.
+
+    **Límite de tasa.** Cada tenant tiene un límite de solicitudes por
+    segundo con una ráfaga máxima (token bucket). Al superarlo, la API
+    responde `429` con `Retry-After`; un tenant saturado no consume el cupo
+    de otro.
+
+    **Administración.** Las rutas `/admin/v1` son del operador de la
+    plataforma, con su propia clave (`claveAdministrador`): alta de tenants,
+    permisos, URL del webhook, límite de tasa y rotación de la clave. Una
+    clave de tenant recibe `403` en esas rutas.
+
+    **Transporte.** La API solo se publica por HTTPS (TLS 1.2 o superior).
+
     Versionado: semántico sobre este documento (`info.version`). Los cambios
     compatibles suben la versión menor y se registran en `CHANGELOG.md`; un
     cambio incompatible exige una versión mayor y una ruta `/v2`.
 
 servers:
-  - url: http://localhost:3000
-    description: Entorno local (Docker Compose)
+  - url: https://localhost:3000
+    description: Entorno local (Docker Compose), con el certificado de la CA de desarrollo
 
 security:
   - claveApi: []
@@ -43,12 +63,16 @@ tags:
     description: Asignación de un cupo a un participante.
   - name: cambios
     description: Feed ordenado de cambios para la reconciliación del tenant.
+  - name: administracion
+    description: Alta y configuración de tenants. Solo para el operador de la plataforma.
 
 paths:
   /v1/actividades:
     post:
       tags: [actividades]
       operationId: crearActividad
+      security:
+        - claveApi: ["actividades:escribir"]
       summary: Crear una actividad con cupo
       requestBody:
         required: true
@@ -87,6 +111,10 @@ paths:
           $ref: "#/components/responses/SolicitudInvalida"
         "401":
           $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/PermisoInsuficiente"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
         "415":
           $ref: "#/components/responses/TipoNoSoportado"
         "503":
@@ -98,6 +126,8 @@ paths:
     get:
       tags: [actividades]
       operationId: consultarActividad
+      security:
+        - claveApi: ["lectura"]
       summary: Consultar la actividad y sus cupos disponibles
       responses:
         "200":
@@ -110,6 +140,10 @@ paths:
           $ref: "#/components/responses/SolicitudInvalida"
         "401":
           $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/PermisoInsuficiente"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
         "404":
           $ref: "#/components/responses/NoEncontrado"
         "503":
@@ -117,6 +151,8 @@ paths:
     patch:
       tags: [actividades]
       operationId: cambiarEstadoActividad
+      security:
+        - claveApi: ["actividades:escribir"]
       summary: Abrir o cerrar la admisión
       requestBody:
         required: true
@@ -140,6 +176,10 @@ paths:
           $ref: "#/components/responses/SolicitudInvalida"
         "401":
           $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/PermisoInsuficiente"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
         "404":
           $ref: "#/components/responses/NoEncontrado"
         "415":
@@ -153,6 +193,8 @@ paths:
     post:
       tags: [reservas]
       operationId: solicitarReserva
+      security:
+        - claveApi: ["reservas:escribir"]
       summary: Solicitar una reserva (admisión asíncrona)
       description: |
         Registra la reserva como `pendiente` y su comando en el outbox, en una
@@ -210,6 +252,10 @@ paths:
           $ref: "#/components/responses/SolicitudInvalida"
         "401":
           $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/PermisoInsuficiente"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
         "404":
           $ref: "#/components/responses/NoEncontrado"
         "409":
@@ -231,6 +277,8 @@ paths:
     get:
       tags: [reservas]
       operationId: listarReservas
+      security:
+        - claveApi: ["lectura"]
       summary: Listado paginado por cursor (operación en contingencia)
       parameters:
         - name: estado
@@ -269,6 +317,10 @@ paths:
           $ref: "#/components/responses/SolicitudInvalida"
         "401":
           $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/PermisoInsuficiente"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
         "404":
           $ref: "#/components/responses/NoEncontrado"
         "503":
@@ -285,6 +337,8 @@ paths:
     get:
       tags: [reservas]
       operationId: consultarReserva
+      security:
+        - claveApi: ["lectura"]
       summary: Consultar el estado de una reserva
       responses:
         "200":
@@ -300,6 +354,10 @@ paths:
           $ref: "#/components/responses/SolicitudInvalida"
         "401":
           $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/PermisoInsuficiente"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
         "404":
           $ref: "#/components/responses/NoEncontrado"
         "503":
@@ -316,6 +374,8 @@ paths:
     post:
       tags: [reservas]
       operationId: cancelarReserva
+      security:
+        - claveApi: ["reservas:escribir"]
       summary: Solicitar la cancelación de una reserva (asíncrona)
       description: |
         Registra el pedido de cancelación y su comando en el outbox, en una
@@ -354,6 +414,10 @@ paths:
           $ref: "#/components/responses/SolicitudInvalida"
         "401":
           $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/PermisoInsuficiente"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
         "404":
           $ref: "#/components/responses/NoEncontrado"
         "409":
@@ -369,6 +433,8 @@ paths:
     get:
       tags: [cambios]
       operationId: leerCambios
+      security:
+        - claveApi: ["cambios:leer"]
       summary: Feed de cambios del tenant (reconciliación)
       description: |
         Cambios en orden de secuencia. Cada elemento trae la instantánea
@@ -412,6 +478,154 @@ paths:
           $ref: "#/components/responses/SolicitudInvalida"
         "401":
           $ref: "#/components/responses/NoAutenticado"
+        "403":
+          $ref: "#/components/responses/PermisoInsuficiente"
+        "429":
+          $ref: "#/components/responses/DemasiadasSolicitudes"
+        "503":
+          $ref: "#/components/responses/NoDisponible"
+
+  /admin/v1/tenants:
+    post:
+      tags: [administracion]
+      operationId: crearTenant
+      summary: Dar de alta un tenant
+      description: |
+        Genera la clave de API (256 bits) y, si se indica `webhook_url`, el
+        secreto del webhook (32 bytes). Los dos se muestran **una sola vez**,
+        en esta respuesta: el servicio guarda solo el hash de la clave.
+      security:
+        - claveAdministrador: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NuevoTenant"
+      responses:
+        "201":
+          description: Tenant creado, con sus credenciales.
+          headers:
+            Location:
+              $ref: "#/components/headers/Location"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantCreado"
+          links:
+            ConsultarTenant:
+              operationId: consultarTenant
+              parameters:
+                id: $response.body#/id
+            CambiarTenant:
+              operationId: cambiarTenant
+              parameters:
+                id: $response.body#/id
+            RotarClave:
+              operationId: rotarClaveTenant
+              parameters:
+                id: $response.body#/id
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticadoAdministrador"
+        "403":
+          $ref: "#/components/responses/SoloAdministrador"
+        "415":
+          $ref: "#/components/responses/TipoNoSoportado"
+        "503":
+          $ref: "#/components/responses/NoDisponible"
+
+  /admin/v1/tenants/{id}:
+    parameters:
+      - $ref: "#/components/parameters/IdTenant"
+    get:
+      tags: [administracion]
+      operationId: consultarTenant
+      summary: Consultar la configuración de un tenant (sin credenciales)
+      security:
+        - claveAdministrador: []
+      responses:
+        "200":
+          description: Tenant.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tenant"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticadoAdministrador"
+        "403":
+          $ref: "#/components/responses/SoloAdministrador"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "503":
+          $ref: "#/components/responses/NoDisponible"
+    patch:
+      tags: [administracion]
+      operationId: cambiarTenant
+      summary: Cambiar permisos, webhook, límite de tasa o estado
+      description: |
+        Solo cambia los campos presentes. `webhook_url: null` quita el
+        webhook y su secreto. Si el tenant registra un webhook y no tenía
+        secreto, el servicio lo genera y lo devuelve **una sola vez** en
+        `webhook_secreto`. Un tenant con `activo: false` deja de autenticarse.
+      security:
+        - claveAdministrador: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CambioTenant"
+      responses:
+        "200":
+          description: Tenant actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TenantCambiado"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticadoAdministrador"
+        "403":
+          $ref: "#/components/responses/SoloAdministrador"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "415":
+          $ref: "#/components/responses/TipoNoSoportado"
+        "503":
+          $ref: "#/components/responses/NoDisponible"
+
+  /admin/v1/tenants/{id}/rotacion:
+    parameters:
+      - $ref: "#/components/parameters/IdTenant"
+    post:
+      tags: [administracion]
+      operationId: rotarClaveTenant
+      summary: Rotar la clave de API del tenant
+      description: |
+        Genera una clave nueva y la devuelve **una sola vez**. La anterior
+        deja de autenticar en el mismo momento.
+      security:
+        - claveAdministrador: []
+      responses:
+        "200":
+          description: Clave nueva.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClaveRotada"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticadoAdministrador"
+        "403":
+          $ref: "#/components/responses/SoloAdministrador"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
         "503":
           $ref: "#/components/responses/NoDisponible"
 
@@ -420,10 +634,26 @@ components:
     claveApi:
       type: http
       scheme: bearer
-      description: Clave de API del tenant (256 bits). El servicio guarda solo su hash SHA-256.
+      description: |
+        Clave de API del tenant (256 bits). El servicio guarda solo su hash
+        SHA-256. Los valores de cada requisito de `security` son los permisos
+        (scopes) que la clave necesita para la operación.
+    claveAdministrador:
+      type: http
+      scheme: bearer
+      description: |
+        Clave del operador de la plataforma, distinta de cualquier clave de
+        tenant. El servicio guarda solo su hash SHA-256.
 
   parameters:
     IdActividad:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdTenant:
       name: id
       in: path
       required: true
@@ -454,6 +684,37 @@ components:
         WWW-Authenticate:
           schema:
             type: string
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problema"
+    PermisoInsuficiente:
+      description: La clave es válida pero no tiene el permiso (scope) que exige la operación.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problema"
+    DemasiadasSolicitudes:
+      description: El tenant superó su límite de tasa; reintentar después de `Retry-After`.
+      headers:
+        Retry-After:
+          $ref: "#/components/headers/RetryAfter"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problema"
+    NoAutenticadoAdministrador:
+      description: Clave de administrador ausente o inválida.
+      headers:
+        WWW-Authenticate:
+          schema:
+            type: string
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problema"
+    SoloAdministrador:
+      description: La clave es de un tenant; las rutas de administración son solo del operador.
       content:
         application/problem+json:
           schema:
@@ -618,6 +879,134 @@ components:
           format: date-time
         entidad:
           $ref: "#/components/schemas/Reserva"
+
+    Scope:
+      type: string
+      enum: ["actividades:escribir", "reservas:escribir", "lectura", "cambios:leer"]
+
+    Scopes:
+      type: array
+      minItems: 1
+      uniqueItems: true
+      items:
+        $ref: "#/components/schemas/Scope"
+
+    LimiteTasa:
+      description: Token bucket del tenant. Sin indicarlo, rige el límite por defecto de la plataforma.
+      type: object
+      required: [por_segundo, rafaga]
+      additionalProperties: false
+      properties:
+        por_segundo:
+          type: integer
+          minimum: 1
+          maximum: 10000
+        rafaga:
+          type: integer
+          minimum: 1
+          maximum: 10000
+
+    WebhookUrl:
+      type: [string, "null"]
+      format: uri
+      maxLength: 2048
+      pattern: "^https?://"
+
+    NuevoTenant:
+      type: object
+      required: [nombre]
+      additionalProperties: false
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          maxLength: 120
+          pattern: "\\S"
+          description: Al menos un carácter que no sea un espacio.
+        scopes:
+          $ref: "#/components/schemas/Scopes"
+        webhook_url:
+          $ref: "#/components/schemas/WebhookUrl"
+        limite:
+          $ref: "#/components/schemas/LimiteTasa"
+
+    CambioTenant:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        scopes:
+          $ref: "#/components/schemas/Scopes"
+        webhook_url:
+          $ref: "#/components/schemas/WebhookUrl"
+        limite:
+          description: "`null` vuelve al límite por defecto de la plataforma."
+          oneOf:
+            - $ref: "#/components/schemas/LimiteTasa"
+            - type: "null"
+        activo:
+          type: boolean
+
+    Tenant:
+      type: object
+      required: [id, nombre, activo, scopes, webhook_url, limite, creado_en]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+        activo:
+          type: boolean
+        scopes:
+          $ref: "#/components/schemas/Scopes"
+        webhook_url:
+          type: [string, "null"]
+        limite:
+          description: "`null`: rige el límite por defecto de la plataforma."
+          oneOf:
+            - $ref: "#/components/schemas/LimiteTasa"
+            - type: "null"
+        creado_en:
+          type: string
+          format: date-time
+
+    TenantCreado:
+      allOf:
+        - $ref: "#/components/schemas/Tenant"
+        - type: object
+          required: [clave_api, webhook_secreto]
+          properties:
+            clave_api:
+              type: string
+              pattern: "^rc_[0-9a-f]{64}$"
+              description: Se muestra una sola vez.
+            webhook_secreto:
+              type: [string, "null"]
+              pattern: "^[0-9a-f]{64}$"
+              description: Secreto del webhook en hexadecimal (32 bytes). Se muestra una sola vez.
+
+    TenantCambiado:
+      allOf:
+        - $ref: "#/components/schemas/Tenant"
+        - type: object
+          properties:
+            webhook_secreto:
+              type: string
+              pattern: "^[0-9a-f]{64}$"
+              description: Solo si este cambio generó el secreto. Se muestra una sola vez.
+
+    ClaveRotada:
+      type: object
+      required: [id, clave_api]
+      properties:
+        id:
+          type: string
+          format: uuid
+        clave_api:
+          type: string
+          pattern: "^rc_[0-9a-f]{64}$"
+          description: Se muestra una sola vez; la anterior ya no autentica.
 
     Problema:
       description: Problem Details (RFC 9457).

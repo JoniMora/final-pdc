@@ -31,6 +31,23 @@ const problemas = {
             "WWW-Authenticate": 'Bearer realm="reserva-cupos"'
         }),
 
+    permisoInsuficiente: faltan =>
+        new Problema(403, "permiso-insuficiente", "La clave no tiene permiso para esta operación",
+            `Falta el permiso: ${faltan.join(", ")}`),
+
+    demasiadasSolicitudes: segundos =>
+        new Problema(429, "limite-de-tasa", "Se superó el límite de solicitudes del tenant", null, {
+            "Retry-After": String(segundos)
+        }),
+
+    noAutenticadoAdministrador: () =>
+        new Problema(401, "no-autenticado", "Clave de administrador ausente o inválida", null, {
+            "WWW-Authenticate": 'Bearer realm="reserva-cupos-admin"'
+        }),
+
+    soloAdministrador: () =>
+        new Problema(403, "solo-administrador", "Las rutas de administración son solo del operador de la plataforma"),
+
     // Un recurso de otro tenant responde igual que uno inexistente.
     noEncontrado: () =>
         new Problema(404, null, "Recurso no encontrado"),

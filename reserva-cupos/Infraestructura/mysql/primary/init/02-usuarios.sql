@@ -69,3 +69,25 @@ CREATE USER 'notificador_app'@'%'
 
 GRANT SELECT ON reservas.tenants
     TO 'notificador_app'@'%';
+
+
+-- Entrega 5: administración de tenants (/admin/v1). Es el único usuario
+-- que puede dar de alta un tenant o cambiar su clave, permisos y webhook;
+-- la API lo usa solo en esas rutas.
+CREATE USER 'admin_app'@'%'
+    IDENTIFIED BY 'admin_local_2026';
+
+GRANT SELECT, INSERT ON reservas.tenants
+    TO 'admin_app'@'%';
+
+GRANT UPDATE (
+          api_key_hash,
+          activo,
+          webhook_url,
+          webhook_secret,
+          scopes,
+          limite_por_segundo,
+          limite_rafaga
+          )
+      ON reservas.tenants
+          TO 'admin_app'@'%';

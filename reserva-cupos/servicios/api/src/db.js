@@ -1,11 +1,9 @@
 const mysql = require("mysql2/promise");
+const { opcionesMysql } = require("../../../compartido/src/tls");
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
-        ...(process.env.DB_SSL_CA ? {ssl:{
-            ca:require('node:fs').readFileSync(process.env.DB_SSL_CA),
-            rejectUnauthorized:true,verifyIdentity:true
-        }} : {}),
+    ...opcionesMysql(),
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
@@ -14,6 +12,28 @@ const pool = mysql.createPool({
     connectTimeout: 3000,
     timezone: "Z"
 });
+
+// Pool del usuario admin_app, el único que puede crear tenants o cambiar
+// sus credenciales. Solo lo usan las rutas /admin/v1 y se crea la primera
+// vez que se necesita.
+let poolAdmin = null;
+
+function poolAdministracion() {
+    if (!poolAdmin) {
+        poolAdmin = mysql.createPool({
+            host: process.env.DB_HOST,
+            ...opcionesMysql(),
+            user: process.env.DB_ADMIN_USER,
+            password: process.env.DB_ADMIN_PASSWORD,
+            database: process.env.DB_NAME,
+            connectionLimit: 2,
+            connectTimeout: 3000,
+            timezone: "Z"
+        });
+    }
+
+    return poolAdmin;
+}
 
 // Errores de infraestructura: la base no está disponible.
 const CODIGOS_INFRAESTRUCTURA = new Set([
@@ -64,4 +84,4 @@ async function enTransaccion(fn, intentos = 3) {
     }
 }
 
-module.exports = { pool, enTransaccion, esErrorDeInfraestructura };
+module.exports = { pool, poolAdministracion, enTransaccion, esErrorDeInfraestructura };
