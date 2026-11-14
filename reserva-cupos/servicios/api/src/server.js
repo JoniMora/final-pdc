@@ -82,6 +82,10 @@ app.use(OpenApiValidator.middleware({
     validateResponses: VALIDAR_RESPUESTAS,
     // La autenticación la resuelve la API (el tenant sale de la clave).
     validateSecurity: false,
+    // Formatos según su RFC (el modo rápido acepta, por ejemplo, una URL
+    // con caracteres no ASCII como format: uri). Lo encontró Schemathesis
+    // en webhook_url de la administración de tenants.
+    ajvFormats: { mode: "full" },
     // Una ruta que no está en el contrato responde 404.
     ignoreUndocumented: false
 }));
