@@ -47,11 +47,13 @@ function describir(comando, resultado) {
 
 async function iniciar() {
     const conexion = await amqp.connect({
-        hostname: process.env.RABBITMQ_HOST || "rabbitmq",
+        protocol: process.env.RABBITMQ_TLS === 'true' ? 'amqps' : 'amqp',
+            port: process.env.RABBITMQ_TLS === 'true' ? 5671 : 5672,
+            hostname: process.env.RABBITMQ_HOST || "rabbitmq",
         username: process.env.RABBITMQ_USER,
         password: process.env.RABBITMQ_PASSWORD,
         heartbeat: 10
-    });
+    }, process.env.RABBITMQ_TLS === 'true' ? {ca:[require('node:fs').readFileSync(process.env.TLS_CA)],rejectUnauthorized:true,servername:process.env.RABBITMQ_HOST} : {});
 
     conexion.on("error", salir);
     conexion.on("close", () => {

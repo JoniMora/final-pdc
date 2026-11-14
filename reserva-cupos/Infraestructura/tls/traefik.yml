@@ -1,0 +1,13 @@
+tls:
+  certificates:
+    - certFile: /tls/traefik.crt
+      keyFile: /tls/traefik.key
+  options:
+    default:
+      minVersion: VersionTLS12
+http:
+  serversTransports:
+    api-tls:
+      serverName: api
+      rootCAs:
+        - /tls/ca.crt

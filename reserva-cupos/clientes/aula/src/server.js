@@ -5,6 +5,10 @@ const path = require("node:path");
 const { crearClienteApi, ErrorDeContrato } = require("./api");
 const { secretoDesdeHex, verificarFirma, aplicarReserva, aplicarEvento } = require("./webhooks");
 
+const { crearSeguridad, puedeVer } = require('./seguridad');
+const { crearRecuperacion } = require('./recuperacion');
+const fs = require('node:fs');
+const https = require('node:https');
 const app = express();
 app.disable("x-powered-by");
 
@@ -29,7 +33,8 @@ const api = crearClienteApi({ baseUrl: API_URL, clave: process.env.API_KEY });
 const pool = new Pool({
     connectionTimeoutMillis: 2000,
     query_timeout: 3000,
-    max: 5
+    max: 5,
+    ...(process.env.PGSSLROOTCERT ? {ssl:{ca:fs.readFileSync(process.env.PGSSLROOTCERT),rejectUnauthorized:true}} : {})
 });
 
 pool.on("error", error => {
@@ -71,6 +76,17 @@ app.post("/webhooks/reservas", express.raw({ type: "application/json", limit: "6
 
 app.use(express.json({ limit: "16kb" }));
 app.use(express.static(path.join(__dirname, "../public")));
+
+const seguridad = crearSeguridad({
+    archivo: process.env.USUARIOS_ARCHIVO || '/seguridad/usuarios.json',
+    secure: process.env.COOKIE_SECURE !== 'false'
+});
+seguridad.montar(app);
+app.use(['/materias','/inscripciones','/estado','/reconciliacion'], seguridad.exigirTransporte, seguridad.autenticar);
+const recuperacion = crearRecuperacion({ pool, api });
+recuperacion.iniciar();
+app.get('/reconciliacion', (req,res)=>res.json(recuperacion.estado));
+app.post('/reconciliacion', seguridad.administrador, async(req,res)=>res.json(await recuperacion.sincronizar()));
 
 // Reenvía al navegador la respuesta de la API con sus cabeceras útiles.
 function reenviar(res, respuesta) {
@@ -124,6 +140,7 @@ app.get("/estado", async (req, res) => {
         aula: "ok",
         contrato: `openapi.yaml ${api.contrato.version}`,
         postgresql: base.status === "fulfilled" ? "conectado" : "no disponible",
+        recuperacion: recuperacion.estado,
         api: servicio.status === "fulfilled" ? `conectada (instancia ${servicio.value.instancia})` : "no disponible"
     });
 });
@@ -142,14 +159,15 @@ app.get("/materias", async (req, res) => {
     } catch (error) {
         console.error("[AULA] Consulta:", error.message);
 
-        res.status(503).json({
-            error: "La base de Aula no esta disponible"
-        });
+        try {
+            await recuperacion.actualizarCatalogo();
+            res.set('X-Aula-Modo','contingencia').json([...recuperacion.catalogo.values()]);
+        } catch (fallo) { errorDeApi(res,fallo); }
     }
 });
 
 // Crea la actividad en el servicio y la registra como materia local.
-app.post("/materias", async (req, res) => {
+app.post("/materias", seguridad.administrador, async (req, res) => {
     let respuesta;
 
     try {
@@ -172,9 +190,10 @@ app.post("/materias", async (req, res) => {
 
     try {
         await pool.query(
-            `INSERT INTO materias (id, actividad_id, nombre, cupo)
-             VALUES ($1, $2, $3, $4)`,
-            [randomUUID(), actividad.id, actividad.nombre, actividad.capacidad]
+            `INSERT INTO materias (id, actividad_id, nombre, cupo, version)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (actividad_id) DO NOTHING`,
+            [randomUUID(), actividad.id, actividad.nombre, actividad.capacidad, actividad.version]
         );
     } catch (error) {
         // La actividad ya existe en el servicio; la reconciliación con
@@ -216,10 +235,14 @@ app.get("/materias/:actividadId", async (req, res) => {
             // La base de Aula no está disponible: se informa solo la API.
         }
 
+        if (inscriptos.status !== 200) return reenviar(res,inscriptos);
+        const propios = inscriptos.cuerpo.datos.filter(r=>puedeVer(req.usuario,r));
         res.json({
             ...actividad.cuerpo,
-            inscriptos: inscriptos.cuerpo.datos,
-            inscriptos_locales: locales
+            inscriptos: propios,
+            siguiente_cursor: inscriptos.cuerpo.siguiente_cursor,
+            inscriptos_locales: req.usuario.rol === 'administrador' ? locales
+                : locales?.filter(alumno=>alumno===req.usuario.participante) ?? null
         });
     } catch (error) {
         errorDeApi(res, error);
@@ -229,10 +252,14 @@ app.get("/materias/:actividadId", async (req, res) => {
 // Solicita la inscripción. El navegador genera la Idempotency-Key y la
 // reutiliza si reintenta, así un reintento no duplica la reserva.
 app.post("/materias/:actividadId/inscripciones", async (req, res) => {
+    const alumno = req.usuario.rol === 'alumno' ? req.usuario.participante : req.body?.alumno;
+    if (req.usuario.rol === 'alumno' && req.body?.alumno && req.body.alumno !== alumno) {
+        return res.status(403).json({error:'No puede inscribir a otra persona'});
+    }
     try {
         const respuesta = await api.llamar("solicitarReserva", {
             parametros: { id: req.params.actividadId },
-            cuerpo: { participante: req.body?.alumno },
+            cuerpo: { participante: alumno },
             encabezados: {
                 "Idempotency-Key": req.get("idempotency-key") || randomUUID()
             }
@@ -250,9 +277,9 @@ app.post("/materias/:actividadId/inscripciones", async (req, res) => {
 
 app.get("/inscripciones/:reservaId", async (req, res) => {
     try {
-        reenviar(res, await api.llamar("consultarReserva", {
-            parametros: { id: req.params.reservaId }
-        }));
+        const r = await api.llamar('consultarReserva',{parametros:{id:req.params.reservaId}});
+        if (r.status===200 && !puedeVer(req.usuario,r.cuerpo)) return res.status(404).json({error:'Inscripción no encontrada'});
+        reenviar(res,r);
     } catch (error) {
         errorDeApi(res, error);
     }
@@ -261,6 +288,9 @@ app.get("/inscripciones/:reservaId", async (req, res) => {
 // Cancela la inscripción; el resultado llega por webhook o consultando.
 app.post("/inscripciones/:reservaId/cancelacion", async (req, res) => {
     try {
+        const previa = await api.llamar('consultarReserva',{parametros:{id:req.params.reservaId}});
+        if(previa.status!==200) return reenviar(res,previa);
+        if(!puedeVer(req.usuario,previa.cuerpo)) return res.status(404).json({error:'Inscripción no encontrada'});
         reenviar(res, await api.llamar("cancelarReserva", {
             parametros: { id: req.params.reservaId }
         }));
@@ -275,6 +305,9 @@ app.use((error, req, res, next) => {
     });
 });
 
-app.listen(PORT, "0.0.0.0", () => {
+const servidor = process.env.TLS_CERT
+    ? https.createServer({cert:fs.readFileSync(process.env.TLS_CERT),key:fs.readFileSync(process.env.TLS_KEY),minVersion:'TLSv1.2'},app)
+    : require('node:http').createServer(app);
+servidor.listen(PORT, "0.0.0.0", () => {
     console.log(`[AULA] Pagina disponible en puerto ${PORT} · contrato openapi.yaml ${api.contrato.version}`);
 });

@@ -113,7 +113,12 @@ app.use((error, req, res, next) => {
     enviarProblema(res, new Problema(500, null, "Error interno"));
 });
 
-const servidor = app.listen(PORT, "0.0.0.0", () => {
+const servidor = process.env.TLS_CERT
+    ? require('node:https').createServer({
+        cert:require('node:fs').readFileSync(process.env.TLS_CERT),
+        key:require('node:fs').readFileSync(process.env.TLS_KEY),minVersion:'TLSv1.2'
+    },app) : require('node:http').createServer(app);
+servidor.listen(PORT, "0.0.0.0", () => {
     console.log(`[API] Escuchando en puerto ${PORT} · contrato ${CONTRATO}`);
 });
 
