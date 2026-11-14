@@ -158,7 +158,7 @@ jobs:
         run: docker compose down -v
 
   seguridad:
-    name: Seguridad y recuperación TLS
+    name: Seguridad, recuperación e integración final TLS
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -181,6 +181,14 @@ jobs:
           node scripts/entrega5.js migrar
       - name: Acceso, cifrado y recuperación ante caída
         run: node scripts/entrega5.js pruebas
+      - name: Recorrido funcional final
+        run: node pruebas/final/recorrido.js
+      - name: Conservar evidencia de seguridad para el cierre
+        run: |
+          mkdir -p ../docs/entrega-6/evidencias
+          cp ../docs/entrega-5/evidencias/integracion.txt ../docs/entrega-6/evidencias/03-seguridad-recuperacion.txt
+      - name: Carga, balanceo y escalado final
+        run: node pruebas/final/carga-escalado.js
       - name: Registros ante una falla
         if: failure()
         run: docker compose -f docker-compose.yml -f docker-compose.seguridad.yml logs --tail=50
@@ -188,8 +196,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: evidencia-entrega5
-          path: docs/entrega-5/evidencias/integracion.txt
+          name: evidencia-integracion-final
+          path: |
+            docs/entrega-5/evidencias/integracion.txt
+            docs/entrega-6/evidencias/*.txt
           if-no-files-found: ignore
       - name: Detener entorno efímero del CI
         if: always()

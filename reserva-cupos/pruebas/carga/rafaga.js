@@ -93,14 +93,42 @@ function contar(datos, estado) {
     let cursor = null;
 
     do {
-        const pagina = http.get(
+        const url =
             `${API_URL}/v1/actividades/${datos.actividadId}/reservas` +
-            `?estado=${estado}&limite=100${cursor ? `&cursor=${cursor}` : ""}`,
-            opciones()
-        );
+            `?estado=${estado}&limite=100` +
+            (cursor ? `&cursor=${encodeURIComponent(cursor)}` : "");
 
-        total += pagina.json("datos").length;
-        cursor = pagina.json("siguiente_cursor");
+        const pagina = http.get(url, opciones());
+
+        if (pagina.status !== 200) {
+            const detalle = String(pagina.body || "")
+                .split(API_KEY).join("[CLAVE OCULTA]")
+                .slice(0, 800);
+
+            throw new Error(
+                `Falló el listado de reservas: HTTP ${pagina.status}, ` +
+                `estado solicitado=${estado}. Respuesta: ${detalle}`
+            );
+        }
+
+        let contenido;
+
+        try {
+            contenido = pagina.json();
+        } catch {
+            throw new Error(
+                "El listado respondió HTTP 200 pero no devolvió JSON válido"
+            );
+        }
+
+        if (!Array.isArray(contenido.datos)) {
+            throw new Error(
+                "El listado respondió HTTP 200 sin un arreglo datos"
+            );
+        }
+
+        total += contenido.datos.length;
+        cursor = contenido.siguiente_cursor;
     } while (cursor);
 
     return total;

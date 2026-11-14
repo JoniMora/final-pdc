@@ -1,0 +1,180 @@
+Fecha: 2026-11-14T13:34:23.003Z
+Resultado: APROBADA
+Configuración inicial: 1 API y 1 worker(s)
+OK: tenant de prueba creado; clave oculta
+Configurando 1 API y 1 worker(s)...
+Container reserva-cupos-infra-mysql-primary-1 Running 
+ Container reserva-cupos-infra-api-1 Running 
+ Container reserva-cupos-infra-rabbitmq-1 Running 
+ Container reserva-cupos-infra-worker-1 Running 
+ Container reserva-cupos-infra-mysql-primary-1 Waiting 
+ Container reserva-cupos-infra-mysql-primary-1 Waiting 
+ Container reserva-cupos-infra-rabbitmq-1 Waiting 
+ Container reserva-cupos-infra-mysql-primary-1 Healthy 
+ Container reserva-cupos-infra-mysql-primary-1 Healthy 
+ Container reserva-cupos-infra-rabbitmq-1 Healthy 
+ Container reserva-cupos-infra-rabbitmq-1 Waiting 
+ Container reserva-cupos-infra-worker-1 Waiting 
+ Container reserva-cupos-infra-mysql-primary-1 Waiting 
+ Container reserva-cupos-infra-api-1 Waiting 
+ Container reserva-cupos-infra-rabbitmq-1 Healthy 
+ Container reserva-cupos-infra-mysql-primary-1 Healthy 
+ Container reserva-cupos-infra-worker-1 Healthy 
+ Container reserva-cupos-infra-api-1 Healthy
+INICIO: Escenario base: 1 API y 1 worker
+█ THRESHOLDS 
+
+    checks
+    ✓ 'rate==1' rate=100.00%
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......................: 1004    9.766254/s
+    checks_succeeded...................: 100.00% 1004 out of 1004
+    checks_failed......................: 0.00%   0 out of 1004
+
+    ✓ admisión responde 202
+    ✓ admisión devuelve Location
+    ✓ 0 pendientes
+    ✓ exactamente 10 confirmadas
+    ✓ exactamente 490 rechazadas
+    ✓ cupos_disponibles = 0
+
+    HTTP
+    http_req_duration.......................................................: min=2.58ms   med=5.57s  avg=14.21s p(95)=45.81s max=51.01s
+      { expected_response:true }............................................: min=2.58ms   med=5.57s  avg=14.21s p(95)=45.81s max=51.01s
+    http_req_failed.........................................................: 0.00%  0 out of 823
+    http_reqs...............................................................: 823    8.005604/s
+
+    EXECUTION
+    iteration_duration......................................................: min=293.94ms med=22.54s avg=23.5s  p(95)=47.57s max=51.22s
+    iterations..............................................................: 500    4.863672/s
+    vus.....................................................................: 0      min=0        max=497
+    vus_max.................................................................: 500    min=500      max=500
+
+    NETWORK
+    data_received...........................................................: 6.9 MB 67 kB/s
+    data_sent...............................................................: 417 kB 4.1 kB/s
+
+
+
+ Container reserva-cupos-infra-k6-run-a201b25123ac Creating 
+ Container reserva-cupos-infra-k6-run-a201b25123ac Created 
+time="2026-11-14T13:30:41Z" level=info msg="Actividad 01a1da40-c88b-7007-b923-c5ac50b9640b: 10 cupos, 500 solicitudes simultáneas" source=console
+time="2026-11-14T13:32:23Z" level=info msg="Resultado (sin pendientes tras 51.3 s de espera): confirmadas=10 rechazadas=490 pendientes=0 cupos_disponibles=0" source=console
+OK: Escenario base: 1 API y 1 worker; controles de k6 aprobados
+Configurando 3 API y 2 worker(s)...
+Container reserva-cupos-infra-mysql-primary-1 Running 
+ Container reserva-cupos-infra-api-1 Running 
+ Container reserva-cupos-infra-rabbitmq-1 Running 
+ Container reserva-cupos-infra-worker-1 Running 
+ Container reserva-cupos-infra-worker-2 Creating 
+ Container reserva-cupos-infra-api-2 Creating 
+ Container reserva-cupos-infra-api-3 Creating 
+ Container reserva-cupos-infra-api-2 Created 
+ Container reserva-cupos-infra-api-3 Created 
+ Container reserva-cupos-infra-worker-2 Created 
+ Container reserva-cupos-infra-rabbitmq-1 Waiting 
+ Container reserva-cupos-infra-mysql-primary-1 Waiting 
+ Container reserva-cupos-infra-mysql-primary-1 Waiting 
+ Container reserva-cupos-infra-mysql-primary-1 Healthy 
+ Container reserva-cupos-infra-rabbitmq-1 Healthy 
+ Container reserva-cupos-infra-worker-2 Starting 
+ Container reserva-cupos-infra-mysql-primary-1 Healthy 
+ Container reserva-cupos-infra-api-3 Starting 
+ Container reserva-cupos-infra-worker-2 Started 
+ Container reserva-cupos-infra-api-3 Started 
+ Container reserva-cupos-infra-api-2 Starting 
+ Container reserva-cupos-infra-api-2 Started 
+ Container reserva-cupos-infra-api-3 Waiting 
+ Container reserva-cupos-infra-api-2 Waiting 
+ Container reserva-cupos-infra-api-1 Waiting 
+ Container reserva-cupos-infra-rabbitmq-1 Waiting 
+ Container reserva-cupos-infra-worker-2 Waiting 
+ Container reserva-cupos-infra-worker-1 Waiting 
+ Container reserva-cupos-infra-mysql-primary-1 Waiting 
+ Container reserva-cupos-infra-worker-2 Healthy 
+ Container reserva-cupos-infra-worker-1 Healthy 
+ Container reserva-cupos-infra-rabbitmq-1 Healthy 
+ Container reserva-cupos-infra-mysql-primary-1 Healthy 
+ Container reserva-cupos-infra-api-3 Healthy 
+ Container reserva-cupos-infra-api-2 Healthy 
+ Container reserva-cupos-infra-api-1 Healthy
+OK: Traefik respondió desde las tres API: c628cf9e56fe, 65c9c5cdf8bc, e6c2234302fc
+INICIO: Escenario escalado: 3 API y 2 workers
+█ THRESHOLDS 
+
+    checks
+    ✓ 'rate==1' rate=100.00%
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......................: 1004    10.120819/s
+    checks_succeeded...................: 100.00% 1004 out of 1004
+    checks_failed......................: 0.00%   0 out of 1004
+
+    ✓ admisión responde 202
+    ✓ admisión devuelve Location
+    ✓ 0 pendientes
+    ✓ exactamente 10 confirmadas
+    ✓ exactamente 490 rechazadas
+    ✓ cupos_disponibles = 0
+
+    HTTP
+    http_req_duration.......................................................: min=2.25ms   med=4.64s  avg=10.82s p(95)=34.31s max=37.01s
+      { expected_response:true }............................................: min=2.25ms   med=4.64s  avg=10.82s p(95)=34.31s max=37.01s
+    http_req_failed.........................................................: 0.00%  0 out of 876
+    http_reqs...............................................................: 876    8.830516/s
+
+    EXECUTION
+    iteration_duration......................................................: min=799.93ms med=20.99s avg=19.24s p(95)=35.4s  max=37.81s
+    iterations..............................................................: 500    5.040249/s
+    vus.....................................................................: 0      min=0        max=499
+    vus_max.................................................................: 500    min=500      max=500
+
+    NETWORK
+    data_received...........................................................: 8.0 MB 80 kB/s
+    data_sent...............................................................: 424 kB 4.3 kB/s
+
+
+
+ Container reserva-cupos-infra-k6-run-e7da996c7ae4 Creating 
+ Container reserva-cupos-infra-k6-run-e7da996c7ae4 Created 
+time="2026-11-14T13:32:40Z" level=info msg="Actividad 01a1da42-9934-7bff-b21e-596add231eff: 10 cupos, 500 solicitudes simultáneas" source=console
+time="2026-11-14T13:34:19Z" level=info msg="Resultado (sin pendientes tras 61.2 s de espera): confirmadas=10 rechazadas=490 pendientes=0 cupos_disponibles=0" source=console
+OK: Escenario escalado: 3 API y 2 workers; controles de k6 aprobados
+Restaurando la configuración inicial
+Configurando 1 API y 1 worker(s)...
+Container reserva-cupos-infra-worker-1 Running 
+ Container reserva-cupos-infra-rabbitmq-1 Running 
+ Container reserva-cupos-infra-mysql-primary-1 Running 
+ Container reserva-cupos-infra-api-1 Running 
+ Container reserva-cupos-infra-api-3 Stopping 
+ Container reserva-cupos-infra-worker-2 Stopping 
+ Container reserva-cupos-infra-api-2 Stopping 
+ Container reserva-cupos-infra-worker-2 Stopped 
+ Container reserva-cupos-infra-worker-2 Removing 
+ Container reserva-cupos-infra-worker-2 Removed 
+ Container reserva-cupos-infra-api-3 Stopped 
+ Container reserva-cupos-infra-api-3 Removing 
+ Container reserva-cupos-infra-api-3 Removed 
+ Container reserva-cupos-infra-api-2 Stopped 
+ Container reserva-cupos-infra-api-2 Removing 
+ Container reserva-cupos-infra-api-2 Removed 
+ Container reserva-cupos-infra-mysql-primary-1 Waiting 
+ Container reserva-cupos-infra-rabbitmq-1 Waiting 
+ Container reserva-cupos-infra-mysql-primary-1 Waiting 
+ Container reserva-cupos-infra-mysql-primary-1 Healthy 
+ Container reserva-cupos-infra-mysql-primary-1 Healthy 
+ Container reserva-cupos-infra-rabbitmq-1 Healthy 
+ Container reserva-cupos-infra-rabbitmq-1 Waiting 
+ Container reserva-cupos-infra-mysql-primary-1 Waiting 
+ Container reserva-cupos-infra-api-1 Waiting 
+ Container reserva-cupos-infra-worker-1 Waiting 
+ Container reserva-cupos-infra-worker-1 Healthy 
+ Container reserva-cupos-infra-mysql-primary-1 Healthy 
+ Container reserva-cupos-infra-api-1 Healthy 
+ Container reserva-cupos-infra-rabbitmq-1 Healthy
+OK: configuración inicial restaurada
