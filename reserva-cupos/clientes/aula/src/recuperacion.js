@@ -1,5 +1,6 @@
 const { randomUUID } = require("node:crypto");
 const { aplicarReserva } = require("./webhooks");
+const { enTransaccion } = require("./transaccion");
 
 // Contingencia y reconciliación de Aula (Entrega 5).
 //
@@ -54,19 +55,12 @@ async function aplicarPagina(pool, datos, desde, ultima) {
         previo = cambio.secuencia;
     }
 
-    const cliente = await pool.connect();
-
-    try {
-        await cliente.query("BEGIN");
-
+    return enTransaccion(pool, async cliente => {
         const control = await cliente.query(
             "SELECT ultima_secuencia_feed FROM punto_control WHERE id = 1 FOR UPDATE"
         );
 
-        if (Number(control.rows[0].ultima_secuencia_feed) !== desde) {
-            await cliente.query("ROLLBACK");
-            return false;
-        }
+        if (Number(control.rows[0].ultima_secuencia_feed) !== desde) return false;
 
         for (const cambio of datos) {
             if (cambio.tipo.startsWith("actividad.")) await aplicarActividad(cliente, cambio.entidad);
@@ -80,14 +74,9 @@ async function aplicarPagina(pool, datos, desde, ultima) {
               WHERE id = 1`,
             [ultima]
         );
-        await cliente.query("COMMIT");
+
         return true;
-    } catch (error) {
-        await cliente.query("ROLLBACK").catch(() => {});
-        throw error;
-    } finally {
-        cliente.release();
-    }
+    });
 }
 
 // Con aula-db disponible el ciclo es lento: los webhooks son el camino

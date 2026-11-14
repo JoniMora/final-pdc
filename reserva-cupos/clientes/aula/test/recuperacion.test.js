@@ -15,6 +15,8 @@ function poolFalso({ fallar = false, cursor = 0 } = {}) {
 
             return { rowCount: 1 };
         },
+        on: () => {},
+        removeListener: () => {},
         release: () => sentencias.push("RELEASE")
     };
 

@@ -280,7 +280,10 @@ async function escenarioAulaDb({ ok, dato }) {
     dato(`Invariantes en el servicio: ${resumenInvariantes(conteo)}`);
     ok("Con aula-db detenida, Aula siguió inscribiendo: 10 confirmadas, 490 rechazadas, 0 duplicadas, 0 cupos negativos");
 
+    // La sesión abierta antes de la caída sigue valiendo: Aula no se
+    // reinició y el login no depende de aula-db.
     const catalogo = await admin("/materias");
+    assert.equal(catalogo.status, 200);
     assert.equal(catalogo.encabezados["x-aula-modo"], "contingencia");
     ok("Durante la caída, el catálogo de Aula sale del feed de la API (modo contingencia)");
 
