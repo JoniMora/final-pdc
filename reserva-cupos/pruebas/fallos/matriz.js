@@ -283,7 +283,7 @@ async function escenarioAulaDb({ ok, dato }) {
     // La sesión abierta antes de la caída sigue valiendo: Aula no se
     // reinició y el login no depende de aula-db.
     const catalogo = await admin("/materias");
-    assert.equal(catalogo.status, 200);
+    assert.equal(catalogo.status, 200, `catálogo en contingencia: ${JSON.stringify(catalogo.datos)}`);
     assert.equal(catalogo.encabezados["x-aula-modo"], "contingencia");
     ok("Durante la caída, el catálogo de Aula sale del feed de la API (modo contingencia)");
 
@@ -547,6 +547,10 @@ async function main() {
             filas.push({ nombre, ...fila, resultado: "Aprobado" });
         } catch (error) {
             console.error(error);
+            // Para diagnosticar: los últimos registros de los componentes.
+            const registros = docker(["logs", "--since", "3m", "--tail", "40", "api", "aula", "worker", "relay", "notificador"],
+                { permitirFallo: true });
+            evidencia.lineas.push("", "Registros de los últimos 3 minutos:", registros || "(no disponibles)");
             evidencia.guardar(error);
             filas.push({ nombre, efecto: "-", garantia: "-", recuperacion: "-", resultado: `Fallido: ${error.message}` });
             fallidos++;
