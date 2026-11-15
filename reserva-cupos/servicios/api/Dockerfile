@@ -1,16 +1,21 @@
 FROM node:22-alpine
 
-# Misma estructura que el repositorio: el código compartido y el contrato
-# quedan en /app/compartido y /app/contrato, y la API los alcanza desde
-# servicios/api/src con ../../../. Del módulo compartido la API usa solo
-# las conexiones TLS (compartido/src/tls.js), que no tiene dependencias.
-COPY --from=compartido src /app/compartido/src
+# Instala las dependencias del código compartido.
+WORKDIR /app/compartido
+
+COPY --from=compartido package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+COPY --from=compartido src ./src
+
+# Copia los contratos que utiliza la API.
 COPY --from=contrato openapi.yaml asyncapi.yaml /app/contrato/
 
+# Instala las dependencias propias de la API.
 WORKDIR /app/servicios/api
 
-COPY package.json ./
-RUN npm install --omit=dev
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
 COPY src ./src
 
