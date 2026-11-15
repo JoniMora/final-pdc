@@ -9,6 +9,7 @@ const OpenApiValidator = require("express-openapi-validator");
 const { pool, esErrorDeInfraestructura } = require("./db");
 const { Problema, enviarProblema, problemas } = require("./problemas");
 const { rutas } = require("./rutas");
+const { crearMetricas } = require("../../../compartido/src/metricas");
 const { rutasAdmin } = require("./admin");
 const {
     crearAutenticacion,
@@ -46,6 +47,30 @@ if (!hashAdministrador) {
 }
 
 const app = express();
+const metricas = crearMetricas("api");
+
+app.use((req, res, next) => {
+    const inicio = process.hrtime.bigint();
+
+    res.once("finish", () => {
+        const segundos = Number(
+            process.hrtime.bigint() - inicio
+        ) / 1e9;
+
+        const etiquetas = {
+            metodo: req.method,
+            ruta: typeof req.route?.path === "string"
+                ? `${req.baseUrl || ""}${req.route.path}`
+                : "sin_ruta",
+            estado: String(res.statusCode)
+        };
+
+        metricas.solicitudes.inc(etiquetas);
+        metricas.duracion.observe(etiquetas, segundos);
+    });
+
+    next();
+});
 
 app.disable("x-powered-by");
 
@@ -190,5 +215,45 @@ servidor.listen(PORT, "0.0.0.0", () => {
 
 servidor.on("error", error => {
     console.error("[API]", error.message);
+    process.exit(1);
+});
+// Puerto de observabilidad dentro del contenedor.
+// No se publica en el host ni se agrega al contrato de negocio.
+const atenderMetricas = async (req, res) => {
+    if (req.method !== "GET" || req.url !== "/metrics") {
+        res.writeHead(404);
+        res.end();
+        return;
+    }
+
+    try {
+        const contenido = await metricas.registro.metrics();
+
+        res.writeHead(200, {
+            "Content-Type": metricas.registro.contentType
+        });
+
+        res.end(contenido);
+    } catch (error) {
+        console.error("[API] Error al exportar métricas:", error.message);
+        res.writeHead(500);
+        res.end();
+    }
+};
+
+const servidorMetricas = process.env.TLS_CERT
+    ? https.createServer({
+        cert: fs.readFileSync(process.env.TLS_CERT),
+        key: fs.readFileSync(process.env.TLS_KEY),
+        minVersion: "TLSv1.2"
+    }, atenderMetricas)
+    : http.createServer(atenderMetricas);
+
+servidorMetricas.listen(9464, "0.0.0.0", () => {
+    console.log("[API] Métricas disponibles en puerto interno 9464");
+});
+
+servidorMetricas.on("error", error => {
+    console.error("[API] Servidor de métricas:", error.message);
     process.exit(1);
 });
