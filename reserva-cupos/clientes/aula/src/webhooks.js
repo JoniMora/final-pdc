@@ -1,4 +1,5 @@
 const crypto = require("node:crypto");
+const { enTransaccion } = require("./transaccion");
 
 // Reglas del receptor según contrato/openapi.yaml (sección webhooks).
 const VENTANA_S = 300;
@@ -65,11 +66,9 @@ async function aplicarReserva(cliente, reserva) {
 // Los webhooks pueden llegar fuera de orden: la reconciliación por feed
 // (Entrega 5) parte de un punto de control propio y aplica por versión.
 async function aplicarEvento(pool, evento) {
-    const cliente = await pool.connect();
-
-    try {
-        await cliente.query("BEGIN");
+    return enTransaccion(pool, async cliente => {
         const aplicado = await aplicarReserva(cliente, evento.entidad);
+
         await cliente.query(
             `UPDATE punto_control
                 SET ultima_secuencia_webhook = GREATEST(ultima_secuencia_webhook, $1),
@@ -77,14 +76,9 @@ async function aplicarEvento(pool, evento) {
               WHERE id = 1`,
             [evento.secuencia]
         );
-        await cliente.query("COMMIT");
+
         return aplicado;
-    } catch (error) {
-        await cliente.query("ROLLBACK").catch(() => {});
-        throw error;
-    } finally {
-        cliente.release();
-    }
+    });
 }
 
 module.exports = { ErrorDeSecreto, secretoDesdeHex, verificarFirma, aplicarReserva, aplicarEvento, VENTANA_S };

@@ -1,3 +1,7 @@
+> Borrador del cierre final. La implementación de E5 cambió y E6 sigue pendiente.
+> Para ejecutar el entorno usar el README de la aplicación; las cifras y explicaciones
+> de esta guía deben actualizarse tras repetir las pruebas sobre la base corregida.
+
 # Demo final: orden y explicación
 
 Duración orientativa: 8 a 10 minutos, sin contar la prueba de carga completa.
@@ -9,10 +13,9 @@ Todos los comandos parten de la raíz del repositorio, en la terminal de Intelli
 Abrir Docker Desktop. Ejecutar, por separado:
 
 ```powershell
-node reserva-cupos/scripts/entrega5.js preparar
-node reserva-cupos/scripts/entrega5.js levantar
-node reserva-cupos/scripts/entrega5.js migrar
-node reserva-cupos/scripts/entrega5.js estado
+node reserva-cupos/scripts/sistema.js preparar
+node reserva-cupos/scripts/sistema.js levantar
+node reserva-cupos/scripts/sistema.js estado
 ```
 
 Abrir https://localhost:3001. Los usuarios y contraseñas de esta instalación están
@@ -31,7 +34,7 @@ Decir: “Resolvemos la competencia de muchas personas por pocos cupos. Aula es 
 cliente de ejemplo; el servicio recibe actividades y participantes de distintos
 tenants. MySQL conserva el estado definitivo y PostgreSQL la proyección de Aula”.
 
-Mostrar `docker-compose.yml` y su overlay de seguridad. Nombrar API, worker,
+Mostrar `docker-compose.yml` con TLS integrado. Nombrar API, worker,
 relay, notificador, RabbitMQ, primario, réplica, Aula, PostgreSQL y Traefik.
 Son procesos separados en un único equipo, no un clúster de varios servidores.
 
@@ -74,7 +77,7 @@ Todas esas rutas están dentro de `reserva-cupos`. Seguir el mapa de la guía de
 Ejecutar antes de la exposición, o durante ella si hay tiempo suficiente:
 
 ```powershell
-node reserva-cupos/scripts/entrega5.js pruebas
+node reserva-cupos/scripts/sistema.js seguridad
 ```
 
 Explicar las comprobaciones: sin sesión 401, permiso insuficiente 403, CSRF,

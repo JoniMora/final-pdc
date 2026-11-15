@@ -12,7 +12,7 @@ import http from "k6/http";
 import { check, sleep } from "k6";
 import exec from "k6/execution";
 
-const API_URL = __ENV.API_URL || "http://api:3000";
+const API_URL = __ENV.API_URL || "https://traefik";
 const API_KEY = __ENV.API_KEY;
 const SOLICITUDES = Number(__ENV.SOLICITUDES || 500);
 const CAPACIDAD = Number(__ENV.CAPACIDAD || 10);

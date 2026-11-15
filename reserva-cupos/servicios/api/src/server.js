@@ -1,10 +1,23 @@
+const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const http = require("node:http");
+const https = require("node:https");
 const express = require("express");
+const yaml = require("js-yaml");
 const OpenApiValidator = require("express-openapi-validator");
 const { pool, esErrorDeInfraestructura } = require("./db");
 const { Problema, enviarProblema, problemas } = require("./problemas");
-const { rutas, autenticar } = require("./rutas");
+const { rutas } = require("./rutas");
+const { rutasAdmin } = require("./admin");
+const {
+    crearAutenticacion,
+    crearExigirPermisos,
+    crearLimitador,
+    crearAutenticacionAdministrador,
+    exigirOperador,
+    leerHashAdministrador
+} = require("./acceso");
 
 const PORT = Number(process.env.PORT || 3000);
 const INSTANCIA = os.hostname();
@@ -17,6 +30,20 @@ const CONTRATO = path.join(
     "openapi.yaml"
 );
 const VALIDAR_RESPUESTAS = process.env.VALIDAR_RESPUESTAS === "true";
+const contrato = yaml.load(fs.readFileSync(CONTRATO, "utf8"));
+
+// Límite de tasa por defecto de cada tenant; el operador puede fijar otro
+// por tenant con PATCH /admin/v1/tenants/{id}.
+const limitar = crearLimitador({
+    porSegundo: Number(process.env.LIMITE_POR_SEGUNDO || 50),
+    rafaga: Number(process.env.LIMITE_RAFAGA || 100)
+});
+
+const hashAdministrador = leerHashAdministrador(process.env.ADMIN_CLAVE_SHA256_ARCHIVO);
+
+if (!hashAdministrador) {
+    console.warn("[API] Sin clave de administrador configurada: /admin/v1 rechaza todas las solicitudes");
+}
 
 const app = express();
 
@@ -30,25 +57,16 @@ app.use(express.json({ limit: "24kb" }));
 // gateway.
 // Pool exclusivo para salud: no espera detrás de las reservas.
 // Conserva la verificación TLS cuando el entorno seguro está activo.
+const { opcionesMysql } = require("../../../compartido/src/tls");
 const poolSalud = require("mysql2/promise").createPool({
     host: process.env.DB_HOST,
+    ...opcionesMysql(),
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
     connectionLimit: 1,
     waitForConnections: false,
-    connectTimeout: 1000,
-    ...(process.env.DB_SSL_CA
-        ? {
-            ssl: {
-                ca: require("node:fs").readFileSync(
-                    process.env.DB_SSL_CA
-                ),
-                rejectUnauthorized: true,
-                verifyIdentity: true
-            }
-        }
-        : {})
+    connectTimeout: 1000
 });
 
 app.get("/health", async (req, res) => {
@@ -63,6 +81,7 @@ app.get("/health", async (req, res) => {
         mysql = "no disponible";
     }
 
+
     res.json({
         servicio: "api",
         instancia: INSTANCIA,
@@ -72,8 +91,11 @@ app.get("/health", async (req, res) => {
 });
 
 // El tenant se autentica antes de validar: una solicitud sin clave
-// responde 401 aunque además sea inválida.
-app.use("/v1", autenticar);
+// responde 401 aunque además sea inválida. Después se descuenta del límite
+// de tasa del tenant, también antes de validar: una ráfaga de solicitudes
+// inválidas consume el cupo igual que una de válidas.
+app.use("/v1", crearAutenticacion(pool, limitar), limitar);
+app.use("/admin", crearAutenticacionAdministrador(pool, hashAdministrador));
 
 app.use(OpenApiValidator.middleware({
     apiSpec: CONTRATO,
@@ -81,11 +103,18 @@ app.use(OpenApiValidator.middleware({
     validateResponses: VALIDAR_RESPUESTAS,
     // La autenticación la resuelve la API (el tenant sale de la clave).
     validateSecurity: false,
+    // Formatos según su RFC (el modo rápido acepta, por ejemplo, una URL
+    // con caracteres no ASCII como format: uri). Lo encontró Schemathesis
+    // en webhook_url de la administración de tenants.
+    ajvFormats: { mode: "full" },
     // Una ruta que no está en el contrato responde 404.
     ignoreUndocumented: false
 }));
 
-app.use("/v1", rutas);
+// Los permisos se comprueban con la operación que identificó el validador:
+// son los que el contrato declara en su `security`.
+app.use("/v1", crearExigirPermisos(contrato), rutas);
+app.use("/admin/v1", exigirOperador, rutasAdmin);
 
 app.use((req, res) => {
     enviarProblema(res, problemas.noEncontrado());
@@ -144,11 +173,17 @@ app.use((error, req, res, next) => {
     enviarProblema(res, new Problema(500, null, "Error interno"));
 });
 
+// Desde la Entrega 5 la API atiende solo por HTTPS: Traefik le habla
+// cifrado y verifica su certificado. Sin TLS_CERT (pruebas fuera de
+// Docker) atiende por HTTP.
 const servidor = process.env.TLS_CERT
-    ? require('node:https').createServer({
-        cert:require('node:fs').readFileSync(process.env.TLS_CERT),
-        key:require('node:fs').readFileSync(process.env.TLS_KEY),minVersion:'TLSv1.2'
-    },app) : require('node:http').createServer(app);
+    ? https.createServer({
+        cert: fs.readFileSync(process.env.TLS_CERT),
+        key: fs.readFileSync(process.env.TLS_KEY),
+        minVersion: "TLSv1.2"
+    }, app)
+    : http.createServer(app);
+
 servidor.listen(PORT, "0.0.0.0", () => {
     console.log(`[API] Escuchando en puerto ${PORT} · contrato ${CONTRATO}`);
 });

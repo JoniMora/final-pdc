@@ -8,8 +8,7 @@ const raiz = path.resolve(__dirname, "../..");
 
 const argumentosCompose = [
     "compose",
-    "-f", "docker-compose.yml",
-    "-f", "docker-compose.seguridad.yml"
+    "-f", "docker-compose.yml"
 ];
 
 const registros = [];
@@ -195,75 +194,20 @@ async function comprobarBalanceo(ca) {
 }
 
 function crearTenant() {
-    const archivoSql = path.join(
-        raiz,
-        "Infraestructura/mysql/primary/crear-tenant.sql"
-    );
+    const resultado = spawnSync(process.execPath, [
+        "scripts/sistema.js", "tenant", `Escalado ${Date.now()}`,
+        "--limite", "1000/1000"
+    ], { cwd: raiz, encoding: "utf8", timeout: 60000 });
 
-    const contenido = fs.readFileSync(archivoSql, "utf8")
-        .replace(/^\uFEFF/, "");
-
-    const entrada = [
-        `SET @nombre = 'Final ${Date.now()}';`,
-        contenido,
-        ""
-    ].join("\n");
-
-    const resultado = spawnSync(
-        "docker",
-        [
-            ...argumentosCompose,
-            "exec",
-            "-T",
-            "mysql-primary",
-            "mysql",
-            "-uroot",
-            "-proot_local_2026",
-            "-N",
-            "-B",
-            "reservas"
-        ],
-        {
-            cwd: raiz,
-            encoding: "utf8",
-            input: entrada,
-            timeout: 60000,
-            maxBuffer: 1024 * 1024
-        }
-    );
-
-    if (resultado.error) {
-        throw new Error(
-            `No pudo ejecutarse el alta: ${resultado.error.message}`
-        );
+    if (resultado.error || resultado.status !== 0) {
+        // No volcar stdout/stderr del alta: pueden contener credenciales.
+        throw new Error("No se pudo crear el tenant con la API de administración");
     }
 
-    if (resultado.status !== 0) {
-        const diagnostico = (
-            (resultado.stdout || "") +
-            (resultado.stderr || "")
-        )
-            .replace(/\brc_[a-f0-9]{64}\b/gi, "[CLAVE OCULTA]")
-            .replace(/\b[a-f0-9]{64}\b/gi, "[SECRETO OCULTO]");
-
-        console.error(diagnostico);
-
-        throw new Error(
-            `El alta del tenant terminó con código ${resultado.status}`
-        );
-    }
-
-    const encontrada = (resultado.stdout || "")
-        .match(/\brc_[a-f0-9]{64}\b/i);
-
-    assert.ok(
-        encontrada,
-        "El alta no devolvió una clave reconocible"
-    );
-
-    claveApi = encontrada[0];
-
-    informar("OK: tenant de prueba creado; clave oculta");
+    const clave = (resultado.stdout || "").trim();
+    assert.match(clave, /^rc_[a-f0-9]{64}$/i, "El alta no devolvió una clave reconocible");
+    claveApi = clave;
+    informar("OK: tenant de prueba creado por administración; clave oculta");
 }
 
 function ejecutarRafaga(nombre) {

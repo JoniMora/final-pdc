@@ -1,0 +1,12 @@
+Matriz de fallos · RabbitMQ detenido con una ráfaga en curso
+Ejecución: 2026-11-15T00:15:23.123Z
+
+  · Ráfaga de 200 solicitudes sobre 10 cupos; rabbitmq detenido tras 40 admisiones
+  · 200 admitidas en 5.3 s · latencia de admisión p50 0.88 s, p95 1.82 s, máx 2.02 s · reintentos 0 (errores vistos: ninguno)
+OK: Con rabbitmq detenido, la API siguió admitiendo: 200 de 200 solicitudes respondieron 202
+  · Pendientes con rabbitmq detenido: 195 (detenido hace 3.1 s)
+  · Invariantes: 10 confirmadas, 190 rechazadas, 0 pendientes, 0 duplicadas, cupos_disponibles = 0
+  · Tiempo desde que rabbitmq vuelve hasta 0 pendientes: 19.7 s
+OK: Al volver rabbitmq, se decidieron todas sin pérdidas ni duplicados
+
+Resultado: APROBADA

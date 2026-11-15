@@ -1,0 +1,16 @@
+Matriz de fallos · Failover del primario de MySQL con medición de RTO y RPO
+Ejecución: 2026-11-15T00:23:36.021Z
+
+  · mysql-primary terminado con SIGKILL con la ráfaga en curso (21 reservas ya confirmadas)
+  · La réplica aplicó todas las transacciones que había recibido (GTID_SUBSET)
+  · Ráfaga de 300 solicitudes sobre 50 cupos con 20 clientes que reintentan con la misma Idempotency-Key
+  · 300 admitidas en 8.0 s · latencia de admisión p50 0.33 s, p95 2.49 s, máx 3.92 s · reintentos 54 (errores vistos: 503×54)
+  · Promoción completa a los 1.6 s de la caída
+  · RTO (caída → primera escritura aceptada por la API): 1.8 s
+OK: El sistema retomó la escritura sobre la réplica promovida (RTO 1.8 s), sin cambiar la configuración de ningún cliente
+  · Invariantes después del failover: 50 confirmadas, 250 rechazadas, 0 pendientes, 0 duplicadas, cupos_disponibles = 0
+  · Reservas admitidas (202/200) que no están después del failover: 0 de 300
+  · Reservas confirmadas antes de la caída que ya no lo están: 0 de 21
+OK: RPO = 0: ninguna reserva admitida ni confirmada se perdió (replicación semisíncrona AFTER_SYNC)
+
+Resultado: APROBADA

@@ -1,24 +1,13 @@
-# Evidencias de integración final
+# Evidencias previas — base anterior a las correcciones de E5
 
-Ejecuciones locales del 14/11/2026. Los archivos registran resultados reales;
-no equivalen a un ensayo oral ni al resultado del próximo CI.
+Estas ejecuciones del 14/11/2026 se conservan como antecedentes de la PR #59.
+No corresponden a la integración local con `c1b2c3b` ni acreditan todos los
+requerimientos de E6. No sobrescribirlas con resultados inventados.
 
-| Archivo | Qué acredita |
-|---|---|
-| [01-recorrido.txt](01-recorrido.txt) | Ocho verificaciones del recorrido autenticado: permisos, cupo, rechazo, cancelación y reasignación. |
-| [02-carga-escalado.txt](02-carga-escalado.txt) | Dos ráfagas de 500 solicitudes, con 1 API/1 worker y 3 API/2 workers; balanceo y restauración de instancias. |
-| [03-seguridad-recuperacion.txt](03-seguridad-recuperacion.txt) | Veinte verificaciones de seguridad y recuperación, repetidas sobre la integración final. |
+- [01-recorrido.txt](01-recorrido.txt): recorrido autenticado previo.
+- [02-carga-escalado.txt](02-carga-escalado.txt): 500 solicitudes/10 cupos en dos configuraciones; las métricas HTTP mezclan admisiones y consultas.
+- [03-seguridad-recuperacion.txt](03-seguridad-recuperacion.txt): suite antigua de veinte comprobaciones, reemplazada por las suites de E5 corregida.
 
-Para reproducirlas desde la raíz, con el entorno TLS preparado y levantado:
-
-```powershell
-node reserva-cupos/pruebas/final/recorrido.js
-node reserva-cupos/pruebas/final/carga-escalado.js
-node reserva-cupos/scripts/entrega5.js pruebas
-Copy-Item -LiteralPath docs/entrega-5/evidencias/integracion.txt -Destination docs/entrega-6/evidencias/03-seguridad-recuperacion.txt
-```
-
-Ejecutar por separado y revisar cada resultado. Las pruebas crean datos de ensayo;
-la de seguridad detiene temporalmente PostgreSQL y la de carga cambia el número
-de instancias y lo restaura al terminar. No ejecutarlas durante una demo ajena.
-No publicar accesos locales, claves de tenant ni claves privadas TLS.
+Para las nuevas ejecuciones usar `scripts/sistema.js seguridad` y los scripts
+de `pruebas/final/`. Las nuevas pruebas deben registrar el commit y las métricas
+de admisión, gráficos y escenarios exigidos por los issues #45 a #50.

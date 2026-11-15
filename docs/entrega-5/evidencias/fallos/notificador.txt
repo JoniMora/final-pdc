@@ -1,0 +1,12 @@
+Matriz de fallos · Notificador detenido: webhooks pendientes
+Ejecución: 2026-11-15T00:15:48.185Z
+
+  · Ráfaga de 100 solicitudes del tenant Aula (con webhook); notificador detenido tras 10 admisiones
+  · 100 admitidas en 1.9 s · latencia de admisión p50 0.42 s, p95 0.67 s, máx 0.71 s · reintentos 0 (errores vistos: ninguno)
+  · Invariantes en el servicio: 10 confirmadas, 90 rechazadas, 0 pendientes, 0 duplicadas, cupos_disponibles = 0
+OK: Sin notificador, el servicio decidió todas las reservas: el webhook no está en el camino de la decisión
+  · Webhooks esperando en webhooks.entregas con el notificador detenido: 100
+  · La proyección de Aula llega a 10 confirmadas y 90 rechazadas 2.7 s después de reiniciar el notificador
+OK: Al volver el notificador, entrega los webhooks pendientes (cola durable) y Aula coincide con el servicio
+
+Resultado: APROBADA

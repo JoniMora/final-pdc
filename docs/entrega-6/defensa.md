@@ -1,3 +1,7 @@
+> Borrador del cierre final. La implementación de E5 cambió y E6 sigue pendiente.
+> Para ejecutar el entorno usar el README de la aplicación; las cifras y explicaciones
+> de esta guía deben actualizarse tras repetir las pruebas sobre la base corregida.
+
 # Guía de defensa: qué decir y qué mostrar del código
 
 ## Apertura: aproximadamente un minuto
@@ -34,7 +38,7 @@ cambiar al editar.
 | Archivo o carpeta | Qué mirar y explicar |
 |---|---|
 | `docker-compose.yml` | Define servicios, redes, volúmenes y dependencias. Es la topología base; no contiene por sí solo toda la configuración segura. |
-| `docker-compose.seguridad.yml` | Complementa el base: certificados, HTTPS, AMQPS y conexiones TLS de bases y réplica. Se aplican ambos archivos. |
+| `docker-compose.yml` | La base E5 corregida integra TLS sin overlay. |
 | `Infraestructura/mysql/primary/init/01-esquema.sql` | Tablas tenants, actividades, reservas y cambios; restricciones que refuerzan la consistencia. |
 | `Infraestructura/mysql/primary/init/02-usuarios.sql` | Privilegios por componente. La API no decide el descuento de cupos. |
 | `Infraestructura/mysql/primary/primary.cnf` y `mysql/replica/replica.cnf` | Identidades, binlog/GTID y configuración de replicación. |
@@ -57,11 +61,11 @@ cambiar al editar.
 | `clientes/aula/src/recuperacion.js` | `aplicarPagina` y `sincronizar`: cambios y cursor de feed en una misma transacción local. |
 | `clientes/aula/public/index.html` | Interfaz que llama al backend. Ocultar un botón no reemplaza autorización en el servidor. |
 | `scripts/preparar-seguridad.js` | Genera CA local, certificados y usuarios con contraseñas derivadas. Los archivos secretos quedan fuera de Git. |
-| `scripts/entrega5.js` | Preparación, arranque seguro, migración y pruebas. E6 reutiliza este entorno. |
+| `scripts/sistema.js` | Preparación, arranque seguro, migración y pruebas. E6 reutiliza este entorno. |
 | `pruebas/final/recorrido.js` | Comprueba el caso completo con HTTPS, roles, confirmación, rechazo, cancelación y reasignación. |
 | `pruebas/final/carga-escalado.js` | Crea tenant de ensayo, ejecuta dos escenarios k6, comprueba instancias y restaura el escalado inicial en finally. |
 | `pruebas/carga/rafaga.js` | Genera 500 solicitudes para diez cupos y verifica resultados finales; distingue errores HTTP de respuestas válidas. |
-| `pruebas/seguridad/integracion.js` | Prueba permisos, TLS y caída/recuperación de PostgreSQL con componentes reales. |
+| `pruebas/seguridad/aula.js` | Prueba permisos, TLS y caída/recuperación de PostgreSQL con componentes reales. |
 | `../.github/workflows/ci.yml` | Ejecuta contratos, módulos, consumidor, integración y entorno seguro; el check final exige éxito de todos los trabajos. |
 
 ## Explicación del bloque central del worker

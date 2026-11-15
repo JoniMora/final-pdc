@@ -1,0 +1,18 @@
+Suite de seguridad de la API (E5-6)
+Ejecución: 2026-11-15T00:12:48.456Z
+
+OK: El operador da de alta tenants con POST /admin/v1/tenants (201); la clave se muestra una sola vez
+OK: Sin clave /admin responde 401 y con una clave de tenant responde 403
+OK: La consulta del tenant no devuelve credenciales
+OK: Otro tenant no ve ni opera la actividad, la reserva ni el feed de A: responde 404 como si no existieran
+OK: Una clave de solo lectura consulta pero no crea ni reserva (403 permiso-insuficiente); el operador cambia sus permisos con PATCH
+OK: Rotar la clave invalida la anterior en el momento (401) y la nueva autentica
+OK: Un tenant desactivado deja de autenticarse
+  · 40 solicitudes simultáneas con límite 5/s y ráfaga 10: 13 atendidas, 27 con 429 y Retry-After
+  · 8 solicitudes del vecino al mismo tiempo: todas 200
+OK: Un tenant saturado recibe 429 con Retry-After y otro tenant no se ve afectado
+OK: Webhook firmado con otro secreto: Aula responde 401 y no lo aplica
+OK: Webhook bien firmado pero de hace 10 minutos (reinyección): Aula responde 401
+OK: Webhooks a 169.254.169.254, a mysql-primary y por HTTP: el notificador no se conecta y los deriva a webhooks.dlq
+
+Resultado: APROBADA

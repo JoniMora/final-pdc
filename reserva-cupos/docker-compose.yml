@@ -1,5 +1,18 @@
 name: reserva-cupos-infra
 
+# Desde la Entrega 5 todo el tráfico entre componentes va cifrado con TLS y
+# verificación del certificado. Los certificados, las identidades de Aula y
+# la clave del operador los genera scripts/preparar-seguridad.js en
+# seguridad/local/ (excluido de Git); sin ese paso, el entorno no arranca:
+# cada montaje de un archivo de seguridad es un bind que exige que exista.
+
+# Certificado de la CA local: con él cada cliente verifica al servidor.
+x-ca: &ca
+  type: bind
+  source: ./seguridad/local/ca.crt
+  target: /tls/ca.crt
+  read_only: true
+
 services:
   rabbitmq:
     build:
@@ -10,11 +23,17 @@ services:
       RABBITMQ_DEFAULT_USER: demo
       RABBITMQ_DEFAULT_PASS: demo_local_2026
 
+    # Solo AMQPS (5671) y la administración por HTTPS (15671, publicada en
+    # el 15672 del host). El listener AMQP sin TLS está deshabilitado.
     ports:
-      - "127.0.0.1:15672:15672"
+      - "127.0.0.1:15672:15671"
 
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
+      - ./Infraestructura/tls/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - *ca
+      - { type: bind, source: ./seguridad/local/rabbitmq.crt, target: /tls/rabbitmq.crt, read_only: true }
+      - { type: bind, source: ./seguridad/local/rabbitmq.key, target: /tls/rabbitmq.key, read_only: true }
 
     networks:
       - interna
@@ -28,7 +47,29 @@ services:
       interval: 10s
       timeout: 10s
       retries: 12
-      start_period: 30s
+      start_period: 60s
+
+    restart: unless-stopped
+
+  # Traefik no monta el socket de Docker: lo consulta a través de este
+  # proxy, que solo deja pasar lecturas de contenedores, eventos y versión.
+  # Cualquier escritura (crear, iniciar o borrar contenedores) responde 403.
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy:v0.4.2
+
+    environment:
+      CONTAINERS: "1"
+      EVENTS: "1"
+      VERSION: "1"
+      PING: "1"
+      POST: "0"
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+    # Red interna sin salida: solo Traefik llega al proxy.
+    networks:
+      - docker
 
     restart: unless-stopped
 
@@ -41,25 +82,36 @@ services:
 
     command:
       - --providers.docker=true
+      - --providers.docker.endpoint=tcp://socket-proxy:2375
       - --providers.docker.exposedByDefault=false
       - --providers.docker.network=reserva-cupos-infra_publica
-      - --entryPoints.web.address=:80
+      - --providers.file.filename=/etc/traefik/tls.yml
+      - --entryPoints.websecure.address=:443
+      - --entryPoints.traefik.address=:8080
+      - --entryPoints.ping.address=:8082
       - --api.dashboard=true
-      - --api.insecure=true
       - --ping=true
+      - --ping.entryPoint=ping
 
-    # El puerto 3000 del host sigue siendo la entrada a la API; el 8080
-    # muestra el panel con los servicios descubiertos.
+    # El puerto 3000 del host sigue siendo la entrada a la API, ahora por
+    # HTTPS; el 8080 muestra el panel con los servicios descubiertos, también
+    # por HTTPS. El ping del health check (8082) no se publica.
     ports:
-      - "127.0.0.1:3000:80"
+      - "127.0.0.1:3000:443"
       - "127.0.0.1:8080:8080"
 
-    # Solo lectura: Traefik observa los contenedores, no los modifica.
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./Infraestructura/tls/traefik.yml:/etc/traefik/tls.yml:ro
+      - *ca
+      - { type: bind, source: ./seguridad/local/traefik.crt, target: /tls/traefik.crt, read_only: true }
+      - { type: bind, source: ./seguridad/local/traefik.key, target: /tls/traefik.key, read_only: true }
 
     networks:
       - publica
+      - docker
+
+    depends_on:
+      - socket-proxy
 
     healthcheck:
       test:
@@ -67,6 +119,8 @@ services:
         - traefik
         - healthcheck
         - --ping
+        - --ping.entryPoint=ping
+        - --entryPoints.ping.address=:8082
       interval: 10s
       timeout: 5s
       retries: 3
@@ -77,30 +131,53 @@ services:
     build:
       context: ./servicios/api
       additional_contexts:
+        compartido: ./compartido
         contrato: ./contrato
 
     # La API no publica en RabbitMQ: escribe la reserva y su comando en el
     # outbox de MySQL, y el relay los publica.
     environment:
       PORT: "3000"
+      TLS_CERT: /tls/api.crt
+      TLS_KEY: /tls/api.key
+      TLS_CA: /tls/ca.crt
+      # El health check (fetch de Node) verifica el certificado propio.
+      NODE_EXTRA_CA_CERTS: /tls/ca.crt
       DB_HOST: mysql-primary
       DB_NAME: reservas
       DB_USER: api_app
       DB_PASSWORD: api_local_2026
+      # Solo las rutas /admin/v1 usan este usuario.
+      DB_ADMIN_USER: admin_app
+      DB_ADMIN_PASSWORD: admin_local_2026
+      # Hash de la clave del operador; la clave no llega al contenedor.
+      ADMIN_CLAVE_SHA256_ARCHIVO: /seguridad/admin.sha256
+      # Límite de tasa por defecto de cada tenant (token bucket).
+      LIMITE_POR_SEGUNDO: "50"
+      LIMITE_RAFAGA: "100"
       # Entorno de desarrollo: también se validan las respuestas contra el
       # contrato. Una respuesta fuera de contrato responde 500.
       VALIDAR_RESPUESTAS: "true"
 
     # Sin puertos propios: se entra por Traefik, que encuentra cada
-    # instancia por estas etiquetas.
+    # instancia por estas etiquetas y le habla por HTTPS.
     labels:
       traefik.enable: "true"
-      traefik.http.routers.api.rule: "PathPrefix(`/v1`) || Path(`/health`)"
-      traefik.http.routers.api.entrypoints: web
+      traefik.http.routers.api.rule: "PathPrefix(`/v1`) || PathPrefix(`/admin`) || Path(`/health`)"
+      traefik.http.routers.api.entrypoints: websecure
+      traefik.http.routers.api.tls: "true"
       traefik.http.services.api.loadbalancer.server.port: "3000"
+      traefik.http.services.api.loadbalancer.server.scheme: https
+      traefik.http.services.api.loadbalancer.serverstransport: api-tls@file
       traefik.http.services.api.loadbalancer.healthcheck.path: /health
       traefik.http.services.api.loadbalancer.healthcheck.interval: 5s
       traefik.http.services.api.loadbalancer.healthcheck.timeout: 3s
+
+    volumes:
+      - *ca
+      - { type: bind, source: ./seguridad/local/api.crt, target: /tls/api.crt, read_only: true }
+      - { type: bind, source: ./seguridad/local/api.key, target: /tls/api.key, read_only: true }
+      - { type: bind, source: ./seguridad/local/admin.sha256, target: /seguridad/admin.sha256, read_only: true }
 
     networks:
       - publica
@@ -115,7 +192,7 @@ services:
         - CMD
         - node
         - -e
-        - "fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        - "fetch('https://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
       interval: 10s
       timeout: 5s
       retries: 3
@@ -130,6 +207,7 @@ services:
         contrato: ./contrato
 
     environment:
+      TLS_CA: /tls/ca.crt
       DB_HOST: mysql-primary
       DB_NAME: reservas
       DB_USER: worker_app
@@ -137,6 +215,9 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: demo
       RABBITMQ_PASSWORD: demo_local_2026
+
+    volumes:
+      - *ca
 
     networks:
       - interna
@@ -149,16 +230,29 @@ services:
 
     restart: unless-stopped
 
+  # MySQL exige TLS en toda conexión por red (require_secure_transport); la
+  # administración por el socket local del contenedor no es tráfico entre
+  # componentes.
   mysql-primary:
     build:
       context: ./Infraestructura/mysql/primary
+
+    command:
+      - mysqld
+      - --ssl-ca=/tls/ca.crt
+      - --ssl-cert=/tls/mysql-primary.crt
+      - --ssl-key=/tls/mysql-primary.key
+      - --require-secure-transport=ON
+      - --tls-version=TLSv1.2,TLSv1.3
 
     environment:
       MYSQL_ROOT_PASSWORD: root_local_2026
 
     volumes:
       - mysql-primary-data:/var/lib/mysql
-      - ./Infraestructura/mysql/primary/crear-tenant.sql:/crear-tenant.sql:ro
+      - *ca
+      - { type: bind, source: ./seguridad/local/mysql-primary.crt, target: /tls/mysql-primary.crt, read_only: true }
+      - { type: bind, source: ./seguridad/local/mysql-primary.key, target: /tls/mysql-primary.key, read_only: true }
 
     networks:
       - interna
@@ -184,12 +278,23 @@ services:
     build:
       context: ./Infraestructura/mysql/replica
 
+    command:
+      - mysqld
+      - --ssl-ca=/tls/ca.crt
+      - --ssl-cert=/tls/mysql-replica.crt
+      - --ssl-key=/tls/mysql-replica.key
+      - --require-secure-transport=ON
+      - --tls-version=TLSv1.2,TLSv1.3
+
     environment:
       MYSQL_ROOT_PASSWORD: root_local_2026
 
     volumes:
       - mysql-replica-data:/var/lib/mysql
       - ./Infraestructura/mysql/replica/configurar-replica.sql:/configurar-replica.sql:ro
+      - *ca
+      - { type: bind, source: ./seguridad/local/mysql-replica.crt, target: /tls/mysql-replica.crt, read_only: true }
+      - { type: bind, source: ./seguridad/local/mysql-replica.key, target: /tls/mysql-replica.key, read_only: true }
 
     networks:
       - interna
@@ -218,6 +323,22 @@ services:
   aula-db:
     image: postgres:16-alpine
 
+    # PostgreSQL exige que la clave privada tenga permisos 0600 y sea del
+    # usuario postgres. Un bind desde Windows no conserva permisos POSIX,
+    # así que se copia dentro del contenedor antes de arrancar.
+    entrypoint: [sh, -c]
+    command:
+      - >-
+        cp /certificados/aula-db.key /tmp/aula-db.key &&
+        chown postgres:postgres /tmp/aula-db.key &&
+        chmod 600 /tmp/aula-db.key &&
+        exec docker-entrypoint.sh postgres
+        -c ssl=on
+        -c ssl_cert_file=/tls/aula-db.crt
+        -c ssl_key_file=/tmp/aula-db.key
+        -c ssl_min_protocol_version=TLSv1.2
+        -c hba_file=/etc/postgresql/pg_hba.conf
+
     environment:
       POSTGRES_DB: aula
       POSTGRES_USER: aula_admin
@@ -226,6 +347,11 @@ services:
     volumes:
       - aula-db-data:/var/lib/postgresql/data
       - ./Infraestructura/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      # pg_hba rechaza cualquier conexión de red sin TLS.
+      - ./Infraestructura/tls/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+      - *ca
+      - { type: bind, source: ./seguridad/local/aula-db.crt, target: /tls/aula-db.crt, read_only: true }
+      - { type: bind, source: ./seguridad/local/aula-db.key, target: /certificados/aula-db.key, read_only: true }
 
     networks:
       - tenant
@@ -256,13 +382,19 @@ services:
 
     environment:
       PORT: "3001"
+      TLS_CERT: /tls/aula.crt
+      TLS_KEY: /tls/aula.key
+      TLS_CA: /tls/ca.crt
+      # fetch de Node (llamadas a la API por el gateway) confía en la CA local.
+      NODE_EXTRA_CA_CERTS: /tls/ca.crt
       # Aula entra por el gateway: no conoce las instancias de la API.
-      API_URL: http://traefik
+      API_URL: https://traefik
       # Clave de API del tenant Aula, solo para desarrollo local.
       API_KEY: rc_aula_5589268069a379faa72a98ae640f818c09fc6179adf5f2146bd97aadbb06bc42
       # Secreto del webhook, compartido con el servicio (03-tenants.sql).
       # Solo para desarrollo local.
       WEBHOOK_SECRET: 46cf76594518a3abd7580dce6146a6db58d2719b2602308e8f7c7dcb7024eb6d
+      USUARIOS_ARCHIVO: /seguridad/usuarios.json
       PGHOST: aula-db
       PGPORT: "5432"
       PGDATABASE: aula
@@ -271,6 +403,12 @@ services:
 
     ports:
       - "127.0.0.1:3001:3001"
+
+    volumes:
+      - *ca
+      - { type: bind, source: ./seguridad/local/aula.crt, target: /tls/aula.crt, read_only: true }
+      - { type: bind, source: ./seguridad/local/aula.key, target: /tls/aula.key, read_only: true }
+      - { type: bind, source: ./seguridad/local/usuarios.json, target: /seguridad/usuarios.json, read_only: true }
 
     networks:
       - publica
@@ -289,7 +427,7 @@ services:
         - CMD
         - node
         - -e
-        - "fetch('http://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+        - "fetch('https://localhost:3001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
       interval: 10s
       timeout: 5s
       retries: 3
@@ -304,6 +442,7 @@ services:
         contrato: ./contrato
 
     environment:
+      TLS_CA: /tls/ca.crt
       DB_HOST: mysql-primary
       DB_NAME: reservas
       DB_USER: relay_app
@@ -311,6 +450,9 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: demo
       RABBITMQ_PASSWORD: demo_local_2026
+
+    volumes:
+      - *ca
 
     networks:
       - interna
@@ -331,6 +473,10 @@ services:
         contrato: ./contrato
 
     environment:
+      TLS_CA: /tls/ca.crt
+      # Los webhooks a Aula van por HTTPS: el notificador confía en la CA
+      # local y rechaza (a la DLQ) cualquier URL http://.
+      NODE_EXTRA_CA_CERTS: /tls/ca.crt
       DB_HOST: mysql-primary
       DB_NAME: reservas
       DB_USER: notificador_app
@@ -342,6 +488,9 @@ services:
       # lista. En el entorno local, el receptor de Aula.
       NOTIFICADOR_HOSTS_PERMITIDOS: aula
       WEBHOOK_TIMEOUT_MS: "5000"
+
+    volumes:
+      - *ca
 
     networks:
       - interna
@@ -356,17 +505,20 @@ services:
     restart: unless-stopped
 
   # Herramienta de pruebas de carga. No arranca con "docker compose up":
-  # se ejecuta con "docker compose run --rm k6 ...".
+  # se ejecuta con "docker compose run --rm k6 ...". Verifica el
+  # certificado del gateway con la CA local (SSL_CERT_FILE).
   k6:
     image: grafana/k6:1.0.0
     profiles:
       - pruebas
 
     environment:
-      API_URL: http://traefik
+      API_URL: https://traefik
+      SSL_CERT_FILE: /tls/ca.crt
 
     volumes:
       - ./pruebas:/pruebas:ro
+      - *ca
 
     networks:
       - publica
@@ -375,6 +527,9 @@ networks:
   publica:
   interna:
   tenant:
+  # Solo Traefik y el proxy del socket; sin salida a otras redes.
+  docker:
+    internal: true
 
 volumes:
   rabbitmq-data:

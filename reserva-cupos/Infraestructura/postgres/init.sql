@@ -7,12 +7,15 @@ CREATE TABLE materias (
                           actividad_id CHAR(36) NOT NULL UNIQUE,
                           nombre VARCHAR(200) NOT NULL,
                           cupo INTEGER NOT NULL,
+                          -- Versión de la actividad: la reconciliación aplica solo
+                          -- una instantánea más nueva (Entrega 5).
+                          version BIGINT NOT NULL DEFAULT 0,
                           creado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 GRANT CONNECT ON DATABASE aula TO aula_app;
 GRANT USAGE ON SCHEMA public TO aula_app;
-GRANT SELECT, INSERT ON TABLE materias TO aula_app;
+GRANT SELECT, INSERT, UPDATE ON TABLE materias TO aula_app;
 
 -- Proyección local de las inscripciones, alimentada por las respuestas de
 -- la API y por los webhooks. Una fila solo se actualiza con una versión
@@ -28,11 +31,13 @@ CREATE TABLE inscripciones (
 
 CREATE INDEX ix_inscripciones_actividad ON inscripciones (actividad_id, estado);
 
--- Última secuencia recibida por webhook. La reconciliación desde el feed
--- (Entrega 5) agrega su propio punto de control.
+-- Puntos de control: la última secuencia recibida por webhook y la última
+-- aplicada desde el feed. Son independientes: los webhooks pueden llegar
+-- fuera de orden, así que su máximo no sirve para retomar el feed.
 CREATE TABLE punto_control (
                                id SMALLINT PRIMARY KEY CHECK (id = 1),
                                ultima_secuencia_webhook BIGINT NOT NULL DEFAULT 0,
+                               ultima_secuencia_feed BIGINT NOT NULL DEFAULT 0,
                                actualizado_en TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -40,8 +45,3 @@ INSERT INTO punto_control (id) VALUES (1);
 
 GRANT SELECT, INSERT, UPDATE ON TABLE inscripciones TO aula_app;
 GRANT SELECT, UPDATE ON TABLE punto_control TO aula_app;
-
--- Entrega 5: el cursor del feed es independiente de los webhooks.
-ALTER TABLE materias ADD COLUMN version BIGINT NOT NULL DEFAULT 0;
-ALTER TABLE punto_control ADD COLUMN ultima_secuencia_feed BIGINT NOT NULL DEFAULT 0;
-GRANT UPDATE ON TABLE materias TO aula_app;

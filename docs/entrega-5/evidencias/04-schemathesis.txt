@@ -1,0 +1,135 @@
+Schemathesis por HTTPS: API pública (clave de tenant) y administración (clave del operador)
+Ejecución: 2026-11-15T00:13:21Z · commit 3eeac3a
+
+$ CLAVE=$(node scripts/sistema.js tenant "Verificación del contrato" --limite 1000/1000 2>/dev/null); docker run --rm --network reserva-cupos-infra_publica -e SCHEMATHESIS_HOOKS=/config/hooks.py -v "$PWD/contrato:/contrato:ro" -v "$PWD/pruebas/contrato:/config:ro" -v "$PWD/seguridad/local/ca.crt:/tls/ca.crt:ro" schemathesis/schemathesis:4.33.1 --config-file /config/schemathesis.toml run /contrato/openapi.yaml --url https://traefik --tls-verify /tls/ca.crt -H "Authorization: Bearer $CLAVE" --exclude-tag administracion --checks all --max-examples 25 --seed 2026 --generation-with-security-parameters false --no-color
+Schemathesis v4.33.1
+━━━━━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from /contrato/openapi.yaml (in 1.66s)
+
+     Base URL:         https://traefik
+     Specification:    Open API 3.1.0
+     Operations:       8 selected / 12 total
+     Configuration:    /config/schemathesis.toml
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✘
+     Accepts backslash and control characters in URL paths:    ✓
+
+ ⏭   Examples (in 0.03s)
+
+     ⏭  8 skipped
+
+ ✅  Coverage (in 7.32s)
+
+     ✅ 8 passed
+
+ ✅  Fuzzing (in 4.48s)
+
+     ✅ 8 passed
+
+ ✅  Stateful (in 15.90s)
+
+     Scenarios:    25
+     API Links:    27 covered / 33 selected / 36 total (27 inferred)
+
+     ✅ 25 passed
+
+=================================== WARNINGS ===================================
+
+Schema validation mismatch: 1 operation mostly rejected generated data due to validation errors, indicating schema constraints don't match API validation
+
+  - GET /v1/actividades/{id}/reservas
+
+💡 Check your schema constraints - API validation may be stricter than documented
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 8/12
+  Tested: 8
+
+Test Phases:
+  ⏭  Examples
+  ✅ Coverage
+  ✅ Fuzzing
+  ✅ Stateful
+
+Warnings:
+  ⚠️ Schema validation mismatch: 1 operation mostly rejected generated data
+
+Test cases:
+  1067 generated, 1067 passed
+
+Seed: 2026
+
+============================= 1 warning in 28.03s ==============================
+(código de salida: 0)
+
+$ docker run --rm --network reserva-cupos-infra_publica -v "$PWD/contrato:/contrato:ro" -v "$PWD/pruebas/contrato:/config:ro" -v "$PWD/seguridad/local/ca.crt:/tls/ca.crt:ro" schemathesis/schemathesis:4.33.1 --config-file /config/schemathesis.toml run /contrato/openapi.yaml --url https://traefik --tls-verify /tls/ca.crt -H "Authorization: Bearer $(cat seguridad/local/admin.key)" --include-tag administracion --checks all --max-examples 25 --seed 2026 --generation-with-security-parameters false --no-color
+Schemathesis v4.33.1
+━━━━━━━━━━━━━━━━━━━━
+
+ ✅  Loaded specification from /contrato/openapi.yaml (in 1.80s)
+
+     Base URL:         https://traefik
+     Specification:    Open API 3.1.0
+     Operations:       4 selected / 12 total
+     Configuration:    /config/schemathesis.toml
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:                            ✘
+     Accepts backslash and control characters in URL paths:    ✓
+
+ ⏭   Examples (in 0.01s)
+
+     ⏭  4 skipped
+
+ ✅  Coverage (in 6.71s)
+
+     ✅ 4 passed
+
+ ✅  Fuzzing (in 1.71s)
+
+     ✅ 4 passed
+
+ ✅  Stateful (in 11.32s)
+
+     Scenarios:    26
+     API Links:    8 covered / 8 selected / 14 total (5 inferred)
+
+     ✅ 26 passed
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 4/12
+  Tested: 4
+
+Test Phases:
+  ⏭  Examples
+  ✅ Coverage
+  ✅ Fuzzing
+  ✅ Stateful
+
+_______________________________ Schema Coverage ________________________________
+
+Operations            4/12    33.3%
+Parameters            5/20    25.0%
+Keywords             63/116   54.3%
+Examples              0/3      0.0%
+Responses            17/87    19.5%
+Response Keywords   191/828   23.0%
+
+HTML report         ./schema-coverage.html
+
+Test cases:
+  925 generated, 925 passed
+
+Seed: 2026
+
+========================== No issues found in 20.10s ===========================
+(código de salida: 0)
+

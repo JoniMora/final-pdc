@@ -1,0 +1,38 @@
+Cifrado en tránsito y socket de Docker (E5-8, E5-9, E5-10)
+Ejecución: 2026-11-15T00:13:01.861Z
+
+  · API (Traefik) en 3000: TLSv1.3, TLS_AES_128_GCM_SHA256, certificado CN=traefik
+  · Aula en 3001: TLSv1.3, TLS_AES_256_GCM_SHA384, certificado CN=aula
+  · Panel de Traefik en 8080: TLSv1.3, TLS_AES_128_GCM_SHA256, certificado CN=traefik
+OK: API, Aula y panel: TLS 1.2+ verificado con la CA local; sin la CA o con otro nombre, el cliente rechaza la conexión
+  · HTTP sin TLS al puerto 3000: HTTP 404
+  · HTTP sin TLS al puerto 3001: ECONNRESET
+  · HTTP sin TLS al puerto 8080: HTTP 404
+OK: Un pedido HTTP sin cifrar a los puertos publicados no obtiene respuesta válida
+  · API por HTTP dentro de su contenedor: ECONNRESET
+OK: Traefik → API va por HTTPS (la API no atiende texto plano) y Traefik verifica el certificado "api"
+  · MySQL primario: 1 conexión(es) de admin_app TLSv1.3 TLS_AES_256_GCM_SHA384
+  · MySQL primario: 10 conexión(es) de api_app TLSv1.3 TLS_AES_256_GCM_SHA384
+  · MySQL primario: 2 conexión(es) de notificador_app TLSv1.3 TLS_AES_256_GCM_SHA384
+  · MySQL primario: 1 conexión(es) de relay_app TLSv1.3 TLS_AES_256_GCM_SHA384
+  · MySQL primario: 1 conexión(es) de replicador TLSv1.3 TLS_AES_128_GCM_SHA256
+  · MySQL primario: 1 conexión(es) de worker_app TLSv1.3 TLS_AES_256_GCM_SHA384
+OK: Todas las conexiones de los servicios y de la réplica al primario tienen Ssl_version y Ssl_cipher
+  · MySQL con --ssl-mode=DISABLED: rechazada
+OK: MySQL rechaza una conexión por red sin TLS (require_secure_transport)
+OK: MySQL acepta una conexión TLS que verifica la CA y el nombre mysql-primary
+OK: La replicación usa TLS y verifica el certificado del primario (SOURCE_SSL, VERIFY_SERVER_CERT)
+  · RabbitMQ: 3 conexiones, todas ssl=true (tlsv1.3)
+OK: rabbitmqctl list_connections: ssl=true en todas las conexiones (relay, worker, notificador)
+  · AMQP sin TLS (rabbitmq:5672) desde el relay: ECONNREFUSED
+OK: RabbitMQ solo escucha AMQPS (5671): el puerto 5672 está cerrado
+  · PostgreSQL: 1 conexión(es) de aula_app, todas con ssl=t (TLSv1.3)
+OK: Aula → aula-db: todas las conexiones usan TLS
+OK: PostgreSQL rechaza la conexión sin TLS (pg_hba) y acepta la verificada (sslmode=verify-full)
+OK: El notificador entrega los webhooks a https://aula:3001 (una URL http:// va a la DLQ: ver seguridad-api.txt)
+  · POST /containers/create a través del proxy: wget: server returned error: HTTP/1.0 403 Forbidden
+OK: Traefik no monta el socket de Docker: lee por el proxy (el descubrimiento sigue funcionando) y una escritura responde 403
+  · Captura Traefik → API: 60 paquetes; el texto "MARCADOR-389870a43e13" no aparece y sí registros TLS 0x17 0x03 0x03
+OK: Captura de tráfico: el contenido entre Traefik y la API viaja cifrado (captura-trafico.txt)
+
+Resultado: APROBADA
