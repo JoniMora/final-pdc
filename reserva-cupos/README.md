@@ -199,7 +199,7 @@ Corre tres suites y deja su salida en `docs/entrega-5/evidencias/`:
 ### Matriz de fallos
 
 ```shell
-node scripts/sistema.js fallos                 # todos (unos 12 minutos)
+node scripts/sistema.js fallos                 # todos (unos 10 minutos)
 node scripts/sistema.js fallos worker          # uno o varios: worker relay rabbitmq notificador api mysql-replica aula-db tenant mysql-primary
 ```
 

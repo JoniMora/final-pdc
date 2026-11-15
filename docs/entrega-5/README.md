@@ -108,10 +108,10 @@ Las demás pruebas (Schemathesis, k6 y oasdiff) y el detalle de cada comando est
 
 Versión corta de cada celda de la columna *Justificación breve / evidencia*, para `Entrega5-Seguridad.pdf`:
 
-1. **Autenticación de usuarios:** Login de personas en Aula con contraseña (scrypt con sal), sesión del servidor en cookie HttpOnly y Secure, CSRF y bloqueo por fuerza bruta. Tenants y operador: claves de 256 bits. Ev. seguridad-aula y seguridad-api.
-2. **Autorización / control de acceso:** Aula: roles administrador y alumno; el alumno opera solo lo propio (403/404). Servicio: permisos por clave declarados en el contrato y aplicados por la API (403), /admin solo del operador, aislamiento entre tenants (404) y límite de tasa (429). Ev. seguridad-aula, seguridad-api y 05.
-3. **Cifrado en tránsito:** TLS 1.2+ en todos los saltos con CA local y verificación de identidad: HTTPS (navegador, Traefik → API, webhooks), AMQPS, MySQL con require_secure_transport, replicación con SSL y PostgreSQL. El texto plano se rechaza; captura del tráfico cifrado. Ev. cifrado y captura-trafico.
-4. **Replicación o recuperación probada:** Réplica semisíncrona y failover por script con una ráfaga en curso: RTO 1,8 s y RPO 0 (0 de 300 reservas perdidas). Matriz de 9 fallos con invariantes verificadas y contingencia de Aula con aula-db caída (+1). Ev. fallos/resumen.
-5. **Informe de amenazas:** docs/entrega-5/amenazas.md: activos y fronteras de confianza, amenazas STRIDE por flujo con mitigación y evidencia, y riesgos que quedan.
+1. **Autenticación de usuarios:** Login de personas en Aula (scrypt con sal), sesión del servidor en cookie HttpOnly/Secure, CSRF y bloqueo por fuerza bruta. Tenants y operador: claves de 256 bits. Ev. seguridad-aula/api.
+2. **Autorización / control de acceso:** Aula: roles administrador y alumno; el alumno opera solo lo propio (403/404). API: permisos por clave del contrato (403), /admin solo del operador, aislamiento entre tenants (404) y límite de tasa (429). Ev. seguridad-aula/api, 05.
+3. **Cifrado en tránsito:** TLS 1.2+ en todos los saltos, CA local y verificación de identidad: HTTPS (navegador, Traefik-API, webhooks), AMQPS, MySQL y su replicación, PostgreSQL. Texto plano rechazado; captura del tráfico. Ev. cifrado, captura-trafico.
+4. **Replicación o recuperación probada:** Réplica semisíncrona y failover por script con una ráfaga en curso: RTO 1,8 s y RPO 0 (0 de 300 reservas perdidas). Matriz de 9 fallos con invariantes verificadas y contingencia de Aula con aula-db caída (escenario +1). Ev. fallos/resumen.
+5. **Informe de amenazas:** docs/entrega-5/amenazas.md: activos y fronteras de confianza, amenazas STRIDE por flujo con su mitigación y evidencia, y los riesgos que quedan.
 
 **Evidencia adicional (links):** informe de amenazas en `https://github.com/JoniMora/final-pdc/blob/v5-seguridad/docs/entrega-5/amenazas.md` y prueba de recuperación ante fallos en `https://github.com/JoniMora/final-pdc/blob/v5-seguridad/docs/entrega-5/evidencias/fallos/resumen.md`. Funcionan una vez publicado el tag `v5-seguridad`.
