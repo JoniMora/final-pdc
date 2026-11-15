@@ -82,7 +82,7 @@ async function aplicarPagina(pool, datos, desde, ultima) {
 // Con aula-db disponible el ciclo es lento: los webhooks son el camino
 // principal y el feed solo cubre lo que se haya perdido. Con aula-db caída
 // o la reconciliación pendiente, se reintenta seguido.
-function crearRecuperacion({ pool, api, intervaloNormalMs = 30000, intervaloDegradadoMs = 5000 }) {
+function crearRecuperacion({ pool, api, interruptor, intervaloNormalMs = 30000, intervaloDegradadoMs = 5000 }) {
     const catalogo = new Map();
     const estado = {
         modo: "iniciando",
@@ -142,10 +142,20 @@ function crearRecuperacion({ pool, api, intervaloNormalMs = 30000, intervaloDegr
         return catalogoEnCurso;
     }
 
+    // Es también la sonda de aula-db: intenta la base aunque el interruptor
+    // esté abierto y lo cierra cuando la reconciliación termina bien.
     async function reconciliar() {
         try {
             for (let i = 0; i < MAX_PAGINAS_POR_CICLO; i++) {
-                const control = await pool.query("SELECT ultima_secuencia_feed FROM punto_control WHERE id = 1");
+                let control;
+
+                try {
+                    control = await pool.query("SELECT ultima_secuencia_feed FROM punto_control WHERE id = 1");
+                } catch (error) {
+                    interruptor?.fallo();
+                    throw error;
+                }
+
                 const desde = Number(control.rows[0].ultima_secuencia_feed);
                 const { datos, ultima_secuencia } = await pagina(desde);
 
@@ -158,6 +168,7 @@ function crearRecuperacion({ pool, api, intervaloNormalMs = 30000, intervaloDegr
 
             estado.modo = "normal";
             estado.ultimo_error = null;
+            interruptor?.exito();
         } catch (error) {
             estado.modo = "degradado";
             estado.ultimo_error = "No se pudo completar la reconciliación";

@@ -9,6 +9,7 @@ const { crearClienteApi, ErrorDeContrato } = require("./api");
 const { secretoDesdeHex, verificarFirma, aplicarReserva, aplicarEvento } = require("./webhooks");
 const { crearSeguridad, puedeVer } = require("./seguridad");
 const { crearRecuperacion } = require("./recuperacion");
+const { crearInterruptor, conBase } = require("./interruptor");
 const { leerCa } = require("../../../compartido/src/tls");
 
 const app = express();
@@ -41,6 +42,10 @@ const pool = new Pool({
     ...(ca ? { ssl: { ca, rejectUnauthorized: true } } : {})
 });
 
+// Con aula-db caída, Aula no vuelve a intentar la base en cada pedido.
+const interruptor = crearInterruptor();
+const base = operacion => conBase(interruptor, operacion);
+
 pool.on("error", error => {
     console.error("[AULA] PostgreSQL:", error.message);
 });
@@ -67,7 +72,7 @@ app.post("/webhooks/reservas", express.raw({ type: "application/json", limit: "6
     }
 
     try {
-        const aplicado = await aplicarEvento(pool, evento);
+        const aplicado = await base(() => aplicarEvento(pool, evento));
         console.log(`[AULA] Webhook ${req.get("x-webhook-id")}: ${evento.tipo} v${evento.entidad.version}`
             + (aplicado ? " aplicado" : " repetido o atrasado, sin cambios"));
         res.status(204).end();
@@ -95,7 +100,7 @@ seguridad.montar(app);
 
 app.use(["/materias", "/inscripciones", "/estado", "/reconciliacion"], seguridad.exigirTransporte, seguridad.autenticar);
 
-const recuperacion = crearRecuperacion({ pool, api });
+const recuperacion = crearRecuperacion({ pool, api, interruptor });
 recuperacion.iniciar();
 
 // Estado y disparo manual de la reconciliación: solo para el administrador.
@@ -120,7 +125,7 @@ function errorDeApi(res, error) {
         return res.status(502).json({ error: "La API respondió fuera de contrato" });
     }
 
-    console.error("[AULA] API:", error.message);
+    console.error("[AULA] API:", error.message, error.cause?.code || error.cause?.message || "");
     res.status(503).json({ error: "No se pudo obtener respuesta de la API" });
 }
 
@@ -128,7 +133,7 @@ function errorDeApi(res, error) {
 // no responde, el webhook o la reconciliación la completan después.
 async function proyectar(reserva) {
     try {
-        await aplicarReserva(pool, reserva);
+        await base(() => aplicarReserva(pool, reserva));
     } catch (error) {
         console.error("[AULA] Proyección local pendiente:", error.message);
     }
@@ -142,7 +147,7 @@ app.get("/health", (req, res) => {
 // es operativo y no forma parte del contrato.
 app.get("/estado", async (req, res) => {
     const [base, servicio] = await Promise.allSettled([
-        pool.query("SELECT 1 FROM materias LIMIT 1"),
+        base(() => pool.query("SELECT 1 FROM materias LIMIT 1")),
 
         fetch(`${API_URL}/health`, {
             signal: AbortSignal.timeout(3000)
@@ -167,12 +172,12 @@ app.get("/estado", async (req, res) => {
 // Materias guardadas en la base propia de Aula.
 app.get("/materias", async (req, res) => {
     try {
-        const result = await pool.query(
+        const result = await base(() => pool.query(
             `SELECT id, actividad_id, nombre, cupo, creado_en
                FROM materias
               ORDER BY creado_en DESC
               LIMIT 20`
-        );
+        ));
 
         res.json(result.rows);
     } catch (error) {
@@ -215,12 +220,12 @@ app.post("/materias", seguridad.administrador, async (req, res) => {
     const actividad = respuesta.cuerpo;
 
     try {
-        await pool.query(
+        await base(() => pool.query(
             `INSERT INTO materias (id, actividad_id, nombre, cupo, version)
              VALUES ($1, $2, $3, $4, $5)
              ON CONFLICT (actividad_id) DO NOTHING`,
             [randomUUID(), actividad.id, actividad.nombre, actividad.capacidad, actividad.version]
-        );
+        ));
     } catch (error) {
         // La actividad ya existe en el servicio: la reconciliación por feed
         // la agrega a la base de Aula cuando vuelva a responder.
@@ -250,12 +255,12 @@ app.get("/materias/:actividadId", async (req, res) => {
         let locales = null;
 
         try {
-            const resultado = await pool.query(
+            const resultado = await base(() => pool.query(
                 `SELECT alumno FROM inscripciones
                   WHERE actividad_id = $1 AND estado = 'confirmada'
                   ORDER BY alumno`,
                 [req.params.actividadId]
-            );
+            ));
             locales = resultado.rows.map(fila => fila.alumno);
         } catch (_) {
             // La base de Aula no está disponible: se informa solo la API.
