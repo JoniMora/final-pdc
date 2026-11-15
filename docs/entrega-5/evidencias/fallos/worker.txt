@@ -1,0 +1,12 @@
+Matriz de fallos · Worker detenido con una ráfaga en curso
+Ejecución: 2026-11-15T00:14:59.540Z
+
+  · Ráfaga de 200 solicitudes sobre 10 cupos; worker detenido tras 40 admisiones
+  · 200 admitidas en 4.8 s · latencia de admisión p50 0.86 s, p95 1.40 s, máx 1.51 s · reintentos 0 (errores vistos: ninguno)
+OK: Con worker detenido, la API siguió admitiendo: 200 de 200 solicitudes respondieron 202
+  · Pendientes con worker detenido: 194 (detenido hace 2.3 s)
+  · Invariantes: 10 confirmadas, 190 rechazadas, 0 pendientes, 0 duplicadas, cupos_disponibles = 0
+  · Tiempo desde que worker vuelve hasta 0 pendientes: 7.2 s
+OK: Al volver worker, se decidieron todas sin pérdidas ni duplicados
+
+Resultado: APROBADA

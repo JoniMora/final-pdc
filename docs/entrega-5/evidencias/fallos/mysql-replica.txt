@@ -1,0 +1,11 @@
+Matriz de fallos · Réplica de MySQL detenida: degradación a asíncrona
+Ejecución: 2026-11-15T00:16:34.349Z
+
+  · Ráfaga de 150 solicitudes; mysql-replica detenida tras 30 admisiones
+  · 150 admitidas en 11.8 s · latencia de admisión p50 0.28 s, p95 10.55 s, máx 10.69 s · reintentos 0 (errores vistos: ninguno)
+OK: Sin réplica, el primario degradó a asíncrono tras la espera semisíncrona (10 s) y siguió confirmando escrituras
+  · Invariantes: 10 confirmadas, 140 rechazadas, 0 pendientes, 0 duplicadas, cupos_disponibles = 0
+  · La réplica volvió, recuperó las 150 reservas escritas sin ella y el primario volvió a semisíncrono en 12.2 s
+OK: Al volver la réplica, se pone al día por GTID y el primario retoma la confirmación semisíncrona
+
+Resultado: APROBADA

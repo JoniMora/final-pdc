@@ -1,0 +1,45 @@
+Entorno de la Entrega 5 sobre volúmenes nuevos
+Ejecución: 2026-11-15T00:11:27Z · commit 3eeac3a
+
+$ docker version --format 'Docker Engine {{.Server.Version}}' && docker compose version && node --version
+Docker Engine 24.0.2
+Docker Compose version v2.18.1
+v24.16.0
+(código de salida: 0)
+
+$ node scripts/sistema.js preparar
+Nada que generar: /Users/jony/PDC-AGAIN/Funes/Final/final-pdc/reserva-cupos/seguridad/local ya estaba completo.
+Credenciales de desarrollo: /Users/jony/PDC-AGAIN/Funes/Final/final-pdc/reserva-cupos/seguridad/local/accesos-locales.txt
+(código de salida: 0)
+
+$ node scripts/sistema.js levantar 2>&1 | grep -v -E '^ *(Container|Network|Volume|#|=>)' | tail -5
+
+
+Réplica: canal configurado con TLS.
+Réplica: conectada al primario por TLS y aplicando.
+Entorno listo: API https://localhost:3000 · Aula https://localhost:3001 · panel https://localhost:8080/dashboard/
+(código de salida: 0)
+
+$ docker compose ps -a
+NAME                                  IMAGE                                  COMMAND                  SERVICE             CREATED             STATUS                    PORTS
+reserva-cupos-infra-api-1             reserva-cupos-infra-api                "docker-entrypoint.s…"   api                 46 seconds ago      Up 22 seconds (healthy)   3000/tcp
+reserva-cupos-infra-aula-1            reserva-cupos-infra-aula               "docker-entrypoint.s…"   aula                46 seconds ago      Up 11 seconds (healthy)   127.0.0.1:3001->3001/tcp
+reserva-cupos-infra-aula-db-1         postgres:16-alpine                     "sh -c 'cp /certific…"   aula-db             47 seconds ago      Up 44 seconds (healthy)   5432/tcp
+reserva-cupos-infra-mysql-primary-1   reserva-cupos-infra-mysql-primary      "docker-entrypoint.s…"   mysql-primary       47 seconds ago      Up 44 seconds (healthy)   3306/tcp, 33060/tcp
+reserva-cupos-infra-mysql-replica-1   reserva-cupos-infra-mysql-replica      "docker-entrypoint.s…"   mysql-replica       46 seconds ago      Up 22 seconds (healthy)   3306/tcp, 33060/tcp
+reserva-cupos-infra-notificador-1     reserva-cupos-infra-notificador        "docker-entrypoint.s…"   notificador         46 seconds ago      Up 16 seconds             
+reserva-cupos-infra-rabbitmq-1        reserva-cupos-infra-rabbitmq           "docker-entrypoint.s…"   rabbitmq            47 seconds ago      Up 44 seconds (healthy)   4369/tcp, 5671-5672/tcp, 15672/tcp, 15691-15692/tcp, 25672/tcp, 127.0.0.1:15672->15671/tcp
+reserva-cupos-infra-relay-1           reserva-cupos-infra-relay              "docker-entrypoint.s…"   relay               46 seconds ago      Up 22 seconds             
+reserva-cupos-infra-socket-proxy-1    tecnativa/docker-socket-proxy:v0.4.2   "docker-entrypoint.s…"   socket-proxy        47 seconds ago      Up 45 seconds             
+reserva-cupos-infra-traefik-1         traefik:v3.6                           "/entrypoint.sh --pr…"   traefik             47 seconds ago      Up 44 seconds (healthy)   80/tcp, 127.0.0.1:8080->8080/tcp, 127.0.0.1:3000->443/tcp
+reserva-cupos-infra-worker-1          reserva-cupos-infra-worker             "docker-entrypoint.s…"   worker              46 seconds ago      Up 23 seconds             
+(código de salida: 0)
+
+$ node scripts/sistema.js estado | tail -1
+Réplica: IO ON · SQL ON
+(código de salida: 0)
+
+$ curl -s --cacert seguridad/local/ca.crt https://localhost:3000/health; echo; curl -s --cacert seguridad/local/ca.crt https://localhost:3001/health
+{"servicio":"api","instancia":"7d950157a264","estado":"ok","mysql":"conectado"}
+{"servicio":"aula","estado":"ok"}(código de salida: 0)
+

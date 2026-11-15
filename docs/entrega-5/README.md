@@ -1,151 +1,117 @@
 # Entrega 5 — Seguridad y confiabilidad
 
-Programación Distribuida y Componentes · Grupo 15  
-Jonathan Mora Colodrero y María Constanza Gigli  
-Fecha de preparación: 14/11/2026 · Rama: `entrega-5-seguridad`  
-Identificador de versión de esta entrega: `v5-seguridad`.
+Módulo 5 — Seguridad y confiabilidad en entornos distribuidos.
 
-## Estado de verificación
-
-La prueba de integración fue ejecutada por la integrante en Docker Desktop el
-14/11/2026 y terminó con **20 comprobaciones aprobadas**, incluidas recuperación
-de PostgreSQL, controles de acceso y replicación con TLS. Su salida real quedó
-guardada en [integracion.txt](evidencias/integracion.txt), con `Resultado: APROBADA`.
-
-Las pruebas locales registraron **49 aprobadas, 0 fallidas y 5 omitidas** por no
-estar configurado el mock Prism. También se validaron Compose y los certificados.
-Estas comprobaciones no equivalen a una auditoría de seguridad ni garantizan
-recuperación ante cualquier fallo; los límites están en el informe de amenazas.
-
-## Correspondencia con la plantilla
-
-| Requisito | Implementación | Comprobación |
-|---|---|---|
-| Autenticación de usuarios | Usuarios locales de Aula; contraseñas scrypt con sal aleatoria; sesiones opacas de 256 bits. | Login correcto/incorrecto, expiración, logout y backend real con API simulada. |
-| Autorización | Administrador crea materias y gestiona reservas. Alumno opera solo sobre su participante. Controles en servidor. | 401 sin sesión, 403 por rol/suplantación/CSRF y 404 ante reserva ajena. |
-| Cifrado en tránsito | Overlay TLS para HTTPS, AMQPS, MySQL, PostgreSQL y replicación. CA local y verificación de identidad. | TLS local positivo/negativo y comprobaciones de protocolos en integración Docker aprobadas. |
-| Recuperación probada | Réplica existente y reconciliación transaccional del feed hacia PostgreSQL. | Pruebas locales de checkpoint/rollback; prueba de caída, continuidad y recuperación en integración Docker. |
-| Informe de amenazas | [Informe de amenazas](amenazas.md). | Alcance, controles, pruebas y limitaciones declaradas. |
-
-## Identidades y controles de acceso
-
-La clave del tenant identifica a Aula frente al servicio y nunca se entrega al
-navegador. No sustituye el login de personas. Las identidades de Aula se guardan
-en `seguridad/local/usuarios.json`, un archivo generado y montado como solo lectura,
-independiente de PostgreSQL para permitir autenticación durante su caída. Solo
-contiene hashes, roles e identificadores; no contraseñas originales.
-
-La preparación genera `admin`, `alumno1` y `alumno2`, con contraseñas aleatorias.
-El archivo de accesos en texto claro es solo para la demostración local y está
-excluido de Git. Se debe proteger en el equipo y no adjuntarlo a las evidencias.
-El operador puede administrar las identidades en ese archivo generando hashes
-mediante `hashPassword` del módulo de seguridad; no existe alta pública.
-
-Las sesiones duran una hora, se mantienen en memoria en una sola instancia de
-Aula y se pierden al reiniciar el proceso (se debe volver a iniciar sesión).
-El servidor vuelve a leer el usuario en cada petición: desactivarlo o cambiar
-su rol afecta las sesiones existentes. Cookie HttpOnly, Secure y SameSite=Strict;
-las escrituras también exigen token CSRF y validan Origin si está presente.
-Diez intentos de login por IP en quince minutos limitan el trabajo de scrypt.
-Este límite es por instancia, no distribuido.
-
-Un alumno no puede elegir otro participante en el cuerpo, consultar o cancelar
-su reserva ni obtener sus nombres en el listado. Un administrador sí puede
-gestionar las inscripciones del tenant. El listado de detalle conserva la
-paginación de la API y no debe interpretarse como una exportación completa.
-
-## Cifrado y límites de confianza
-
-Se utiliza `docker-compose.yml` más `docker-compose.seguridad.yml`. El compose
-base queda como referencia de la entrega 4; por sí solo no acredita seguridad.
-
-| Enlace de red | Protección |
+| | |
 |---|---|
-| Navegador → Aula | HTTPS directo, certificado de Aula. |
-| Cliente/API y Aula → Traefik | HTTPS, certificado del gateway y CA confiable. |
-| Traefik → instancias API | HTTPS con CA y nombre de servidor `api`; no termina el cifrado en el gateway. |
-| Notificador → Aula | HTTPS obligatorio además de HMAC; CA local en Node. |
-| Relay/worker/notificador → RabbitMQ | AMQPS 5671 con CA y nombre; listener AMQP sin TLS deshabilitado. |
-| Procesos → MySQL | CA, verificación de identidad y require_secure_transport. |
-| Réplica → primario | SOURCE_SSL y verificación del certificado del origen. |
-| Aula → PostgreSQL | TLS con CA y nombre; pg_hba rechaza conexiones de red sin cifrar. |
+| **Grupo N°** | 15 |
+| **Integrantes** | Jonathan Mora Colodrero · María Constanza Gigli |
+| **Tag / Release** | `v5-seguridad` |
+| **Fecha de entrega** | 14/11/2026 |
+| **Certificación de la cátedra** | `Entrega5-Seguridad.pdf`, completada con el texto de la [última sección](#texto-de-la-certificación) y entregada por separado (no se versiona) |
+| **Informe de amenazas** | [`amenazas.md`](amenazas.md) |
+| **Evidencias** | [`evidencias/`](evidencias/README.md): ejecución del 14/11/2026 sobre volúmenes nuevos |
 
-La administración por socket local dentro de cada contenedor no es tráfico entre
-componentes de red. No se implementa mTLS: el servidor se autentica con certificado
-y el cliente con las credenciales correspondientes. La CA y claves son solo de
-desarrollo; no se instalan silenciosamente en la confianza del sistema operativo.
-No se monta la clave privada de la CA en ningún contenedor. El panel inseguro de
-Traefik deja de publicarse en el overlay. La administración RabbitMQ publicada usa HTTPS; su listener HTTP se restringe a 127.0.0.1 dentro del contenedor, sin acceso desde otros componentes.
+## Checklist de la entrega
 
-## Contingencia y reconciliación
+| Requisito | Cumple | Justificación breve / evidencia |
+|---|---|---|
+| Hay autenticación de usuarios implementada | ☑ Sí | **Personas:** login en Aula con contraseñas scrypt con sal, sesión del lado del servidor en una cookie `HttpOnly; Secure; SameSite=Strict`, CSRF, error idéntico para un usuario inexistente y bloqueo por fuerza bruta. **Tenants:** clave de API de 256 bits (la base guarda su hash), rotable. **Operador:** clave propia para `/admin`. [seguridad-aula](evidencias/seguridad-aula.txt) · [seguridad-api](evidencias/seguridad-api.txt) |
+| Hay autorización / control de acceso (no todos pueden todo) | ☑ Sí | En Aula, el administrador crea materias y gestiona inscripciones; el alumno opera solo lo propio (`403` al crear o suplantar, `404` ante una reserva ajena). En el servicio, permisos por clave declarados en el contrato y aplicados por la API desde esa declaración (`403`), `/admin` solo para el operador, aislamiento entre tenants (`404`) y límite de tasa por tenant (`429`). [seguridad-aula](evidencias/seguridad-aula.txt) · [seguridad-api](evidencias/seguridad-api.txt) · [05](evidencias/05-carga.txt) |
+| La comunicación entre componentes está cifrada en tránsito (HTTPS/TLS) | ☑ Sí | TLS 1.2 o superior en todos los saltos, con una CA local y verificación de identidad en cada cliente: HTTPS (navegador → Aula, clientes → Traefik → cada instancia de la API, notificador → webhooks), AMQPS, MySQL con `require_secure_transport`, replicación con `SOURCE_SSL` y PostgreSQL. El texto plano se rechaza en cada protocolo y una captura muestra el tráfico cifrado. Ver [cifrado](#cifrado-en-tránsito). [cifrado](evidencias/cifrado.txt) · [captura](evidencias/captura-trafico.txt) |
+| Hay un mecanismo de replicación o recuperación ante fallos implementado y probado | ☑ Sí | Réplica semisíncrona con failover por script: el primario cae con una ráfaga en curso y el sistema retoma la escritura en 1,8 s, sin perder ninguna reserva admitida ni confirmada (RPO = 0). Matriz de fallos sobre nueve componentes con las invariantes verificadas, y contingencia y reconciliación de Aula (escenario +1). Ver [recuperación](#recuperación-ante-fallos). [fallos](evidencias/fallos/resumen.md) |
+| Se incluyó un informe corto de amenazas (qué se protegió y de qué) | ☑ Sí | [`amenazas.md`](amenazas.md): activos y fronteras de confianza, amenazas STRIDE por flujo con su mitigación y la evidencia de cada una, y los riesgos que quedan. |
 
-Ante caída de PostgreSQL, las sesiones y el catálogo reconstruido desde el feed
-permiten seguir consultando y solicitando reservas mediante la API. No se admite
-si también falla MySQL o la API; se informa la indisponibilidad.
+## Identidades y permisos
 
-Al volver PostgreSQL, un ciclo periódico lee `/v1/cambios` desde
-`ultima_secuencia_feed`, aplica las actividades de Aula y las reservas por versión,
-y confirma datos y cursor en una misma transacción. Si falla, hace rollback y
-repite desde el cursor anterior. La clave única y el control de versión toleran
-repeticiones y eventos atrasados.
+Hay tres identidades distintas, cada una con su credencial y su alcance:
 
-El máximo recibido por webhook no es el checkpoint del feed: los webhooks pueden
-llegar fuera de orden. Un tenant también puede observar saltos legítimos de
-secuencia porque el contador es global. Una página se valida como creciente,
-no como consecutiva. Hay límites de lotes por ciclo para no bloquear el proceso;
-la recuperación de un historial grande requiere varios ciclos.
+| Quién | Cómo se autentica | Qué puede hacer | Dónde se aplica |
+|---|---|---|---|
+| Persona de Aula (administrador o alumno) | Usuario y contraseña → sesión | Administrador: crear materias, inscribir a cualquiera, ver la reconciliación. Alumno: inscribirse a sí mismo, ver y cancelar lo propio | Aula ([`seguridad.js`](../../reserva-cupos/clientes/aula/src/seguridad.js)), en cada pedido |
+| Tenant (Aula, otros sistemas) | Clave de API | Lo que permiten sus permisos (`actividades:escribir`, `reservas:escribir`, `lectura`, `cambios:leer`), solo sobre sus recursos y hasta su límite de tasa | API ([`acceso.js`](../../reserva-cupos/servicios/api/src/acceso.js)), con los permisos tomados del contrato |
+| Operador de la plataforma | Clave de operador (la API recibe solo su hash) | Alta de tenants, permisos, webhook, límite, estado y rotación de claves | API, rutas `/admin/v1` |
 
-## Ejecutar desde PowerShell o terminal de IntelliJ
+El servicio sigue sin conocer a los usuarios finales: autentica tenants. Las personas las autentica el tenant; Aula, el cliente de referencia, lo hace con sus propios roles. Las identidades de Aula están en un archivo de solo lectura (solo hashes) y no en PostgreSQL: el login sigue funcionando cuando `aula-db` cae.
 
-Desde la raíz `final-pdc` (Docker Desktop abierto, Node 22+, Git/OpenSSL y Compose
-2.24.4 o posterior):
+## Cifrado en tránsito
 
-```powershell
-node reserva-cupos/scripts/entrega5.js preparar
-node reserva-cupos/scripts/entrega5.js levantar
-node reserva-cupos/scripts/entrega5.js migrar
-node reserva-cupos/scripts/entrega5.js estado
-node reserva-cupos/scripts/entrega5.js pruebas
+| Enlace | Protocolo | El cliente verifica | El texto plano |
+|---|---|---|---|
+| Navegador → Aula | HTTPS | Certificado `aula` (CA local) | Sin respuesta |
+| Aula y clientes → Traefik | HTTPS | Certificado `traefik`; también para un nombre desconocido | `404`, sin datos |
+| Traefik → cada instancia de la API | HTTPS | Certificado `api` (`serversTransport`) | La API no atiende HTTP |
+| Notificador → receptor del tenant | HTTPS + HMAC | Certificado del receptor | La URL `http://` va a la DLQ |
+| Relay, worker, notificador → RabbitMQ | AMQPS 5671 | Certificado `rabbitmq` | 5672 cerrado |
+| Servicios → MySQL primario | TLS | CA y nombre `mysql-primary` | `require_secure_transport` |
+| Réplica → primario | TLS | `SOURCE_SSL_VERIFY_SERVER_CERT` | Idem |
+| Aula → aula-db | TLS | CA y nombre `aula-db` | `pg_hba` lo rechaza |
+| Traefik → Docker | Proxy del socket en una red interna | — | Solo lecturas; una escritura recibe `403` |
+
+La CA y los certificados los genera `node scripts/sistema.js preparar` en `seguridad/local/`, fuera de Git; la clave de la CA no se monta en ningún contenedor. El CI genera las suyas en cada corrida.
+
+## Recuperación ante fallos
+
+Cada escenario detiene un componente con una ráfaga de reservas en curso. El cliente de la ráfaga reintenta como uno correcto (misma `Idempotency-Key`), y al final se verifica por la API pública que haya exactamente tantas confirmadas como cupos, ninguna pendiente, ningún participante con dos reservas activas y `cupos_disponibles` coherente. Resumen de la ejecución ([detalle por escenario](evidencias/fallos/resumen.md)):
+
+| Componente detenido | Efecto observado | Garantía verificada | Recuperación |
+|---|---|---|---|
+| worker | La admisión sigue respondiendo `202`; las decisiones esperan | Comandos durables; 10 confirmadas, 0 duplicadas | 7,2 s hasta 0 pendientes |
+| relay | La admisión sigue; los comandos quedan en el outbox | Outbox transaccional, nada se pierde | 7,1 s |
+| rabbitmq | La admisión sigue; relay, worker y notificador se reinician hasta reconectar | Outbox y colas durables | 19,7 s |
+| notificador | Las decisiones no se demoran; 100 webhooks esperan en la cola | Al volver se entregan; Aula = servicio | 2,7 s |
+| una instancia de la API (SIGKILL, con dos) | Las solicitudes en curso reciben `502`/`504` y se reintentan | Sin reservas perdidas ni duplicadas | peor caso 4,9 s para un cliente |
+| mysql-replica | Una espera de hasta 10,7 s (plazo semisíncrono) y luego replicación asíncrona | Las escrituras siguen; la réplica se pone al día | 12,2 s |
+| aula-db, con 500 alumnos inscribiéndose (+1) | Aula en contingencia: catálogo desde el feed, inscripciones directo a la API | 10/490/0 duplicadas; aula-db = servicio | 12,1 s |
+| Aula y aula-db (el servidor del tenant) | Los webhooks agotan los reintentos y van a la DLQ | Aula se reconstruye desde el feed | 16,9 s |
+| mysql-primary (failover) | Escrituras `503` hasta la promoción (1,6 s) | **RPO = 0**: 0 de 300 admitidas y 0 de 21 confirmadas perdidas | **RTO 1,8 s** |
+
+**Failover del primario.** El script termina el primario con SIGKILL y lo deja aislado (detenido, para que no vuelva como un segundo primario). Espera a que la réplica aplique todo lo recibido, la promueve y le pasa el alias de red `mysql-primary`. Los clientes no cambian su configuración: el nombre que usan resuelve ahora a la réplica, cuyo certificado también es válido para ese nombre. La replicación semisíncrona `AFTER_SYNC` garantiza que toda escritura confirmada al cliente ya estaba en la réplica, y lo verifica la prueba: ninguna reserva admitida ni confirmada antes de la caída falta después.
+
+**Contingencia de Aula (escenario +1).** 500 alumnos se inscriben por Aula en una materia de 10 cupos y `aula-db` cae a mitad de la ráfaga. Aula sigue inscribiendo (las inscripciones van a la API, el catálogo sale del feed y el login no depende de PostgreSQL). Al volver, un ciclo aplica `/v1/cambios` desde su propio punto de control y la base de Aula termina igual al estado del servicio.
+
+## Decisiones y límites
+
+Respecto del plan de la Entrega 5 (issues #30 a #44):
+
+- **Sesiones del lado del servidor en lugar de JWT.** Se pueden revocar: el logout y la desactivación de una persona tienen efecto inmediato, algo que un JWT no permite sin una lista de revocación.
+- **Rol "administrador" en lugar de "docente".** Gestiona las inscripciones de todos, no solo materias. Un alumno que intenta ver una reserva ajena recibe `404` y no `403`: así no se entera de que existe.
+- **Los permisos se aplican desde el contrato.** La API lee el `security` de cada operación en vez de tener una lista propia, así que el permiso documentado y el aplicado no pueden diferir.
+- **TLS siempre, en un solo `docker-compose.yml`.** Un overlay opcional dejaba el compose base con Aula inutilizable y las pruebas de carga sin cifrar, y requería Compose 2.24.4 para `!override`.
+- **El certificado de la réplica también vale para `mysql-primary`.** Sin eso, la verificación de identidad que exigen los clientes rompería el failover.
+La matriz de fallos, Schemathesis y k6 (en el CI y en local) encontraron seis problemas que se corrigieron antes de esta ejecución:
+
+- **Aula terminaba si `aula-db` caía con una conexión en uso.** La conexión tomada del pool emitía un error sin manejador; se perdían las sesiones y el alumno veía `401` en plena contingencia. Ahora la transacción registra la pérdida, falla la operación y descarta la conexión.
+- **Sin plazos de Traefik hacia la API,** una solicitud en curso en una instancia caída esperaba indefinidamente. Ahora: 3 s para conectar y 15 s de respuesta, y el cliente reintenta.
+- **El `/health` de la API se encolaba detrás del pool de MySQL** mientras el primario esperaba a la réplica, y Traefik sacaba de servicio a la única instancia. Ahora responde en 1 s como máximo.
+- **La administración aceptaba `https://Ï` como `format: uri`** (modo rápido de validación de formatos). Ahora la API valida los formatos según su RFC.
+- **Con `aula-db` caída, Aula intentaba la base en cada inscripción.** En el runner del CI, cientos de resoluciones del nombre de un contenedor detenido demoraban las llamadas a la API ("fetch failed"). Ahora, después de un fallo, Aula va directo a contingencia y el ciclo de reconciliación hace de sonda para detectar la vuelta de la base.
+- **El límite de tasa se aplicaba después de buscar la clave en MySQL,** así que un tenant que inunda la API le costaba a la base una consulta por solicitud rechazada; con 1.800 solicitudes por segundo apareció una respuesta que no era `429`. Ahora, con el balde de esa clave vacío, el `429` se responde antes de consultar la base.
+
+Límites declarados (detalle en el [informe de amenazas](amenazas.md#riesgos-que-quedan)): las contraseñas de la infraestructura siguen en el repositorio; no hay TLS mutuo; el límite de tasa y las sesiones de Aula son por instancia (pasan a Redis en la Entrega 6); el failover se ejecuta a pedido y volver a la topología con réplica requiere recrear el entorno.
+
+## Cómo reproducir
+
+Desde `reserva-cupos`, con Docker, Node.js 22 y OpenSSL:
+
+```shell
+docker compose down -v                      # si viene de otra entrega
+node scripts/sistema.js preparar            # CA, certificados, identidades y clave del operador
+node scripts/sistema.js levantar            # todo con TLS y la réplica configurada
+node scripts/sistema.js seguridad           # suites de API, Aula y cifrado
+node scripts/sistema.js fallos              # matriz completa; el failover va último
 ```
 
-Cada comando debe terminar sin errores antes de ejecutar el siguiente. La preparación
-es repetible y no reemplaza certificados o credenciales existentes. La migración
-agrega columnas sin borrar datos y modifica solo el transporte de la réplica y
-la URL del tenant local de Aula. Para quien venga de entrega 2 se deben aplicar
-primero las migraciones de tablas/tenant/índices hacia entrega 4; no basta este paso.
+Las demás pruebas (Schemathesis, k6 y oasdiff) y el detalle de cada comando están en el [README de ejecución](../../reserva-cupos/README.md#pruebas) y en las [evidencias](evidencias/README.md).
 
-Abrir `https://localhost:3001`. Las contraseñas están en
-`reserva-cupos/seguridad/local/accesos-locales.txt`. Para un navegador sin avisos,
-confiar explícitamente en `ca.crt` mediante el administrador de certificados del
-equipo (solo esta CA de desarrollo). Las pruebas usan esa CA directamente, sin
-`-k` ni desactivar validación. No compartir su clave privada.
+## Texto de la certificación
 
-El script de pruebas crea una materia de prueba, verifica roles y propiedad,
-retira únicamente la proyección de esa materia para probar reconstrucción,
-detiene PostgreSQL, solicita otra reserva y lo vuelve a iniciar en un bloque
-finally. No borra volúmenes. Ejecutarlo fuera de una demostración en uso.
-El resultado se guarda en `evidencias/integracion.txt` con estado aprobado o fallido.
+Versión corta de cada celda de la columna *Justificación breve / evidencia*, para `Entrega5-Seguridad.pdf`:
 
-Para detener sin borrar:
+1. **Autenticación de usuarios:** Login de personas en Aula con contraseña (scrypt con sal), sesión del servidor en cookie HttpOnly y Secure, CSRF y bloqueo por fuerza bruta. Tenants y operador: claves de 256 bits. Ev. seguridad-aula y seguridad-api.
+2. **Autorización / control de acceso:** Aula: roles administrador y alumno; el alumno opera solo lo propio (403/404). Servicio: permisos por clave declarados en el contrato y aplicados por la API (403), /admin solo del operador, aislamiento entre tenants (404) y límite de tasa (429). Ev. seguridad-aula, seguridad-api y 05.
+3. **Cifrado en tránsito:** TLS 1.2+ en todos los saltos con CA local y verificación de identidad: HTTPS (navegador, Traefik → API, webhooks), AMQPS, MySQL con require_secure_transport, replicación con SSL y PostgreSQL. El texto plano se rechaza; captura del tráfico cifrado. Ev. cifrado y captura-trafico.
+4. **Replicación o recuperación probada:** Réplica semisíncrona y failover por script con una ráfaga en curso: RTO 1,8 s y RPO 0 (0 de 300 reservas perdidas). Matriz de 9 fallos con invariantes verificadas y contingencia de Aula con aula-db caída (+1). Ev. fallos/resumen.
+5. **Informe de amenazas:** docs/entrega-5/amenazas.md: activos y fronteras de confianza, amenazas STRIDE por flujo con mitigación y evidencia, y riesgos que quedan.
 
-```powershell
-node reserva-cupos/scripts/entrega5.js detener
-```
-
-## Archivos principales
-
-- `clientes/aula/src/seguridad.js`: hashes, sesiones, CSRF, rate limit y roles.
-- `clientes/aula/src/recuperacion.js`: catálogo de contingencia y aplicación del feed.
-- `Infraestructura/postgres/entrega5.sql`: migración repetible para bases actuales.
-- `scripts/preparar-seguridad.js`: CA, certificados por servicio y usuarios locales.
-- `docker-compose.seguridad.yml`: conexiones cifradas y montaje mínimo de claves.
-- `pruebas/seguridad/integracion.js`: prueba funcional y de recuperación en Docker.
-- Tests de Aula y `pruebas/seguridad/tls.test.js`: comprobaciones locales.
-
-## Cierre de entrega
-
-La recuperación en Docker está comprobada en la evidencia de integración.
-Completar Grupo 15, fecha efectiva y enlace al informe en la plantilla del profesor;
-el docente completa nota y corrección.
-Finalmente hacer commit, push y crear un tag de entrega tras revisar los cambios.
-
+**Evidencia adicional (links):** informe de amenazas en `https://github.com/JoniMora/final-pdc/blob/v5-seguridad/docs/entrega-5/amenazas.md` y prueba de recuperación ante fallos en `https://github.com/JoniMora/final-pdc/blob/v5-seguridad/docs/entrega-5/evidencias/fallos/resumen.md`. Funcionan una vez publicado el tag `v5-seguridad`.

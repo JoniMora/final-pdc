@@ -8,7 +8,7 @@ Temática 7 — Plataforma de e-learning de alta concurrencia, generalizada a un
 | **Grupo N°** | 15 |
 | **Integrantes** | Jonathan Mora Colodrero · María Constanza Gigli |
 | **Repositorio** | https://github.com/JoniMora/final-pdc |
-| **Estado actual** | Entrega 5 — Seguridad y confiabilidad, verificada localmente el 14/11/2026 |
+| **Estado actual** | Entrega 5 — Seguridad y confiabilidad (`v5-seguridad`), verificada el 14/11/2026 |
 
 | Entrega | Contenido | Tag |
 |---|---|---|
@@ -17,35 +17,38 @@ Temática 7 — Plataforma de e-learning de alta concurrencia, generalizada a un
 | 2 | Infraestructura: nueve contenedores, tres redes, primario-réplica semisíncrono y RabbitMQ | `v2.1-infraestructura` (original: `v2-infraestructura`) |
 | 3 | Comunicación: API v1 síncrona, outbox → relay → RabbitMQ → worker asíncrono y caso de concurrencia demostrado | `v3-comunicacion` |
 | 4 | Middleware: contratos OpenAPI y AsyncAPI verificados en CI, descubrimiento de servicios con Traefik, cancelación y webhooks firmados | `v4-middleware` |
+| 5 | Seguridad y confiabilidad: personas y roles en Aula, permisos por clave, administración de tenants, límite de tasa, TLS en todos los saltos, contingencia de Aula, matriz de fallos y failover medido | `v5-seguridad` |
 
 > **Revisión 1 (17/09/2026)** — persistencia primario-réplica con replicación semi-sincrónica: el nodo único de MySQL era un punto único de falla.
 > **Revisión 2 (22/09/2026)** — ampliación de alcance a pedido de la cátedra: API pública multi-tenant para cualquier dominio con cupo y continuidad operativa de los sistemas consumidores ante la caída de su propia base de datos.
+> **Revisión 3 (14/11/2026)** — la plantilla de la Entrega 5 exige autenticación de usuarios, autorización y cifrado entre componentes: la autenticación de las personas (en el cliente de referencia, Aula) y TLS en el entorno local dejan de estar fuera de alcance, y la administración de tenants pasa de un script a una API del operador. El servicio sigue sin conocer a los usuarios finales: autentica tenants (con permisos por clave) y al operador.
 
 ---
 
 
-## Entrega 5: seguridad y confiabilidad
+## Entrega 5: implementación actual
 
-Usuarios, sesiones y permisos de Aula, configuración TLS y recuperación mediante
-el feed. Ver [guía de entrega 5](docs/entrega-5/README.md),
-[amenazas](docs/entrega-5/amenazas.md) y [evidencias](docs/entrega-5/evidencias/README.md).
-Integración Docker verificada el 14/11/2026: 20 comprobaciones aprobadas.
+La aplicación está en [`reserva-cupos`](reserva-cupos/README.md). Sobre la Entrega 4, esta entrega piensa qué pasa cuando algo es atacado o falla:
 
-## Entrega 4: implementación actual
+- **Autenticación y autorización** — en Aula, login de personas (scrypt con sal, sesión del lado del servidor, CSRF) con roles administrador y alumno; en el servicio, permisos por clave de API declarados en el contrato y aplicados desde él, administración de tenants con una clave de operador (alta, permisos, webhook, límite y rotación) y límite de tasa por tenant.
+- **Cifrado en tránsito en todos los saltos** — HTTPS del navegador a Aula, de Aula y los clientes a Traefik, de Traefik a cada instancia de la API y del notificador a los webhooks; AMQPS; MySQL con `require_secure_transport` y replicación con `SOURCE_SSL`; PostgreSQL que rechaza el texto plano. CA local y verificación de identidad en cada cliente. Traefik ya no monta el socket de Docker.
+- **Recuperación probada** — contingencia y reconciliación de Aula por el feed, y una matriz de fallos que detiene cada componente con carga en curso y verifica las invariantes, incluido el failover del primario con RTO y RPO medidos.
+- **Informe de amenazas** STRIDE por flujo, con la evidencia de cada mitigación y los riesgos que quedan.
 
-La aplicación está en [`reserva-cupos`](reserva-cupos/README.md). Sobre el recorrido de la Entrega 3, esta entrega desacopla los componentes por **contrato explícito** y agrega **descubrimiento de servicios**:
-
-- **Contratos formales** — [`openapi.yaml`](reserva-cupos/contrato/openapi.yaml) 1.1.0 para la API pública y los webhooks, y [`asyncapi.yaml`](reserva-cupos/contrato/asyncapi.yaml) 1.0.0 para los mensajes de RabbitMQ, con versionado semántico y [CHANGELOG](reserva-cupos/contrato/CHANGELOG.md). Una sola definición de cada entidad: AsyncAPI toma las de OpenAPI. Publicados en [GitHub Pages](https://jonimora.github.io/final-pdc/).
-- **Cada componente valida contra el contrato** — la API valida solicitudes y respuestas (`express-openapi-validator`); el relay, el worker y el notificador validan cada mensaje con JSON Schema; Aula arma cada llamada a partir del contrato y valida las respuestas.
-- **Descubrimiento de servicios** — Traefik descubre las instancias de la API por etiquetas de Docker, les hace health check y balancea: `--scale api=3` no requiere configuración.
-- **Desacople verificado en CI** — Aula se prueba contra un mock de Prism generado del contrato; la API real, con Schemathesis; la firma de los webhooks, con un vector de prueba del contrato que el emisor y el receptor verifican por separado. Los cambios incompatibles se rechazan en los dos contratos (oasdiff para la API, ejemplos de cada mensaje para AsyncAPI), el check obligatorio exige que pasen todos los trabajos del CI y CODEOWNERS exige la revisión del otro integrante.
-- **Sobre esos contratos** — cancelación asíncrona (`POST /v1/reservas/{id}/cancelacion`), estado `fallida`, webhooks firmados con HMAC, reintentos escalonados y DLQ, protección SSRF y proyección local de Aula alimentada por webhooks.
-
-- [Certificación de la Entrega 4](docs/entrega-4/README.md): mapa de contratos, descubrimiento y cómo se verifica el desacople.
-- [Evidencias de ejecución](docs/entrega-4/evidencias/README.md).
+- [Certificación de la Entrega 5](docs/entrega-5/README.md), [informe de amenazas](docs/entrega-5/amenazas.md) y [evidencias](docs/entrega-5/evidencias/README.md).
 - [Inicio local y pruebas](reserva-cupos/README.md).
 
-**Alcance:** todavía no se implementan el límite de tasa, la autenticación de personas y los permisos, TLS, ni la contingencia y reconciliación de Aula (Entrega 5). Tag de esta etapa: `v4-middleware`.
+## Entrega 4
+
+Sobre el recorrido de la Entrega 3, la Entrega 4 desacopló los componentes por **contrato explícito** y agregó **descubrimiento de servicios**:
+
+- **Contratos formales** — [`openapi.yaml`](reserva-cupos/contrato/openapi.yaml) para la API pública y los webhooks, y [`asyncapi.yaml`](reserva-cupos/contrato/asyncapi.yaml) para los mensajes de RabbitMQ, con versionado semántico y [CHANGELOG](reserva-cupos/contrato/CHANGELOG.md). Una sola definición de cada entidad: AsyncAPI toma las de OpenAPI. Publicados en [GitHub Pages](https://jonimora.github.io/final-pdc/).
+- **Cada componente valida contra el contrato** — la API valida solicitudes y respuestas (`express-openapi-validator`); el relay, el worker y el notificador validan cada mensaje con JSON Schema; Aula arma cada llamada a partir del contrato y valida las respuestas.
+- **Descubrimiento de servicios** — Traefik descubre las instancias de la API por etiquetas de Docker, les hace health check y balancea: `--scale api=3` no requiere configuración.
+- **Desacople verificado en CI** — Aula contra un mock de Prism generado del contrato; la API real, con Schemathesis; la firma de los webhooks, con un vector de prueba del contrato. Los cambios incompatibles se rechazan en los dos contratos.
+- **Sobre esos contratos** — cancelación asíncrona, estado `fallida`, webhooks firmados con HMAC, reintentos escalonados y DLQ, protección SSRF y proyección local de Aula alimentada por webhooks.
+
+[Certificación de la Entrega 4](docs/entrega-4/README.md) y [evidencias](docs/entrega-4/evidencias/README.md). Tag: `v4-middleware`.
 
 ## El problema
 
@@ -217,11 +220,11 @@ Criterio de aceptación: **exactamente 10 confirmadas, 0 duplicadas, 0 cupos neg
 
 ## Alcance y límites declarados
 
-**Extensiones, en orden de recorte si el calendario lo exige:** particionado por actividad · límite de tasa por tenant · reintentos escalonados de webhooks · webhooks (el tenant sondearía el feed). El núcleo que prueba las garantías no se recorta.
+**Extensiones, en orden de recorte si el calendario lo exige:** particionado por actividad · límite de tasa por tenant (implementado en la Entrega 5) · reintentos escalonados de webhooks (implementados en la Entrega 4) · webhooks (el tenant sondearía el feed). El núcleo que prueba las garantías no se recorta.
 
-**Límites:** relay de instancia única (su caída demora, no pierde) · failover manual · degradación a replicación asíncrona si vence el timeout de la réplica · límite de tasa por instancia de la API · webhooks al-menos-una-vez, el receptor deduplica · `metadata` opaca de hasta 16 KB, sin búsquedas por su contenido · un único host.
+**Límites:** relay de instancia única (su caída demora, no pierde) · failover por script, a pedido (sin detección automática) · degradación a replicación asíncrona si vence el timeout de la réplica · límite de tasa por instancia de la API · webhooks al-menos-una-vez, el receptor deduplica · `metadata` opaca de hasta 16 KB, sin búsquedas por su contenido · un único host.
 
-**Fuera de alcance:** alojar, replicar o respaldar bases de datos de los tenants · alta de tenants autoservicio (script de administración) · autenticación de los usuarios finales del tenant · listas de espera · modificación de la capacidad de una actividad · pagos · TLS en el entorno local · cifrado en reposo.
+**Fuera de alcance:** alojar, replicar o respaldar bases de datos de los tenants · alta de tenants autoservicio (la hace el operador con la API de administración) · que el servicio conozca a los usuarios finales del tenant (los autentica el tenant; Aula lo hace desde la Revisión 3) · listas de espera · modificación de la capacidad de una actividad · pagos · certificados de una autoridad pública y TLS mutuo · cifrado en reposo.
 
 ## Equipo
 

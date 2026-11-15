@@ -1,0 +1,12 @@
+Matriz de fallos · Una instancia de la API cae (SIGKILL) con dos instancias
+Ejecución: 2026-11-15T00:15:56.990Z
+
+  · API escalada a 2 instancias; Traefik las descubrió a las dos
+  · Ráfaga de 300 solicitudes; una instancia de la API terminada con SIGKILL tras 60 admisiones
+  · 300 admitidas en 6.2 s · latencia de admisión p50 0.63 s, p95 1.27 s, máx 4.93 s · reintentos 27 (errores vistos: 502×17, 504×10)
+  · Invariantes: 10 confirmadas, 290 rechazadas, 0 pendientes, 0 duplicadas, cupos_disponibles = 0
+OK: Con una instancia caída, Traefik dejó de enviarle tráfico y los reintentos con la misma Idempotency-Key no duplicaron reservas
+  · Errores que vio el cliente antes de reintentar: 502×17, 504×10; peor admisión: 4.9 s
+  · La ráfaga terminó 9.9 s después de la caída
+
+Resultado: APROBADA
