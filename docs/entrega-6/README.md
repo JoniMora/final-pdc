@@ -22,11 +22,16 @@ Ver [revisión del PR #59](https://github.com/JoniMora/final-pdc/pull/59).
 | [#48](https://github.com/JoniMora/final-pdc/issues/48) | Redis, límite global, caché y curva 1/2/4 API | Pendiente |
 | [#49](https://github.com/JoniMora/final-pdc/issues/49) | Escenarios k6, métricas de admisión y gráficos | Parcial: ráfaga previa; faltan escenarios e informe |
 | [#50](https://github.com/JoniMora/final-pdc/issues/50) | Fallos parciales bajo carga con gráficos | Pendiente; E5 incorpora un arnés reutilizable |
-| [#51](https://github.com/JoniMora/final-pdc/issues/51) | Documento de patrones, evidencias y release | Pendiente |
+| [#51](https://github.com/JoniMora/final-pdc/issues/51) | Documento de patrones, evidencias y release | Parcial: documento de patrones; faltan mediciones finales y release |
 
 El orden de asignación debe confirmarse en el Project. Las dependencias están
 expresadas en cada issue. No se cierra un issue por haber agregado documentación
 si faltan sus pruebas y criterios de aceptación.
+
+## Documento de patrones
+
+Ver [problema, patrón, código y evidencia](patrones.md). Este aporte documental
+no cierra #51 ni reemplaza las nuevas pruebas de escalabilidad pendientes.
 
 ## Avances conservados
 
