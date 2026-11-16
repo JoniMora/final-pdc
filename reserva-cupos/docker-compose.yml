@@ -516,9 +516,19 @@ services:
       # lista. En el entorno local, el receptor de Aula.
       NOTIFICADOR_HOSTS_PERMITIDOS: aula
       WEBHOOK_TIMEOUT_MS: "5000"
+      TLS_CERT: /tls/notificador.crt
+      TLS_KEY: /tls/notificador.key
 
     volumes:
       - *ca
+      - type: bind
+        source: ./seguridad/local/notificador.crt
+        target: /tls/notificador.crt
+        read_only: true
+      - type: bind
+        source: ./seguridad/local/notificador.key
+        target: /tls/notificador.key
+        read_only: true
 
     networks:
       - interna

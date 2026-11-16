@@ -33,6 +33,7 @@ const CERTIFICADOS = {
     api: ["api", "localhost"],
     worker: ["worker", "localhost"],
     relay: ["relay", "localhost"],
+    notificador: ["notificador", "localhost"],
     aula: ["aula", "localhost"],
     "mysql-primary": ["mysql-primary", "localhost"],
     "mysql-replica": ["mysql-replica", "mysql-primary", "localhost"],
