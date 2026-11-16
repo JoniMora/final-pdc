@@ -215,9 +215,20 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: demo
       RABBITMQ_PASSWORD: demo_local_2026
+      TLS_CERT: /tls/worker.crt
+      TLS_KEY: /tls/worker.key
+      NODE_EXTRA_CA_CERTS: /tls/ca.crt
 
     volumes:
       - *ca
+      - type: bind
+        source: ./seguridad/local/worker.crt
+        target: /tls/worker.crt
+        read_only: true
+      - type: bind
+        source: ./seguridad/local/worker.key
+        target: /tls/worker.key
+        read_only: true
 
     networks:
       - interna
@@ -251,8 +262,14 @@ services:
     volumes:
       - mysql-primary-data:/var/lib/mysql
       - *ca
-      - { type: bind, source: ./seguridad/local/mysql-primary.crt, target: /tls/mysql-primary.crt, read_only: true }
-      - { type: bind, source: ./seguridad/local/mysql-primary.key, target: /tls/mysql-primary.key, read_only: true }
+      - type: bind
+        source: ./seguridad/local/mysql-primary.crt
+        target: /tls/mysql-primary.crt
+        read_only: true
+      - type: bind
+        source: ./seguridad/local/mysql-primary.key
+        target: /tls/mysql-primary.key
+        read_only: true
 
     networks:
       - interna
