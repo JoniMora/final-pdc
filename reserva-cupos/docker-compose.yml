@@ -561,6 +561,43 @@ services:
     networks:
       - publica
 
+  prometheus:
+    image: prom/prometheus:v3.5.0
+
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.config.file=/etc/prometheus/web.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+
+    ports:
+      - "127.0.0.1:9090:9090"
+
+    volumes:
+      - prometheus-data:/prometheus
+      - *ca
+      - type: bind
+        source: ./Infraestructura/prometheus/prometheus.yml
+        target: /etc/prometheus/prometheus.yml
+        read_only: true
+      - type: bind
+        source: ./Infraestructura/prometheus/web.yml
+        target: /etc/prometheus/web.yml
+        read_only: true
+      - type: bind
+        source: ./seguridad/local/prometheus.crt
+        target: /tls/prometheus.crt
+        read_only: true
+      - type: bind
+        source: ./seguridad/local/prometheus.key
+        target: /tls/prometheus.key
+        read_only: true
+
+    networks:
+      - interna
+
+    restart: unless-stopped
+
 networks:
   publica:
   interna:
@@ -574,3 +611,4 @@ volumes:
   mysql-primary-data:
   mysql-replica-data:
   aula-db-data:
+  prometheus-data:
