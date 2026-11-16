@@ -1,10 +1,13 @@
 {
   "uid": "reserva-cupos-e6",
   "title": "Reserva de cupos — Entrega 6",
-  "tags": ["entrega-6", "reserva-cupos"],
+  "tags": [
+    "entrega-6",
+    "reserva-cupos"
+  ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "5s",
   "time": {
     "from": "now-15m",
@@ -15,8 +18,16 @@
       "id": 1,
       "title": "Instancias con métricas disponibles",
       "type": "stat",
-      "gridPos": { "h": 5, "w": 12, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -25,12 +36,17 @@
         }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "short", "decimals": 0 },
+        "defaults": {
+          "unit": "short",
+          "decimals": 0
+        },
         "overrides": []
       },
       "options": {
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         }
@@ -40,8 +56,16 @@
       "id": 2,
       "title": "Reservas admitidas por segundo — HTTP 202",
       "type": "timeseries",
-      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -50,7 +74,10 @@
         }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "ops", "min": 0 },
+        "defaults": {
+          "unit": "ops",
+          "min": 0
+        },
         "overrides": []
       }
     },
@@ -58,8 +85,16 @@
       "id": 3,
       "title": "p95 de admisión de reservas — HTTP 202",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -68,7 +103,10 @@
         }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "s", "min": 0 },
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
         "overrides": []
       }
     },
@@ -76,8 +114,16 @@
       "id": 4,
       "title": "Decisiones de reserva por segundo",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -86,7 +132,10 @@
         }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "ops", "min": 0 },
+        "defaults": {
+          "unit": "ops",
+          "min": 0
+        },
         "overrides": []
       }
     },
@@ -94,8 +143,16 @@
       "id": 5,
       "title": "Webhooks: entregas, errores y reintentos por segundo",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -104,7 +161,10 @@
         }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "ops", "min": 0 },
+        "defaults": {
+          "unit": "ops",
+          "min": 0
+        },
         "overrides": []
       }
     },
@@ -112,8 +172,16 @@
       "id": 6,
       "title": "p95 de duración del intento HTTP de webhook",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 13
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
           "refId": "A",
@@ -122,7 +190,40 @@
         }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "s", "min": 0 },
+        "defaults": {
+          "unit": "s",
+          "min": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "title": "RabbitMQ: mensajes por cola",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (queue) (rabbitmq_queue_messages)",
+          "legendFormat": "{{queue}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0,
+          "decimals": 0
+        },
         "overrides": []
       }
     }

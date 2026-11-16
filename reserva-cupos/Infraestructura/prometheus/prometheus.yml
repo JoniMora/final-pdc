@@ -51,3 +51,13 @@ scrape_configs:
         type: A
         port: 9464
         refresh_interval: 5s
+
+  - job_name: rabbitmq
+    scheme: https
+    metrics_path: /metrics/per-object
+    tls_config:
+      ca_file: /tls/ca.crt
+      server_name: rabbitmq
+    static_configs:
+      - targets:
+          - rabbitmq:15691
