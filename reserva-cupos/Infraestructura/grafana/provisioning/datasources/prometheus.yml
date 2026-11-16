@@ -1,0 +1,20 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: https://prometheus:9090
+    isDefault: true
+    editable: false
+    version: 2
+
+    jsonData:
+      httpMethod: POST
+      timeInterval: 5s
+      tlsAuthWithCACert: false
+      tlsSkipVerify: false
+
+    secureJsonData:
+      tlsCACert: ""

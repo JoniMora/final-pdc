@@ -30,6 +30,7 @@ const DIAS = "365";
 // alias de red y los clientes verifican la identidad contra ese nombre.
 const CERTIFICADOS = {
     prometheus: ["prometheus", "localhost"],
+    grafana: ["grafana", "localhost"],
     traefik: ["traefik", "localhost"],
     api: ["api", "localhost"],
     worker: ["worker", "localhost"],

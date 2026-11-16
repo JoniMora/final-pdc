@@ -1,0 +1,130 @@
+{
+  "uid": "reserva-cupos-e6",
+  "title": "Reserva de cupos — Entrega 6",
+  "tags": ["entrega-6", "reserva-cupos"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Instancias con métricas disponibles",
+      "type": "stat",
+      "gridPos": { "h": 5, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(up{job=~\"api|worker|relay|notificador\"})",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "short", "decimals": 0 },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 2,
+      "title": "Reservas admitidas por segundo — HTTP 202",
+      "type": "timeseries",
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(pdc_http_solicitudes_total{servicio=\"api\",metodo=\"POST\",ruta=~\".*/reservas\",estado=\"202\"}[1m]))",
+          "legendFormat": "Admisiones/s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops", "min": 0 },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "p95 de admisión de reservas — HTTP 202",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(pdc_http_duracion_segundos_bucket{servicio=\"api\",metodo=\"POST\",ruta=~\".*/reservas\",estado=\"202\"}[1m])))",
+          "legendFormat": "p95 admisión"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s", "min": 0 },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "Decisiones de reserva por segundo",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (resultado) (rate(pdc_eventos_total{servicio=\"worker\",tipo=\"reservar\",resultado=~\"confirmada|rechazada|fallida\"}[1m]))",
+          "legendFormat": "{{resultado}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops", "min": 0 },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "title": "Webhooks: entregas, errores y reintentos por segundo",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (resultado) (rate(pdc_eventos_total{servicio=\"notificador\",tipo=\"webhook\"}[1m]))",
+          "legendFormat": "{{resultado}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "ops", "min": 0 },
+        "overrides": []
+      }
+    },
+    {
+      "id": 6,
+      "title": "p95 de duración del intento HTTP de webhook",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(pdc_http_duracion_segundos_bucket{servicio=\"notificador\",ruta=\"webhook\"}[1m])))",
+          "legendFormat": "p95 intento HTTP"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "s", "min": 0 },
+        "overrides": []
+      }
+    }
+  ]
+}

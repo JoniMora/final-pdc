@@ -597,6 +597,50 @@ services:
       - interna
 
     restart: unless-stopped
+  grafana:
+    image: grafana/grafana:13.3.1
+
+    environment:
+      SSL_CERT_FILE: /tls/ca.crt
+      GF_SERVER_PROTOCOL: https
+      GF_SERVER_HTTP_PORT: "3000"
+      GF_SERVER_ROOT_URL: https://localhost:3002
+      GF_SERVER_CERT_FILE: /tls/grafana.crt
+      GF_SERVER_CERT_KEY: /tls/grafana.key
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+
+    ports:
+      - "127.0.0.1:3002:3000"
+
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - *ca
+      - type: bind
+        source: ./Infraestructura/grafana/provisioning
+        target: /etc/grafana/provisioning
+        read_only: true
+      - type: bind
+        source: ./Infraestructura/grafana/dashboards
+        target: /var/lib/grafana/dashboards
+        read_only: true
+      - type: bind
+        source: ./seguridad/local/grafana.crt
+        target: /tls/grafana.crt
+        read_only: true
+      - type: bind
+        source: ./seguridad/local/grafana.key
+        target: /tls/grafana.key
+        read_only: true
+
+    networks:
+      - interna
+
+    depends_on:
+      prometheus:
+        condition: service_started
+
+    restart: unless-stopped
 
 networks:
   publica:
@@ -612,3 +656,4 @@ volumes:
   mysql-replica-data:
   aula-db-data:
   prometheus-data:
+  grafana-data:
