@@ -32,6 +32,7 @@ const CERTIFICADOS = {
     traefik: ["traefik", "localhost"],
     api: ["api", "localhost"],
     worker: ["worker", "localhost"],
+    relay: ["relay", "localhost"],
     aula: ["aula", "localhost"],
     "mysql-primary": ["mysql-primary", "localhost"],
     "mysql-replica": ["mysql-replica", "mysql-primary", "localhost"],

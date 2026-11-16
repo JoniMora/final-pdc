@@ -460,6 +460,9 @@ services:
 
     environment:
       TLS_CA: /tls/ca.crt
+      TLS_CERT: /tls/relay.crt
+      TLS_KEY: /tls/relay.key
+      NODE_EXTRA_CA_CERTS: /tls/ca.crt
       DB_HOST: mysql-primary
       DB_NAME: reservas
       DB_USER: relay_app
@@ -470,6 +473,14 @@ services:
 
     volumes:
       - *ca
+      - type: bind
+        source: ./seguridad/local/relay.crt
+        target: /tls/relay.crt
+        read_only: true
+      - type: bind
+        source: ./seguridad/local/relay.key
+        target: /tls/relay.key
+        read_only: true
 
     networks:
       - interna
