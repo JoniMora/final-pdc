@@ -1,3 +1,4 @@
+const { secuenciarConfirmados } = require("./secuenciar");
 const fs = require("node:fs");
 const https = require("node:https");
 const mysql = require("mysql2/promise");
@@ -105,43 +106,9 @@ async function conectarBroker() {
 // Asigna secuencias a los cambios confirmados.
 // El relay secuenciador sigue siendo de instancia única.
 async function secuenciar() {
-    const conexion = await pool.getConnection();
-
-    try {
-        await conexion.query(
-            "SET TRANSACTION ISOLATION LEVEL READ COMMITTED"
-        );
-
-        await conexion.beginTransaction();
-
-        const [[{ ultima }]] = await conexion.query(
-            "SELECT COALESCE(MAX(secuencia), 0) AS ultima FROM cambios"
-        );
-
-        const [resultado] = await conexion.query(
-            `UPDATE cambios c
-               JOIN (
-                   SELECT id, ROW_NUMBER() OVER (ORDER BY id) AS n
-                     FROM cambios
-                    WHERE secuencia IS NULL
-                    ORDER BY id
-                    LIMIT ?
-               ) pendientes ON pendientes.id = c.id
-                SET c.secuencia = ? + pendientes.n`,
-            [LOTE, Number(ultima)]
-        );
-
-        await conexion.commit();
-
-        contar("cambio", "secuenciado", resultado.affectedRows);
-
-        return resultado.affectedRows;
-    } catch (error) {
-        await conexion.rollback().catch(() => {});
-        throw error;
-    } finally {
-        conexion.release();
-    }
+    const cantidad = await secuenciarConfirmados(pool, LOTE);
+    contar("cambio", "secuenciado", cantidad);
+    return cantidad;
 }
 
 function publicarComando(comando, messageId) {
