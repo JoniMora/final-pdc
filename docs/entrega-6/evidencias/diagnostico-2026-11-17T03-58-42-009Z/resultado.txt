@@ -1,0 +1,6 @@
+Corrida: 2026-11-17T03-58-42-009Z
+Prueba: duplicados.js
+Tenant: 01a1e7a8-3397-7f2d-b6cd-ed065afbfb6b
+Muestras: 2
+Codigo k6: 0
+El estado de la base es una instantanea; k6 conserva sus criterios originales.

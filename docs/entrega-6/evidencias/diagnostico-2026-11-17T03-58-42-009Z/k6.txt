@@ -1,0 +1,57 @@
+
+
+  █ THRESHOLDS 
+
+    checks
+    ✓ 'rate==1' rate=100.00%
+
+    respuestas{caso:clave,status:200}
+    ✓ 'count==19' count=19
+
+    respuestas{caso:clave,status:202}
+    ✓ 'count==1' count=1
+
+    respuestas{caso:participante,status:202}
+    ✓ 'count==1' count=1
+
+    respuestas{caso:participante,status:409}
+    ✓ 'count==19' count=19
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......................: 41      58.338177/s
+    checks_succeeded...................: 100.00% 41 out of 41
+    checks_failed......................: 0.00%   0 out of 41
+
+    ✓ misma clave: 202 o 200
+    ✓ mismo participante: 202 o 409
+    ✓ exactamente 2 reservas en la actividad
+
+    CUSTOM
+    respuestas...................................................................: 40    56.915295/s
+      { caso:clave,status:200 }..................................................: 19    27.034765/s
+      { caso:clave,status:202 }..................................................: 1     1.422882/s
+      { caso:participante,status:202 }...........................................: 1     1.422882/s
+      { caso:participante,status:409 }...........................................: 19    27.034765/s
+
+    HTTP
+    http_req_duration............................................................: avg=323.11ms min=13.61ms med=335.71ms max=544.87ms p(90)=509.41ms p(95)=527.77ms
+      { expected_response:true }.................................................: avg=323.11ms min=13.61ms med=335.71ms max=544.87ms p(90)=509.41ms p(95)=527.77ms
+    http_req_failed..............................................................: 0.00% 0 out of 42
+    http_reqs....................................................................: 42    59.76106/s
+
+    EXECUTION
+    iteration_duration...........................................................: avg=356.81ms min=120.5ms med=366.09ms max=572.39ms p(90)=539.76ms p(95)=550.76ms
+    iterations...................................................................: 40    56.915295/s
+
+    NETWORK
+    data_received................................................................: 85 kB 121 kB/s
+    data_sent....................................................................: 30 kB 43 kB/s
+
+
+
+
+ Container pdc-diagnostico-1794887922011 Creating 
+ Container pdc-diagnostico-1794887922011 Created 
+time="2026-11-17T03:58:45Z" level=info msg="Reservas creadas: 2 (alumno-reintento, alumno-repetido)" source=console

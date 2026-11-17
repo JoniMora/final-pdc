@@ -1,0 +1,46 @@
+
+2026-11-17T03:58:43.613Z
+usuario	estado	conexiones
+relay_app	NULL	1
+worker_app	NULL	4
+notificador_app	NULL	2
+api_app	NULL	11
+admin_app	NULL	1
+Variable_name	Value
+Rpl_semi_sync_source_clients	1
+Rpl_semi_sync_source_net_avg_wait_time	0
+Rpl_semi_sync_source_net_wait_time	0
+Rpl_semi_sync_source_net_waits	7359
+Rpl_semi_sync_source_no_times	0
+Rpl_semi_sync_source_no_tx	0
+Rpl_semi_sync_source_status	ON
+Rpl_semi_sync_source_timefunc_failures	0
+Rpl_semi_sync_source_tx_avg_wait_time	147001
+Rpl_semi_sync_source_tx_wait_time	962714867
+Rpl_semi_sync_source_tx_waits	6549
+Rpl_semi_sync_source_wait_pos_backtraverse	0
+Rpl_semi_sync_source_wait_sessions	0
+Rpl_semi_sync_source_yes_tx	6549
+
+2026-11-17T03:58:46.102Z
+usuario	estado	conexiones
+relay_app	NULL	1
+worker_app	NULL	4
+notificador_app	NULL	2
+api_app	NULL	11
+admin_app	NULL	1
+Variable_name	Value
+Rpl_semi_sync_source_clients	1
+Rpl_semi_sync_source_net_avg_wait_time	0
+Rpl_semi_sync_source_net_wait_time	0
+Rpl_semi_sync_source_net_waits	7366
+Rpl_semi_sync_source_no_times	0
+Rpl_semi_sync_source_no_tx	0
+Rpl_semi_sync_source_status	ON
+Rpl_semi_sync_source_timefunc_failures	0
+Rpl_semi_sync_source_tx_avg_wait_time	146914
+Rpl_semi_sync_source_tx_wait_time	963168617
+Rpl_semi_sync_source_tx_waits	6556
+Rpl_semi_sync_source_wait_pos_backtraverse	0
+Rpl_semi_sync_source_wait_sessions	0
+Rpl_semi_sync_source_yes_tx	6556

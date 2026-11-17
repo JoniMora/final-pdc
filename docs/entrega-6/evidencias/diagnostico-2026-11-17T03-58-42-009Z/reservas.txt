@@ -1,0 +1,4 @@
+actividad_id	estado	cantidad
+01a1e7a8-3d15-7fd9-99b9-fbdf2ca293c1	confirmada	2
+id	capacidad	cupos_disponibles
+01a1e7a8-3d15-7fd9-99b9-fbdf2ca293c1	10	8
