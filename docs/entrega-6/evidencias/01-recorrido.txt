@@ -1,4 +1,4 @@
-Fecha: 2026-11-17T01:12:07.018Z
+Fecha: 2026-11-17T12:48:32.679Z
 Resultado: APROBADA
 OK: No se accede a materias sin sesión
 OK: Administrador y alumno se autentican por HTTPS
