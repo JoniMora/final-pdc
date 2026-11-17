@@ -1,0 +1,194 @@
+{
+  "inicio": "2026-11-17T14:08:29.099Z",
+  "aprobada": true,
+  "parametros": {
+    "solicitudesPorCorrida": 100,
+    "capacidad": 10,
+    "repeticiones": 3,
+    "conexionesMaximas": 64,
+    "particiones": 4,
+    "timeoutClienteMs": 60000
+  },
+  "corridas": [
+    {
+      "apis": 1,
+      "repeticion": 1,
+      "actividad": "01a1e9d6-8282-783b-85d3-f15c106f074f",
+      "solicitudes": 100,
+      "duracionMs": 2197.5739000000003,
+      "errores": [],
+      "instanciasObservadas": [
+        "27ffd150723e"
+      ],
+      "admisionesPorSegundo": 45.50472682625143,
+      "p95ClienteMs": 2122.5356,
+      "estados": "confirmada\t10\nrechazada\t90"
+    },
+    {
+      "apis": 2,
+      "repeticion": 1,
+      "actividad": "01a1e9d7-3991-743b-ba01-e17cf46ab5d8",
+      "solicitudes": 100,
+      "duracionMs": 3045.6656000000003,
+      "errores": [],
+      "instanciasObservadas": [
+        "27ffd150723e",
+        "3ec00b41e2be"
+      ],
+      "admisionesPorSegundo": 32.8335454818152,
+      "p95ClienteMs": 2684.122199999998,
+      "estados": "confirmada\t10\nrechazada\t90"
+    },
+    {
+      "apis": 4,
+      "repeticion": 1,
+      "actividad": "01a1e9d7-f223-7605-8806-3705585167dd",
+      "solicitudes": 100,
+      "duracionMs": 2024.6777000000002,
+      "errores": [],
+      "instanciasObservadas": [
+        "3ec00b41e2be",
+        "27ffd150723e",
+        "2c866390e548",
+        "901b31416e36"
+      ],
+      "admisionesPorSegundo": 49.390577078020854,
+      "p95ClienteMs": 1816.8372999999992,
+      "estados": "confirmada\t10\nrechazada\t90"
+    },
+    {
+      "apis": 4,
+      "repeticion": 2,
+      "actividad": "01a1e9d8-55ce-7e7e-b329-bf80c095d802",
+      "solicitudes": 100,
+      "duracionMs": 4235.3321,
+      "errores": [],
+      "instanciasObservadas": [
+        "3ec00b41e2be",
+        "27ffd150723e",
+        "2c866390e548",
+        "901b31416e36"
+      ],
+      "admisionesPorSegundo": 23.610899367253868,
+      "p95ClienteMs": 4227.341899999999,
+      "estados": "confirmada\t10\nrechazada\t90"
+    },
+    {
+      "apis": 1,
+      "repeticion": 2,
+      "actividad": "01a1e9d8-b5af-71c1-a42b-34c561b3f684",
+      "solicitudes": 100,
+      "duracionMs": 992.5383000000147,
+      "errores": [],
+      "instanciasObservadas": [
+        "27ffd150723e"
+      ],
+      "admisionesPorSegundo": 100.75177955349281,
+      "p95ClienteMs": 983.2023000000045,
+      "estados": "confirmada\t10\nrechazada\t90"
+    },
+    {
+      "apis": 2,
+      "repeticion": 2,
+      "actividad": "01a1e9d9-29c6-7e74-9220-49549b989094",
+      "solicitudes": 100,
+      "duracionMs": 990.8575000000128,
+      "errores": [],
+      "instanciasObservadas": [
+        "27ffd150723e",
+        "238a3a1fdb93"
+      ],
+      "admisionesPorSegundo": 100.92268565358663,
+      "p95ClienteMs": 923.6712000000116,
+      "estados": "confirmada\t10\nrechazada\t90"
+    },
+    {
+      "apis": 2,
+      "repeticion": 3,
+      "actividad": "01a1e9d9-5ad5-703d-9651-29d2d4f78b77",
+      "solicitudes": 100,
+      "duracionMs": 1330.9534000000276,
+      "errores": [],
+      "instanciasObservadas": [
+        "27ffd150723e",
+        "238a3a1fdb93"
+      ],
+      "admisionesPorSegundo": 75.13411063076883,
+      "p95ClienteMs": 1029.323000000004,
+      "estados": "confirmada\t10\nrechazada\t90"
+    },
+    {
+      "apis": 4,
+      "repeticion": 3,
+      "actividad": "01a1e9da-260a-73a2-b56d-8c8ae15718cd",
+      "solicitudes": 100,
+      "duracionMs": 2639.0077000000165,
+      "errores": [],
+      "instanciasObservadas": [
+        "238a3a1fdb93",
+        "27ffd150723e",
+        "f126ef58c963",
+        "f9671a81806d"
+      ],
+      "admisionesPorSegundo": 37.893030778197186,
+      "p95ClienteMs": 2630.7062999999907,
+      "estados": "confirmada\t10\nrechazada\t90"
+    },
+    {
+      "apis": 1,
+      "repeticion": 3,
+      "actividad": "01a1e9da-615d-7939-b5d4-23efdf284ea2",
+      "solicitudes": 100,
+      "duracionMs": 2351.623200000002,
+      "errores": [],
+      "instanciasObservadas": [
+        "27ffd150723e"
+      ],
+      "admisionesPorSegundo": 42.52381929213826,
+      "p95ClienteMs": 2343.0319000000018,
+      "estados": "confirmada\t10\nrechazada\t90"
+    }
+  ],
+  "resumen": [
+    {
+      "apis": 1,
+      "throughput": {
+        "muestras": 3,
+        "media": 62.926775223960824,
+        "desvio": 32.79130474422401
+      },
+      "p95": {
+        "muestras": 3,
+        "media": 1816.2566000000022,
+        "desvio": 729.8213854360445
+      }
+    },
+    {
+      "apis": 2,
+      "throughput": {
+        "muestras": 3,
+        "media": 69.63011392205688,
+        "desvio": 34.376637956029356
+      },
+      "p95": {
+        "muestras": 3,
+        "media": 1545.705466666671,
+        "desvio": 987.3120427508223
+      }
+    },
+    {
+      "apis": 4,
+      "throughput": {
+        "muestras": 3,
+        "media": 36.9648357411573,
+        "desvio": 12.91487921886392
+      },
+      "p95": {
+        "muestras": 3,
+        "media": 2891.6284999999966,
+        "desvio": 1226.2517696194866
+      }
+    }
+  ],
+  "fin": "2026-11-17T14:13:28.266Z"
+}

@@ -1,0 +1,23 @@
+<!doctype html><meta charset="utf-8"><title>Curva de admisiones E6</title><style>body{font:16px system-ui;max-width:1000px;margin:30px auto}svg{width:100%}</style><h1>Admisiones de reservas con 1, 2 y 4 APIs</h1><p>Tres corridas por configuracion; 100 POST por corrida, 64 conexiones maximas, cuatro workers constantes. Media y desvio muestral. Sin reintentos.</p><p>El tiempo del cliente incluye espera por conexion. El p95 de cada corrida no mezcla consultas de drenaje. La barra muestra media de esos p95, no el percentil de todas las corridas juntas.</p><h2>Admisiones/s: media +/- desvio</h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 280" role="img" aria-label="Admisiones/s: media +/- desvio">
+        <path d="M50 20V220H680" fill="none" stroke="black"/>
+        <rect x="105" y="111.0953439485359" width="70" height="108.9046560514641" fill="#2463eb"/>
+            <path d="M140 54.344847010808365V167.84584088626343 M128 54.344847010808365h24" stroke="black"/>
+            <text x="80" y="20">62.93 +/- 32.79</text>
+            <text x="120" y="250">1 API</text><rect x="305" y="99.49416475709617" width="70" height="120.50583524290383" fill="#2463eb"/>
+            <path d="M340 40V158.98832951419234 M328 40h24" stroke="black"/>
+            <text x="280" y="20">69.63 +/- 34.38</text>
+            <text x="320" y="250">2 API</text><rect x="505" y="156.0265529567969" width="70" height="63.973447043203095" fill="#2463eb"/>
+            <path d="M540 133.6753284697518V178.377777443842 M528 133.6753284697518h24" stroke="black"/>
+            <text x="480" y="20">36.96 +/- 12.91</text>
+            <text x="520" y="250">4 API</text></svg><h2>p95 del cliente en ms: media +/- desvio</h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 280" role="img" aria-label="p95 del cliente en ms: media +/- desvio">
+        <path d="M50 20V220H680" fill="none" stroke="black"/>
+        <rect x="105" y="140.60813656677533" width="70" height="79.39186343322467" fill="#2463eb"/>
+            <path d="M140 108.70632282350513V172.50995031004553 M128 108.70632282350513h24" stroke="black"/>
+            <text x="80" y="20">1816.26 +/- 729.82</text>
+            <text x="120" y="250">1 API</text><rect x="305" y="152.43441630571968" width="70" height="67.56558369428032" fill="#2463eb"/>
+            <path d="M340 109.2772198699015V195.5916127415379 M328 109.2772198699015h24" stroke="black"/>
+            <text x="280" y="20">1545.71 +/- 987.31</text>
+            <text x="320" y="250">2 API</text><rect x="505" y="93.60168438114981" width="70" height="126.39831561885019" fill="#2463eb"/>
+            <path d="M540 40V147.2033687622996 M528 40h24" stroke="black"/>
+            <text x="480" y="20">2891.63 +/- 1226.25</text>
+            <text x="520" y="250">4 API</text></svg><p>La prueba caliente de 500 solicitudes se conserva por separado. Esta curva usa 100 por corrida; no debe presentarse como nueve rafagas de 500. Las APIs comparten primario, disco y Redis; no se exige ni se presupone mejora lineal.</p>
