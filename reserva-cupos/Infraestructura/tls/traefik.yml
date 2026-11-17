@@ -33,6 +33,8 @@ http:
       forwardingTimeouts:
         dialTimeout: 3s
         responseHeaderTimeout: 15s
+        # Menor al keepAliveTimeout de la API (65 s).
+        idleConnTimeout: 60s
 
   # Panel de servicios descubiertos (Entrega 4), solo por HTTPS y solo en el
   # puerto 8080 publicado en 127.0.0.1. Es de lectura: muestra rutas e

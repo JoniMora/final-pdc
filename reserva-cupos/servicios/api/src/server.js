@@ -222,6 +222,11 @@ const servidor = process.env.TLS_CERT
     }, app)
     : http.createServer(app);
 
+// Traefik retira conexiones ociosas a los 60 s, antes de que Node las cierre.
+// Evita reutilizar un socket que el backend esta cerrando por keep-alive.
+servidor.keepAliveTimeout = 65000;
+servidor.headersTimeout = 66000;
+
 servidor.listen(PORT, "0.0.0.0", () => {
     console.log(`[API] Escuchando en puerto ${PORT} · contrato ${CONTRATO}`);
 });
