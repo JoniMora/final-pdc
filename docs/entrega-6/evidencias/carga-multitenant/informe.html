@@ -1,0 +1,78 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><title>E6: multitenant</title>
+<style>body{font:16px system-ui;max-width:1100px;margin:32px auto;padding:0 20px;color:#172033}table{border-collapse:collapse;width:100%}td,th{padding:8px;border:1px solid #ddd;text-align:left}pre{white-space:pre-wrap}svg{width:100%;border:1px solid #ddd}h1{font-size:28px}</style>
+<h1>E6: multitenant</h1><p>Generado con los resultados reales de k6. Las tasas generales de k6 incluyen setup y teardown; usar los histogramas de admision para su latencia.</p>
+<h2>Admisiones HTTP 202 por segundo</h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 350" role="img" aria-label="Serie temporal y fallos"><path d="M50 40V290H920" fill="none" stroke="#333"/><polyline fill="none" stroke="#2463eb" stroke-width="2" points="50,290 103.125,290 156.25,113.62116800000001 209.375,50 262.5,50 315.625,50 368.75,50.00960076806143 421.875,226.39745559289486 475,290 528.125,290 581.25,290 634.375,290 687.5,290 740.625,290 793.75,290 846.875,290 900,290"/><text x="50" y="325">2026-11-17T13:25:28.668Z</text><text x="650" y="325">2026-11-17T13:26:48.668Z</text></svg><h2>p95 de admision en segundos</h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 350" role="img" aria-label="Serie temporal y fallos"><path d="M50 40V290H920" fill="none" stroke="#333"/><polyline fill="none" stroke="#2463eb" stroke-width="2" points="50,93.3277391512828 220,62.50397841278627 390,62.50397841278627 560,62.50397841278627 730,62.50397841278627 900,50"/><text x="50" y="325">2026-11-17T13:25:38.668Z</text><text x="650" y="325">2026-11-17T13:26:03.668Z</text></svg><h2>Mensajes por cola</h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 350" role="img" aria-label="Serie temporal y fallos"><path d="M50 40V290H920" fill="none" stroke="#333"/><polyline fill="none" stroke="#2463eb" stroke-width="2" points="50,290 103.125,290 156.25,290 209.375,290 262.5,290 315.625,290 368.75,290 421.875,290 475,290 528.125,290 581.25,290 634.375,290 687.5,290 740.625,290 793.75,290 846.875,290 900,290"/><polyline fill="none" stroke="#079669" stroke-width="2" points="50,290 103.125,290 156.25,126.875 209.375,50 262.5,61.25 315.625,61.25 368.75,70.625 421.875,80 475,87.5 528.125,96.875 581.25,111.875 634.375,128.75 687.5,156.875 740.625,175.625 793.75,218.75 846.875,290 900,290"/><polyline fill="none" stroke="#9333ea" stroke-width="2" points="50,290 103.125,290 156.25,246.875 209.375,239.375 262.5,248.75 315.625,258.125 368.75,258.125 421.875,267.5 475,276.875 528.125,284.375 581.25,290 634.375,290 687.5,290 740.625,290 793.75,290 846.875,290 900,290"/><polyline fill="none" stroke="#c2410c" stroke-width="2" points="50,290 103.125,290 156.25,192.5 209.375,147.5 262.5,149.375 315.625,160.625 368.75,168.125 421.875,177.5 475,185 528.125,194.375 581.25,211.25 634.375,228.125 687.5,256.25 740.625,276.875 793.75,290 846.875,290 900,290"/><polyline fill="none" stroke="#2463eb" stroke-width="2" points="50,290 103.125,290 156.25,192.5 209.375,147.5 262.5,149.375 315.625,160.625 368.75,168.125 421.875,177.5 475,185 528.125,194.375 581.25,209.375 634.375,226.25 687.5,254.375 740.625,273.125 793.75,290 846.875,290 900,290"/><polyline fill="none" stroke="#079669" stroke-width="2" points="50,290 103.125,290 156.25,290 209.375,290 262.5,290 315.625,290 368.75,290 421.875,290 475,290 528.125,290 581.25,290 634.375,290 687.5,290 740.625,290 793.75,290 846.875,290 900,290"/><polyline fill="none" stroke="#9333ea" stroke-width="2" points="50,235.625 103.125,235.625 156.25,235.625 209.375,235.625 262.5,235.625 315.625,235.625 368.75,235.625 421.875,235.625 475,235.625 528.125,235.625 581.25,235.625 634.375,235.625 687.5,235.625 740.625,235.625 793.75,235.625 846.875,235.625 900,235.625"/><polyline fill="none" stroke="#c2410c" stroke-width="2" points="50,290 103.125,290 156.25,290 209.375,290 262.5,290 315.625,290 368.75,290 421.875,290 475,290 528.125,290 581.25,290 634.375,290 687.5,290 740.625,290 793.75,290 846.875,290 900,290"/><polyline fill="none" stroke="#2463eb" stroke-width="2" points="50,290 103.125,290 156.25,290 209.375,290 262.5,290 315.625,290 368.75,290 421.875,290 475,290 528.125,290 581.25,290 634.375,290 687.5,290 740.625,290 793.75,290 846.875,290 900,290"/><polyline fill="none" stroke="#079669" stroke-width="2" points="50,290 103.125,290 156.25,290 209.375,290 262.5,290 315.625,290 368.75,290 421.875,290 475,290 528.125,290 581.25,290 634.375,290 687.5,290 740.625,290 793.75,290 846.875,290 900,290"/><polyline fill="none" stroke="#9333ea" stroke-width="2" points="50,290 103.125,290 156.25,290 209.375,290 262.5,290 315.625,290 368.75,290 421.875,290 475,290 528.125,290 581.25,290 634.375,290 687.5,290 740.625,290 793.75,290 846.875,290 900,290"/><text x="50" y="325">2026-11-17T13:25:28.668Z</text><text x="650" y="325">2026-11-17T13:26:48.668Z</text></svg><h2>p95 de demora de webhook en segundos</h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 350" role="img" aria-label="Serie temporal y fallos"><path d="M50 40V290H920" fill="none" stroke="#333"/><polyline fill="none" stroke="#2463eb" stroke-width="2" points="50,58.20054495912805 110.71428571428571,66.30236441944268 171.42857142857142,65.25682783093592 232.14285714285714,62.797820163487756 292.85714285714283,61.21870070271038 353.57142857142856,55.187020064404265 414.2857142857143,50.94168937329698 475,50 535.7142857142857,50.643890169775744 596.4285714285714,51.808981209526166 657.1428571428571,59.84588555858306 717.8571428571429,62.76935406315113 778.5714285714286,67.43476124536562 839.2857142857143,80.70299727520435 900,95.07553133514989"/><text x="50" y="325">2026-11-17T13:25:38.668Z</text><text x="650" y="325">2026-11-17T13:26:48.668Z</text></svg><table><thead><tr><th>Metrica</th><th>Valores</th></tr></thead><tbody><tr><td>http_req_duration</td><td><pre>{
+  &quot;p(95)&quot;: 1124.83194775,
+  &quot;max&quot;: 1258.634561,
+  &quot;avg&quot;: 414.36701360000023
+}</pre></td></tr><tr><td>http_req_waiting</td><td><pre>{
+  &quot;avg&quot;: 413.88483726521815,
+  &quot;p(95)&quot;: 1124.60404045,
+  &quot;max&quot;: 1258.048322
+}</pre></td></tr><tr><td>iterations</td><td><pre>{
+  &quot;rate&quot;: 5.554564664807257,
+  &quot;count&quot;: 400
+}</pre></td></tr><tr><td>http_req_sending</td><td><pre>{
+  &quot;p(95)&quot;: 0.39647729999999987,
+  &quot;max&quot;: 7.434446,
+  &quot;avg&quot;: 0.21975307500000033
+}</pre></td></tr><tr><td>http_req_receiving</td><td><pre>{
+  &quot;avg&quot;: 0.26242325978260894,
+  &quot;p(95)&quot;: 0.42775394999999966,
+  &quot;max&quot;: 6.986162
+}</pre></td></tr><tr><td>vus</td><td><pre>{
+  &quot;min&quot;: 0,
+  &quot;max&quot;: 80,
+  &quot;value&quot;: 0
+}</pre></td></tr><tr><td>checks</td><td><pre>{
+  &quot;rate&quot;: 1,
+  &quot;passes&quot;: 408,
+  &quot;fails&quot;: 0
+}</pre></td></tr><tr><td>reservas_admitidas</td><td><pre>{
+  &quot;count&quot;: 400,
+  &quot;rate&quot;: 5.554564664807257
+}</pre></td></tr><tr><td>http_reqs</td><td><pre>{
+  &quot;count&quot;: 920,
+  &quot;rate&quot;: 12.775498729056691
+}</pre></td></tr><tr><td>data_received</td><td><pre>{
+  &quot;count&quot;: 472004,
+  &quot;rate&quot;: 6554.441850119211
+}</pre></td></tr><tr><td>http_req_blocked</td><td><pre>{
+  &quot;avg&quot;: 3.6072443032608748,
+  &quot;p(95)&quot;: 36.98930224999996,
+  &quot;max&quot;: 86.690231
+}</pre></td></tr><tr><td>vus_max</td><td><pre>{
+  &quot;value&quot;: 80,
+  &quot;min&quot;: 80,
+  &quot;max&quot;: 80
+}</pre></td></tr><tr><td>admisiones_estado</td><td><pre>{
+  &quot;count&quot;: 400,
+  &quot;rate&quot;: 5.554564664807257
+}</pre></td></tr><tr><td>http_req_tls_handshaking</td><td><pre>{
+  &quot;avg&quot;: 2.8451431010869555,
+  &quot;p(95)&quot;: 27.008404949999957,
+  &quot;max&quot;: 82.908756
+}</pre></td></tr><tr><td>data_sent</td><td><pre>{
+  &quot;count&quot;: 135095,
+  &quot;rate&quot;: 1875.9847834803409
+}</pre></td></tr><tr><td>admision_ms</td><td><pre>{
+  &quot;p(95)&quot;: 1257.427672,
+  &quot;max&quot;: 1258.634561,
+  &quot;avg&quot;: 941.4873048975003
+}</pre></td></tr><tr><td>http_req_duration{expected_response:true}</td><td><pre>{
+  &quot;avg&quot;: 414.36701360000023,
+  &quot;p(95)&quot;: 1124.83194775,
+  &quot;max&quot;: 1258.634561
+}</pre></td></tr><tr><td>http_req_connecting</td><td><pre>{
+  &quot;max&quot;: 30.881964,
+  &quot;avg&quot;: 0.706269895652174,
+  &quot;p(95)&quot;: 1.8796455999999915
+}</pre></td></tr><tr><td>http_req_failed</td><td><pre>{
+  &quot;fails&quot;: 920,
+  &quot;rate&quot;: 0,
+  &quot;passes&quot;: 0
+}</pre></td></tr><tr><td>iteration_duration</td><td><pre>{
+  &quot;avg&quot;: 950.3700094824994,
+  &quot;p(95)&quot;: 1257.7111871500001,
+  &quot;max&quot;: 1258.889597
+}</pre></td></tr></tbody></table></html>
