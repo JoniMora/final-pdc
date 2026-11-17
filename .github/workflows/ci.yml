@@ -118,6 +118,8 @@ jobs:
   # saltos: Schemathesis, k6 y las suites verifican el certificado del
   # gateway con la CA que genera scripts/preparar-seguridad.js en el runner.
   integracion:
+    env:
+      TRAEFIK_LOG_LEVEL: DEBUG
     name: Integración (Schemathesis, ráfaga y límite de tasa)
     runs-on: ubuntu-latest
     needs: [contratos, pruebas]
@@ -171,6 +173,21 @@ jobs:
           SATURADO=$(node scripts/sistema.js tenant "CI saturado" --limite 10/20)
           VECINO=$(node scripts/sistema.js tenant "CI vecino" --limite 10/20)
           docker compose run --rm k6 run -q -e CLAVE_SATURADO="$SATURADO" -e CLAVE_VECINO="$VECINO" /pruebas/carga/limite.js
+
+      - name: Guardar diagnostico de transporte de integracion
+        if: failure()
+        run: |
+          mkdir -p ../docs/entrega-6/evidencias/ci-transporte
+          docker compose logs --no-color --since=20m traefik api redis > ../docs/entrega-6/evidencias/ci-transporte/servicios.txt 2>&1
+          docker compose ps -a > ../docs/entrega-6/evidencias/ci-transporte/estado.txt
+          docker compose logs --no-color --since=20m traefik | tail -n 250
+
+      - name: Conservar diagnostico de integracion
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostico-transporte-integracion
+          path: docs/entrega-6/evidencias/ci-transporte/
 
       - name: Registros ante una falla
         if: failure()

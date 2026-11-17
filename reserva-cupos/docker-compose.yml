@@ -99,8 +99,16 @@ services:
   traefik:
     image: traefik:v3.6
 
+    environment:
+      # CI habilita DEBUG para registrar la causa de errores de transporte.
+      TRAEFIK_LOG_LEVEL: ${TRAEFIK_LOG_LEVEL:-ERROR}
+
     command:
       - --providers.docker=true
+      - --accesslog=true
+      - --accesslog.format=json
+      - --accesslog.filters.statuscodes=500-599
+      - --accesslog.fields.headers.defaultmode=drop
       - --providers.docker.endpoint=tcp://socket-proxy:2375
       - --providers.docker.exposedByDefault=false
       - --providers.docker.network=reserva-cupos-infra_publica
