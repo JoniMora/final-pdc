@@ -4,7 +4,7 @@ Grupo 15: Jonathan Mora Colodrero y María Constanza Gigli.
 
 ## Base de trabajo
 
-La rama local `codex/integrar-base-e5` integra la entrega 5 corregida
+La rama `entrega-6-final` integra la entrega 5 corregida
 (commit `c1b2c3b` de la PR #58) con los avances de la PR #59. Es una
 integración local para revisión, no un merge de GitHub ni una entrega aprobada.
 
@@ -17,7 +17,7 @@ Ver [revisión del PR #59](https://github.com/JoniMora/final-pdc/pull/59).
 | Issue | Trabajo | Estado en esta integración |
 |---|---|---|
 | [#45](https://github.com/JoniMora/final-pdc/issues/45) | Métricas, Prometheus y Grafana | Pendiente |
-| [#46](https://github.com/JoniMora/final-pdc/issues/46) | Particionado por actividad y pruebas N=1/4 | Pendiente |
+| [#46](https://github.com/JoniMora/final-pdc/issues/46) | Particionado por actividad y pruebas N=1/4 | Criterios comprobados localmente; pendiente CI y revision. Ver [resultados](particionado.md) |
 | [#47](https://github.com/JoniMora/final-pdc/issues/47) | Circuit Breaker por tenant en el notificador | Pendiente |
 | [#48](https://github.com/JoniMora/final-pdc/issues/48) | Redis, límite global, caché y curva 1/2/4 API | Pendiente |
 | [#49](https://github.com/JoniMora/final-pdc/issues/49) | Escenarios k6, métricas de admisión y gráficos | Parcial: ráfaga previa; faltan escenarios e informe |

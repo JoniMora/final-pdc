@@ -1,0 +1,13 @@
+api
+aula
+aula-db
+grafana
+mysql-primary
+mysql-replica
+notificador
+prometheus
+rabbitmq
+relay
+socket-proxy
+traefik
+worker

@@ -1,0 +1,5 @@
+actividad_id	estado	cantidad
+01a1e7b0-0bef-7467-9cdb-f4fcd76a160d	confirmada	10
+01a1e7b0-0bef-7467-9cdb-f4fcd76a160d	rechazada	490
+id	capacidad	cupos_disponibles
+01a1e7b0-0bef-7467-9cdb-f4fcd76a160d	10	0

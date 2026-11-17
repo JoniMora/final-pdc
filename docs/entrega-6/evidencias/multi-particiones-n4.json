@@ -1,0 +1,25 @@
+{
+  "particiones": 4,
+  "fecha": "2026-11-17T04:19:39.263Z",
+  "actividades": 8,
+  "porActividad": 40,
+  "capacidad": 10,
+  "total": 320,
+  "conexionesHttpMaximas": 64,
+  "comprobaciones": [
+    "Topologia estable y un consumidor por particion, sin comandos anteriores",
+    "320 admisiones con HTTP 202 y Location",
+    "Cada actividad termina con 10 confirmadas, 30 rechazadas y cero cupos disponibles",
+    "Orden de decisiones coincide con el registro de comandos dentro de cada actividad"
+  ],
+  "aprobada": true,
+  "admisionMs": 5802.848099999999,
+  "p95AdmisionClienteMs": 5217.9046,
+  "tiempoTotalMs": 47459.1722,
+  "decisionesPorSegundo": 6.742637622322456,
+  "comparacion": {
+    "referencia": "2026-11-17T04:15:31.493Z",
+    "factor": 1.4286263636094352
+  },
+  "mejoraObservada": true
+}

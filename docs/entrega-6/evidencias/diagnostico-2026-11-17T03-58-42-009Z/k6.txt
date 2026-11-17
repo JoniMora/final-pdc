@@ -1,6 +1,6 @@
 
 
-  █ THRESHOLDS 
+  █ THRESHOLDS
 
     checks
     ✓ 'rate==1' rate=100.00%
@@ -18,7 +18,7 @@
     ✓ 'count==19' count=19
 
 
-  █ TOTAL RESULTS 
+  █ TOTAL RESULTS
 
     checks_total.......................: 41      58.338177/s
     checks_succeeded...................: 100.00% 41 out of 41
@@ -52,6 +52,6 @@
 
 
 
- Container pdc-diagnostico-1794887922011 Creating 
- Container pdc-diagnostico-1794887922011 Created 
+ Container pdc-diagnostico-1794887922011 Creating
+ Container pdc-diagnostico-1794887922011 Created
 time="2026-11-17T03:58:45Z" level=info msg="Reservas creadas: 2 (alumno-reintento, alumno-repetido)" source=console

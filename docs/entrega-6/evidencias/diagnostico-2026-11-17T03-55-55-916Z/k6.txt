@@ -1,12 +1,12 @@
 
 
-  █ THRESHOLDS 
+  █ THRESHOLDS
 
     checks
     ✓ 'rate==1' rate=100.00%
 
 
-  █ TOTAL RESULTS 
+  █ TOTAL RESULTS
 
     checks_total.......................: 1004    14.579287/s
     checks_succeeded...................: 100.00% 1004 out of 1004
@@ -42,7 +42,7 @@
 
 
 
- Container pdc-diagnostico-1794887755917 Creating 
- Container pdc-diagnostico-1794887755917 Created 
+ Container pdc-diagnostico-1794887755917 Creating
+ Container pdc-diagnostico-1794887755917 Created
 time="2026-11-17T03:55:59Z" level=info msg="Actividad 01a1e7a5-b61e-752b-81c3-af83ce2a9886: 10 cupos, 500 solicitudes simultáneas" source=console
 time="2026-11-17T03:57:08Z" level=info msg="Resultado (sin pendientes tras 64.0 s de espera): confirmadas=10 rechazadas=490 pendientes=0 cupos_disponibles=0" source=console
