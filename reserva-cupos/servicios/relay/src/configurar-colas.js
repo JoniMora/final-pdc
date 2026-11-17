@@ -1,5 +1,7 @@
 const amqp = require("amqplib");
 const { conexionRabbit } = require("../../../compartido/src/tls");
+const { configurarParticiones } = require("../../../compartido/src/particiones");
+const { colas } = configurarParticiones();
 
 async function configurar() {
     let conexion;
@@ -54,22 +56,22 @@ async function configurar() {
             "fallido"
         );
 
-        // Primera partición de comandos.
-        await canal.assertQueue("reservas.comandos.0", {
-            durable: true,
-            arguments: {
-                "x-dead-letter-exchange": "reservas.dlx",
-                "x-dead-letter-routing-key": "fallido"
-            }
-        });
+        // Cada partición recibe el mismo peso en el exchange.
+        for (const cola of colas) {
+            await canal.assertQueue(cola, {
+                durable: true,
+                arguments: {
+                    "x-dead-letter-exchange": "reservas.dlx",
+                    "x-dead-letter-routing-key": "fallido"
+                }
+            });
 
-        // En el exchange de hash, "1" es el peso de esta cola.
-        await canal.bindQueue(
-            "reservas.comandos.0",
-            "reservas.comandos",
-            "1"
-        );
-
+            await canal.bindQueue(
+                cola,
+                "reservas.comandos",
+                "1"
+            );
+        }
         // Cola de webhooks fallidos.
         await canal.assertQueue("webhooks.dlq", {
             durable: true

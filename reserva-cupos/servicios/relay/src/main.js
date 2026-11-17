@@ -12,11 +12,12 @@ const {
     comandoDesdeCambio,
     entregaDesdeCambio
 } = require("./mensajes");
+const { configurarParticiones } = require("../../../compartido/src/particiones");
 
 // Único proceso que secuencia el feed y publica el outbox.
 const EXCHANGE = "reservas.comandos";
 const EXCHANGE_WEBHOOKS = "webhooks.eventos";
-const COLAS_COMANDOS = ["reservas.comandos.0"];
+const { colas: COLAS_COMANDOS } = configurarParticiones();
 
 const INTERVALO_MS = Number(process.env.RELAY_INTERVALO_MS || 500);
 const BARRIDO_MS = Number(process.env.RELAY_BARRIDO_MS || 30000);
