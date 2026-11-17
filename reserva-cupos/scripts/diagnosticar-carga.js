@@ -8,7 +8,9 @@ const { crearTenant } = require('../pruebas/comun');
 
 const ejecutar = promisify(execFile);
 const raiz = path.resolve(__dirname, '..');
-const compose = ['compose', '-f', 'docker-compose.yml', '-f', 'docker-compose.particiones.yml'];
+const unaParticion = process.argv.includes('--una');
+const compose = ['compose', '-f', 'docker-compose.yml',
+    ...(unaParticion ? [] : ['-f', 'docker-compose.particiones.yml'])];
 const corrida = new Date().toISOString().replace(/[:.]/g, '-');
 const directorio = path.resolve(raiz, '../docs/entrega-6/evidencias', `diagnostico-${corrida}`);
 const contenedor = `pdc-diagnostico-${Date.now()}`;
@@ -21,7 +23,8 @@ function ocultar(texto) {
 }
 
 function guardar(nombre, contenido) {
-    fs.writeFileSync(path.join(directorio, nombre), ocultar(contenido), 'utf8');
+    const normalizado = ocultar(contenido).replace(/[ \t]+$/gm, '').trimEnd() + '\n';
+    fs.writeFileSync(path.join(directorio, nombre), normalizado, 'utf8');
 }
 
 async function docker(args, opciones = {}) {
@@ -56,11 +59,15 @@ WHERE SCHEMA_NAME='reservas' ORDER BY SUM_TIMER_WAIT DESC LIMIT 20;`;
 
 async function main() {
     fs.mkdirSync(directorio, { recursive: true });
-    console.log('1/4 Verificando Docker y los cuatro workers...');
+    console.log(`1/4 Verificando Docker y ${unaParticion ? 'un worker' : 'los cuatro workers'}...`);
     const { stdout: activos } = await docker(['ps', '--status', 'running', '--services']);
     const servicios = new Set(activos.trim().split(/\r?\n/));
-    for (const servicio of ['api', 'relay', 'worker', 'worker-p1', 'worker-p2', 'worker-p3']) {
+    for (const servicio of ['api', 'relay', 'worker',
+        ...(unaParticion ? [] : ['worker-p1', 'worker-p2', 'worker-p3'])]) {
         if (!servicios.has(servicio)) throw new Error(`No esta ejecutandose ${servicio}; no se inicia carga.`);
+    }
+    if (unaParticion && ['worker-p1', 'worker-p2', 'worker-p3'].some(s => servicios.has(s))) {
+        throw new Error('Para N=1 deben estar detenidos los workers de las otras particiones.');
     }
     guardar('servicios.txt', activos);
     const tenant = await crearTenant(`Diagnostico automatico ${corrida}`, {
@@ -118,7 +125,7 @@ async function main() {
     guardar('reservas.txt', (await sql(`SELECT actividad_id, estado, COUNT(*) AS cantidad
 FROM reservas.reservas WHERE tenant_id='${tenant.id}' GROUP BY actividad_id,estado;
 SELECT id, capacidad, cupos_disponibles FROM reservas.actividades WHERE tenant_id='${tenant.id}';`)).stdout);
-    guardar('resultado.txt', `Corrida: ${corrida}\nPrueba: ${prueba}\nTenant: ${tenant.id}\nMuestras: ${muestras}\nCodigo k6: ${codigo}\n`
+    guardar('resultado.txt', `Corrida: ${corrida}\nParticiones previstas: ${unaParticion ? 1 : 4}\nPrueba: ${prueba}\nTenant: ${tenant.id}\nMuestras: ${muestras}\nCodigo k6: ${codigo}\n`
         + 'El estado de la base es una instantanea; k6 conserva sus criterios originales.\n');
     console.log(`4/4 Terminado. Codigo k6: ${codigo}. Muestras: ${muestras}.`);
     console.log(`Archivos: ${directorio}`);
