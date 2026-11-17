@@ -29,6 +29,8 @@ const DIAS = "365";
 // mysql-primary: al promoverla (pruebas/fallos/failover.js) recibe ese
 // alias de red y los clientes verifican la identidad contra ese nombre.
 const CERTIFICADOS = {
+    redis: ["redis", "localhost"],
+    "receptor-pruebas": ["receptor-pruebas", "localhost"],
     prometheus: ["prometheus", "localhost"],
     grafana: ["grafana", "localhost"],
     traefik: ["traefik", "localhost"],

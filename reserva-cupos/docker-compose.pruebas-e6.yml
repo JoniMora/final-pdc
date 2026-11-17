@@ -1,0 +1,22 @@
+services:
+  notificador:
+    environment:
+      NOTIFICADOR_HOSTS_PERMITIDOS: aula,receptor-pruebas
+
+  receptor-pruebas:
+    profiles: [pruebas-e6]
+    build:
+      context: ./servicios/notificador
+      additional_contexts:
+        compartido: ./compartido
+        contrato: ./contrato
+    command: [node, /pruebas/final/receptor-circuito.js]
+    environment:
+      TLS_CERT: /tls/receptor-pruebas.crt
+      TLS_KEY: /tls/receptor-pruebas.key
+      CONTROL_TOKEN: e6_control_local
+    volumes:
+      - ./pruebas:/pruebas:ro
+      - { type: bind, source: ./seguridad/local/receptor-pruebas.crt, target: /tls/receptor-pruebas.crt, read_only: true }
+      - { type: bind, source: ./seguridad/local/receptor-pruebas.key, target: /tls/receptor-pruebas.key, read_only: true }
+    networks: [publica]

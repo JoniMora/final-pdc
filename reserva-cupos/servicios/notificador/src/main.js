@@ -5,18 +5,15 @@ const amqp = require("amqplib");
 
 const { crearValidadorDeMensajes } = require("../../../compartido/src/contrato");
 const { opcionesMysql, conexionRabbit } = require("../../../compartido/src/tls");
-const { crearMetricas } = require("../../../compartido/src/metricas");
+const { crearMetricas, crearMetricasCircuitos } = require("../../../compartido/src/metricas");
+const { crearCircuitos, ErrorHttp } = require("./circuitos");
+const { planReintento } = require('./reintento');
 
 const { firmar } = require("./firma");
 const { ErrorDestino, validarUrl, crearLookup } = require("./destino");
 const { enviar } = require("./enviar");
 
 const COLA = "webhooks.entregas";
-const ESPERAS = [
-    "webhooks.espera.10s",
-    "webhooks.espera.1m",
-    "webhooks.espera.5m"
-];
 
 const PREFETCH = 10;
 const TIMEOUT_MS = Number(process.env.WEBHOOK_TIMEOUT_MS || 5000);
@@ -35,6 +32,15 @@ const PERMITIDOS = new Set(
 const lookup = crearLookup(PERMITIDOS);
 const validar = crearValidadorDeMensajes();
 const metricas = crearMetricas("notificador");
+const metricasCircuitos = crearMetricasCircuitos(metricas.registro);
+const circuitos = crearCircuitos({
+    enviar: enviarMedido,
+    metricas: metricasCircuitos,
+    resetTimeout: Number(process.env.WEBHOOK_CIRCUITO_ESPERA_MS || 10000),
+    volumeThreshold: Number(process.env.WEBHOOK_CIRCUITO_MINIMOS || 3),
+    errorFilter: error => error instanceof ErrorDestino,
+    onTransicion: evento => console.log('[notificador] circuito', JSON.stringify(evento))
+});
 
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
@@ -140,14 +146,15 @@ async function iniciar() {
 
     await canal.prefetch(PREFETCH);
 
-    async function reprogramar(entrega, motivo) {
+    async function reprogramar(entrega, motivo, { consumirIntento = true } = {}) {
         const intento = Number(
             entrega.properties.headers?.["x-intento"] || 0
         );
 
         const id = entrega.properties.messageId;
+        const plan = planReintento(intento, consumirIntento);
 
-        if (intento >= ESPERAS.length) {
+        if (plan.agotado) {
             console.error(
                 `[notificador] ${id}: ${motivo}. ` +
                 "Sin más reintentos, a webhooks.dlq"
@@ -158,12 +165,13 @@ async function iniciar() {
             return;
         }
 
-        canal.sendToQueue(ESPERAS[intento], entrega.content, {
+        const destinoEspera = plan.cola;
+        canal.sendToQueue(destinoEspera, entrega.content, {
             persistent: true,
             contentType: "application/json",
             messageId: id,
             type: "entrega",
-            headers: { "x-intento": intento + 1 }
+            headers: { "x-intento": plan.intento }
         });
 
         await canal.waitForConfirms();
@@ -173,7 +181,7 @@ async function iniciar() {
 
         console.error(
             `[notificador] ${id}: ${motivo}. ` +
-            `Reintento ${intento + 1} en ${ESPERAS[intento]}`
+            `${consumirIntento ? 'Reintento ' + (intento + 1) : 'Diferido sin intento HTTP'} en ${destinoEspera}`
         );
     }
 
@@ -258,7 +266,7 @@ async function iniciar() {
         const cuerpo = JSON.stringify(mensaje.evento);
 
         try {
-            const estado = await enviarMedido(url, cuerpo, {
+            const estado = await circuitos.ejecutar(mensaje.tenant_id, url, cuerpo, {
                 "Content-Type": "application/json",
                 "User-Agent": "reserva-cupos-notificador/1.0",
                 "X-Firma": firmar(tenant.webhook_secret, cuerpo),
@@ -273,6 +281,8 @@ async function iniciar() {
 
                 canal.ack(entrega);
                 contar("entregado");
+                const demora = (Date.now() - Date.parse(mensaje.evento.ocurrido_en)) / 1000;
+                if (Number.isFinite(demora)) metricasCircuitos.demora.observe(Math.max(0, demora));
                 return;
             }
 
@@ -283,6 +293,11 @@ async function iniciar() {
                 `el tenant respondió ${estado}`
             );
         } catch (error) {
+            if (error.code === 'EOPENBREAKER') {
+                contar('diferido_circuito');
+                await reprogramar(entrega, 'circuito abierto o prueba de recuperacion en curso', { consumirIntento: false });
+                return;
+            }
             if (error instanceof ErrorDestino) {
                 console.error(
                     `[notificador] ${id}: destino rechazado, ` +
@@ -294,7 +309,7 @@ async function iniciar() {
                 return;
             }
 
-            contar("error_envio");
+            contar(error instanceof ErrorHttp ? 'error_http' : 'error_envio');
 
             await reprogramar(
                 entrega,

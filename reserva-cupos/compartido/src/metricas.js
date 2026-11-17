@@ -1,4 +1,4 @@
-const { Registry, Counter, Histogram } = require("prom-client");
+const { Registry, Counter, Histogram, Gauge } = require("prom-client");
 
 function crearMetricas(servicio) {
     const registro = new Registry();
@@ -33,4 +33,18 @@ function crearMetricas(servicio) {
     return { registro, solicitudes, duracion, eventos };
 }
 
-module.exports = { crearMetricas };
+function crearMetricasCircuitos(registro) {
+    return {
+        estado: new Gauge({ name: 'pdc_webhook_circuito_estado',
+            help: 'Estado por tenant: 0 cerrado, 1 abierto, 2 semiabierto',
+            labelNames: ['tenant'], registers: [registro] }),
+        transiciones: new Counter({ name: 'pdc_webhook_circuito_transiciones_total',
+            help: 'Transiciones del circuito por tenant y estado',
+            labelNames: ['tenant', 'estado'], registers: [registro] }),
+        demora: new Histogram({ name: 'pdc_webhook_demora_segundos',
+            help: 'Demora desde ocurrido_en hasta entrega HTTP exitosa',
+            buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60, 120, 300, 600], registers: [registro] })
+    };
+}
+
+module.exports = { crearMetricas, crearMetricasCircuitos };
