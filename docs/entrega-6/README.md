@@ -1,4 +1,4 @@
-# Entrega 6 — Patrones y escalabilidad (en preparación)
+# Entrega 6 — Patrones y escalabilidad (validacion tecnica aprobada)
 
 Grupo 15: Jonathan Mora Colodrero y María Constanza Gigli.
 
@@ -16,13 +16,13 @@ Ver [revisión del PR #59](https://github.com/JoniMora/final-pdc/pull/59).
 
 | Issue | Trabajo | Estado en esta integración |
 |---|---|---|
-| [#45](https://github.com/JoniMora/final-pdc/issues/45) | Métricas, Prometheus y Grafana | Base verificada; nuevos paneles y scraping de todos los workers preparados para validar |
-| [#46](https://github.com/JoniMora/final-pdc/issues/46) | Particionado por actividad y pruebas N=1/4 | Criterios comprobados localmente; pendiente CI y revision. Ver [resultados](particionado.md) |
+| [#45](https://github.com/JoniMora/final-pdc/issues/45) | Métricas, Prometheus y Grafana | Dashboard, metricas y capturas verificados; CI aprobado |
+| [#46](https://github.com/JoniMora/final-pdc/issues/46) | Particionado por actividad y pruebas N=1/4 | Criterios comprobados localmente y CI aprobado; pendiente revision. Ver [resultados](particionado.md) |
 | [#47](https://github.com/JoniMora/final-pdc/issues/47) | Circuit Breaker por tenant en el notificador | Integracion Docker y Aula real aprobadas: ciclo completo y once entregas recuperadas. [Detalle](circuit-breaker.md) |
 | [#48](https://github.com/JoniMora/final-pdc/issues/48) | Redis, límite global, caché y curva 1/2/4 API | Redis real, invalidacion, curva de lecturas y curva POST repetida aprobados en Docker. [Detalle](redis.md) |
-| [#49](https://github.com/JoniMora/final-pdc/issues/49) | Escenarios k6, métricas de admisión y gráficos | Caliente, multitenant y rampa aprobados; reportes HTML generados. Capturas pendientes. [Detalle](carga.md) |
+| [#49](https://github.com/JoniMora/final-pdc/issues/49) | Escenarios k6, métricas de admisión y gráficos | Caliente, multitenant y rampa aprobados; reportes HTML y capturas enlazados. [Detalle](carga.md) |
 | [#50](https://github.com/JoniMora/final-pdc/issues/50) | Fallos parciales bajo carga con gráficos | Ejecucion Docker aprobada; invariantes y grafico registrados. Grabacion enlazada; pendiente revision del contenido y acceso. [Detalle](fallos-bajo-carga.md) |
-| [#51](https://github.com/JoniMora/final-pdc/issues/51) | Documento de patrones, evidencias y release | Evidencias locales revisadas; falta CI completo, capturas, grabacion, revision y release |
+| [#51](https://github.com/JoniMora/final-pdc/issues/51) | Documento de patrones, evidencias y release | Evidencias, capturas, video y CI disponibles; pendientes revision y release |
 
 El orden de asignación debe confirmarse en el Project. Las dependencias están
 expresadas en cada issue. No se cierra un issue por haber agregado documentación
@@ -83,9 +83,9 @@ local de Git no ha borrado volúmenes ni migrado el Docker de los integrantes.
 
 ## Evidencias y material adelantado
 
-Las [evidencias del 14/11](evidencias/README.md) pertenecen a la base anterior.
-Se conservan como antecedentes y deben repetirse con la base corregida antes de
-acreditar esta versión. No demuestran cumplimiento de todos los issues de E6.
+El [indice de evidencias](evidencias/README.md) distingue las corridas actuales
+aprobadas de los antecedentes del 14/11. No se mezclan mediciones de versiones
+diferentes. [CI completo de ec1cecf](https://github.com/JoniMora/final-pdc/actions/runs/44107729654) aprobado: doce jobs exitosos.
 
 El [guion de demo](demo.md) y la [guía de defensa](defensa.md) son borradores
 adelantados del cierre final; requieren actualización al terminar los issues.

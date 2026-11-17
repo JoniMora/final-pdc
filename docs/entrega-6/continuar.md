@@ -1,15 +1,17 @@
-# Continuar E6
+# Estado de cierre E6
 
-Las pruebas locales y las integraciones Docker se ejecutaron y aprobaron por
-separado el 17/11/2026. Codigo y evidencias se subieron en commits separados
-sobre entrega-6-final. No repetir esos commits ni crear otra rama.
+Validacion tecnica aprobada sobre ec1cecf: doce jobs de CI exitosos.
+https://github.com/JoniMora/final-pdc/actions/runs/44107729654
 
-El estado actualizado esta en [cierre-validacion.md](cierre-validacion.md).
-La curva repetida de admisiones y el circuito con Aula real ya aprobaron.
-La grabacion ya tiene enlace en fallos-bajo-carga.md. Falta revisar acceso,
-completar trazabilidad de capturas por escenario, actualizar la
-descripcion del PR y comprobar CI del nuevo commit antes de la release.
+Curva POST repetida, circuito con Aula real, carga y fallos tienen evidencias.
+Las capturas 21 y 22 y el video estan enlazados en evidencias/README.md.
+Los escenarios se identifican por sus intervalos: no es necesario repetirlos
+para corregir el indice documental.
 
-La primera ejecucion de verificar-e6.js todo fallo; sus resultados no se
-reclasifican. Los requisitos reejecutados tienen sus propios JSON aprobados.
-Los diagnosticos historicos se conservan y no se agregan automaticamente.
+Pendientes administrativos: revision del equipo, confirmar acceso al video,
+actualizar la descripcion antigua del PR, cerrar E5 (#58/#44) y publicar
+la release v6-escalabilidad sobre la version acordada. La integracion final
+v7-final es otra entrega. No resolver conversaciones en nombre del revisor.
+
+La primera ejecucion de verificar-e6.js todo fallo; se conserva como tal.
+Los requisitos se reejecutaron por separado y el CI completo posterior aprobo.

@@ -20,8 +20,11 @@ la conexion antes del cierre ocioso del backend. No se modifican los tiempos
 de Redis, la verificacion TLS, el limite de tasa ni los criterios de k6.
 No se agregan reintentos para disimular respuestas incorrectas.
 
-La sintaxis y las pruebas unitarias se verifican localmente. La correccion
-requiere una nueva corrida de CI; no se declara resuelta antes de aprobarla.
+La sintaxis y las pruebas unitarias se verificaron localmente. La corrida 56
+del commit ec1cecf aprobo los doce jobs, incluida Integracion y CI completo:
+https://github.com/JoniMora/final-pdc/actions/runs/44107729654
+El resultado valida esta corrida; no prueba por si solo la causa exacta del
+502 anterior ni elimina la necesidad de vigilar recurrencias.
 
 Referencias: [Node HTTP](https://nodejs.org/api/http.html#serverkeepalivetimeout)
 y [Traefik ServersTransport](https://doc.traefik.io/traefik/reference/routing-configuration/http/load-balancing/serverstransport/).

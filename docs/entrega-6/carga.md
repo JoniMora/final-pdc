@@ -2,7 +2,8 @@
 
 Estado: caliente, multitenant y rampa aprobados en Docker el 17/11/2026.
 Cada escenario conserva k6, JSON y un reporte HTML con series reales de
-Prometheus. Faltan las capturas nuevas de Grafana y la revision del CI.
+Prometheus. Las capturas generales y los intervalos por escenario se enlazan
+en evidencias/README.md. El CI completo de ec1cecf aprobo.
 
 Reportes: [caliente](evidencias/carga-caliente/informe.html),
 [multitenant](evidencias/carga-multitenant/informe.html) y

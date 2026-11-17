@@ -21,28 +21,25 @@ No se deben mezclar mediciones anteriores a Redis con las posteriores.
 - Repeticiones y estadistica aprobadas: nueve corridas POST, tres por configuracion. Ver [resultado](evidencias/curva-admisiones/resultado.json) e [informe](evidencias/curva-admisiones/informe.html). Cada corrida usa 100 solicitudes; la rafaga de 500 esta documentada por separado.
 - Curva de admisiones aprobada con 1/2/4 APIs y cuatro workers constantes. Se registran media y desvio muestral de admisiones/s y de los p95 por corrida. No hay mejora sostenida con mas APIs en esta muestra.
 - Circuito con Aula real aprobado: detencion, apertura, recuperacion, ciclo completo y once webhooks entregados. Ver [resultado](evidencias/circuito-aula/resultado.json).
-- Capturas generales de Grafana aportadas. Falta identificar las capturas por escenario. [Grabacion del fallo](https://drive.google.com/file/d/1A_N1ycuPNV_gmTaPBNMfOlLRruA-ttKp/view?usp=sharing) aportada; revisar contenido y acceso sin sesion.
-- [CI de c9a28ca](https://github.com/JoniMora/final-pdc/actions/runs/44098389774) completo: todos los jobs aprobaron. Los commits nuevos requieren su propio CI.
+- Capturas generales 21 y 22 registradas, con intervalos de cada escenario en evidencias/README.md. Video de fallos enlazado; su acceso sin sesion debe confirmarlo el equipo.
+- [CI completo de ec1cecf](https://github.com/JoniMora/final-pdc/actions/runs/44107729654) aprobado: doce jobs exitosos, incluidas Integracion, Seguridad y Escalabilidad.
 - La descripcion del PR sigue describiendo el antiguo escalado de tres APIs y dos workers; actualizarla cuando las mediciones y la revision esten completas.
-- Revisar integracion de E5 y base de merge con el companero. No rebasar ni forzar el push automaticamente.
+- La comparacion de GitHub confirma que ec1cecf contiene c1b2c3b de E5: behind_by=0 y merge-base=c1b2c3b. La PR #58 y el issue #44 aun estan abiertos; coordinar su cierre antes de E6, sin rebase ni force-push automaticos.
 - Tag y release v6-escalabilidad pendientes de version aprobada; v7-final es otra entrega.
 
 ## Material visual
 
-Dashboard: https://localhost:3002/d/reserva-cupos-e6
+Las capturas 21 y 22 y los intervalos locales de cada escenario estan en
+[el indice de evidencias](evidencias/README.md). Incluyen ensayos previos;
+los HTML y JSON separan los resultados aprobados.
 
-Seleccionar un intervalo que incluya la corrida real. Para cada escenario guardar
-una captura con admisiones/s, p95, decisiones y colas; capturar tambien cache,
-consultas MySQL y estado de circuitos cuando corresponda. Si no hay datos no
-presentar un panel vacio como prueba. Conservar el intervalo y nombre del escenario.
-
-Para la grabacion de #50, usar la captura de pantalla de Windows y repetir
-'node reserva-cupos/scripts/verificar-e6.js fallos' en la terminal de IntelliJ,
-mostrando los instantes de detencion, recuperacion, resultado y reporte HTML.
-No mostrar accesos-locales.txt ni claves. Guardar el video o un enlace accesible
-para el evaluador; el reporte HTML existente no sustituye una grabacion.
+La grabacion de #50 esta enlazada en [fallos bajo carga](fallos-bajo-carga.md).
+No hace falta repetir la prueba para corregir este documento. Su acceso sin
+sesion y el contenido del video deben confirmarse en la revision del equipo.
 
 ## Publicacion
 
 No crear release ni resolver conversaciones solo porque el codigo este escrito.
-Completar los puntos anteriores, revisar el diff con el companero y confirmar CI.
+Revisar el diff y la descripcion del PR, cerrar E5 (#58/#44), aprobar E6 y
+confirmar CI del commit final. Publicar v6-escalabilidad sobre la version
+acordada, sin mover tags existentes. La integracion v7-final se evalua aparte.

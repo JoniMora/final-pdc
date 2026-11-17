@@ -11,7 +11,7 @@
 - [107 pruebas unitarias](verificacion-local.json).
 
 Cada carpeta de carga contiene JSON y salida k6. Los resultados aprobados
-incluyen repeticiones y estadistica; el material visual pendiente se detalla,
+incluyen repeticiones y estadistica. El estado de cierre se documenta
 en [cierre de validacion](../cierre-validacion.md).
 
 - [Curva repetida de admisiones POST](curva-admisiones/informe.html): nueve corridas con media y desvio.
@@ -25,3 +25,29 @@ anterior. Las mediciones N1/N4 y su comparacion se describen en
 Los diagnosticos fallidos no acreditan aprobacion. La primera ejecucion de
 verificacion-todo.json fallo; las pruebas posteriores estan registradas
 por requisito, sin modificar retroactivamente ese resultado.
+
+## Capturas y trazabilidad temporal
+
+[21: dashboard general](21-dashboard-tres-horas.png) y
+[22: Redis y circuitos](22-dashboard-redis-circuitos.png) se capturaron el
+17/11/2026 alrededor de las 11:20, con Last 3 hours. Muestran un intervalo
+compartido; no son tres capturas independientes ni una corrida continua.
+Las ventanas de las corridas aprobadas, hora de Buenos Aires (UTC-3), son:
+
+| Escenario | Intervalo registrado | Evidencia detallada |
+|---|---|---|
+| caliente | 10:23:00 a 10:24:58 | [HTML](carga-caliente/informe.html) / [JSON](carga-caliente/resultado.json) |
+| multitenant | 10:25:18 a 10:26:42 | [HTML](carga-multitenant/informe.html) / [JSON](carga-multitenant/resultado.json) |
+| rampa | 10:27:01 a 10:29:02 | [HTML](carga-rampa/informe.html) / [JSON](carga-rampa/resultado.json) |
+
+Las capturas tambien incluyen ensayos anteriores, incluidos fallos; las
+marcas de tiempo anteriores identifican los resultados aprobados. Los
+HTML contienen las series de Prometheus de cada escenario y sus p95.
+La curva repetida se observa alrededor de las 11:08-11:13 y el circuito
+con Aula alrededor de las 11:16-11:17. La ausencia de un punto semiabierto
+en el scraping no contradice las transiciones de los registros del circuito.
+
+## CI de la version tecnica
+
+[CI completo de ec1cecf](https://github.com/JoniMora/final-pdc/actions/runs/44107729654): los doce jobs aprobaron sobre ec1cecf.
+El ajuste del 502 se documenta en [ci-integracion.md](../ci-integracion.md).

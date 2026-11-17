@@ -87,12 +87,12 @@ de carga, escalado y fallos parciales de los issues #46 a #50.
 El cierre del issue #45 queda sujeto a revisar sus criterios y
 la implementación en el pull request.
 
-## Ampliacion preparada para Redis y circuitos
+## Ampliacion de Redis y circuitos verificada
 
 El dashboard incorpora paneles de estado y transiciones del circuito por tenant,
 cache de autenticacion, consultas a MySQL, limite distribuido y demora total de
 webhooks. Prometheus tambien consulta los workers de las particiones adicionales.
 Las integraciones Docker de circuito, Redis, carga y fallos aprobaron por
 separado el 17/11/2026. Los reportes de carga contienen series reales de
-Prometheus; falta revisar visualmente los paneles nuevos y guardar sus capturas.
-Las capturas anteriores corresponden a la base, no a estas ampliaciones.
+Prometheus. Las capturas 21 y 22 muestran las ampliaciones con datos reales;
+ver sus intervalos y alcances en [el indice de evidencias](evidencias/README.md).
