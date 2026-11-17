@@ -156,7 +156,7 @@ async function iniciar() {
                     canal.nack(entrega, false, false);
             }
         },
-        { noAck: false }
+        { noAck: false, exclusive: true }
     );
 
     console.log(
