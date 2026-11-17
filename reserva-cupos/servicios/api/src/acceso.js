@@ -15,7 +15,7 @@ const { sha256 } = require("./modelo");
 // Con un limitador, una clave cuyo balde ya está vacío recibe 429 antes de
 // consultar MySQL: un tenant que inunda la API no le cuesta a la base una
 // consulta por cada solicitud que de todos modos se rechaza.
-function crearAutenticacion(pool, limitador) {
+function crearAutenticacion(pool, limitador, { cache, observarConsulta = () => {} } = {}) {
     return async function autenticar(req, res, next) {
         const clave = claveBearer(req);
 
@@ -24,17 +24,19 @@ function crearAutenticacion(pool, limitador) {
         const hash = sha256(clave);
         req.claveHash = hash.toString("hex");
 
-        limitador?.rechazarSiAgotado(req.claveHash);
+        await limitador?.rechazarSiAgotado?.(req.claveHash);
 
-        const [filas] = await pool.query(
-            `SELECT id, scopes, limite_por_segundo, limite_rafaga
-               FROM tenants WHERE api_key_hash = ? AND activo = TRUE`,
-            [hash]
-        );
-
-        if (filas.length === 0) throw problemas.noAutenticado();
-
-        const fila = filas[0];
+        async function cargar() {
+            observarConsulta();
+            const [filas] = await pool.query(
+                `SELECT id, scopes, limite_por_segundo, limite_rafaga
+                   FROM tenants WHERE api_key_hash = ? AND activo = TRUE`,
+                [hash]
+            );
+            return filas[0] || null;
+        }
+        const fila = cache ? await cache.buscar(req.claveHash, cargar) : await cargar();
+        if (!fila) throw problemas.noAutenticado();
 
         req.tenantId = fila.id;
         req.scopes = new Set(fila.scopes ? fila.scopes.split(",") : []);

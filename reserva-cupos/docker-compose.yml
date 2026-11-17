@@ -14,6 +14,25 @@ x-ca: &ca
   read_only: true
 
 services:
+  redis:
+    image: redis:8.2-alpine
+    command: [redis-server, /usr/local/etc/redis/redis.conf]
+    environment:
+      REDISCLI_AUTH: redis_local_2026
+    volumes:
+      - redis-data:/data
+      - ./Infraestructura/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - *ca
+      - { type: bind, source: ./seguridad/local/redis.crt, target: /tls/redis.crt, read_only: true }
+      - { type: bind, source: ./seguridad/local/redis.key, target: /tls/redis.key, read_only: true }
+    networks: [interna]
+    healthcheck:
+      test: [CMD, redis-cli, --tls, --cacert, /tls/ca.crt, -h, redis, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
   rabbitmq:
     build:
       context: ./Infraestructura/rabbitmq
@@ -157,6 +176,8 @@ services:
       DB_ADMIN_PASSWORD: admin_local_2026
       # Hash de la clave del operador; la clave no llega al contenedor.
       ADMIN_CLAVE_SHA256_ARCHIVO: /seguridad/admin.sha256
+      REDIS_URL: rediss://redis:6379
+      REDIS_PASSWORD: redis_local_2026
       # Límite de tasa por defecto de cada tenant (token bucket).
       LIMITE_POR_SEGUNDO: "50"
       LIMITE_RAFAGA: "100"
@@ -190,6 +211,8 @@ services:
 
     depends_on:
       mysql-primary:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
     healthcheck:
@@ -656,6 +679,7 @@ networks:
     internal: true
 
 volumes:
+  redis-data:
   rabbitmq-data:
   mysql-primary-data:
   mysql-replica-data:

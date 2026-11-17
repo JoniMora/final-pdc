@@ -11,6 +11,9 @@ const { Problema, enviarProblema, problemas } = require("./problemas");
 const { rutas } = require("./rutas");
 const { crearMetricas } = require("../../../compartido/src/metricas");
 const { rutasAdmin } = require("./admin");
+const { crearRedis } = require('./redis');
+const { crearLimitadorRedis } = require('./limite-redis');
+const { crearCacheAutenticacion } = require('./cache-autenticacion');
 const {
     crearAutenticacion,
     crearExigirPermisos,
@@ -35,10 +38,17 @@ const contrato = yaml.load(fs.readFileSync(CONTRATO, "utf8"));
 
 // Límite de tasa por defecto de cada tenant; el operador puede fijar otro
 // por tenant con PATCH /admin/v1/tenants/{id}.
-const limitar = crearLimitador({
+const metricas = crearMetricas('api');
+const redis = crearRedis();
+const cache = redis ? crearCacheAutenticacion(redis, {
+    observar: resultado => metricas.eventos.inc({ tipo: 'auth_cache', resultado })
+}) : null;
+const opcionesLimite = {
     porSegundo: Number(process.env.LIMITE_POR_SEGUNDO || 50),
-    rafaga: Number(process.env.LIMITE_RAFAGA || 100)
-});
+    rafaga: Number(process.env.LIMITE_RAFAGA || 100),
+    observar: resultado => metricas.eventos.inc({ tipo: 'limite_distribuido', resultado })
+};
+const limitar = redis ? crearLimitadorRedis(redis, opcionesLimite) : crearLimitador(opcionesLimite);
 
 const hashAdministrador = leerHashAdministrador(process.env.ADMIN_CLAVE_SHA256_ARCHIVO);
 
@@ -47,7 +57,8 @@ if (!hashAdministrador) {
 }
 
 const app = express();
-const metricas = crearMetricas("api");
+app.locals.cacheAutenticacion = cache;
+app.use((req, res, next) => { res.set('X-Instancia', INSTANCIA); next(); });
 
 app.use((req, res, next) => {
     const inicio = process.hrtime.bigint();
@@ -119,7 +130,9 @@ app.get("/health", async (req, res) => {
 // responde 401 aunque además sea inválida. Después se descuenta del límite
 // de tasa del tenant, también antes de validar: una ráfaga de solicitudes
 // inválidas consume el cupo igual que una de válidas.
-app.use("/v1", crearAutenticacion(pool, limitar), limitar);
+app.use("/v1", crearAutenticacion(pool, limitar, { cache,
+    observarConsulta: () => metricas.eventos.inc({ tipo: 'auth_mysql', resultado: 'consulta' })
+}), limitar);
 app.use("/admin", crearAutenticacionAdministrador(pool, hashAdministrador));
 
 app.use(OpenApiValidator.middleware({
@@ -186,7 +199,7 @@ app.use((error, req, res, next) => {
     // La base no responde: lo admitido ya está guardado y el cliente
     // puede reintentar con la misma Idempotency-Key.
     if (esErrorDeInfraestructura(error)) {
-        console.error("[API] MySQL no disponible:", error.code || error.message);
+        console.error("[API] Infraestructura no disponible:", error.code || error.message);
         return enviarProblema(res, problemas.noDisponible());
     }
 
