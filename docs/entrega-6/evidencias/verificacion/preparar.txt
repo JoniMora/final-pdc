@@ -1,0 +1,2 @@
+Nada que generar: C:\Users\mcons\Documents\final-pdc\reserva-cupos\seguridad\local ya estaba completo.
+Credenciales de desarrollo: C:\Users\mcons\Documents\final-pdc\reserva-cupos\seguridad\local\accesos-locales.txt

@@ -1,0 +1,178 @@
+TAP version 13
+# Subtest: cada operación de /v1 declara exactamente un permiso en el contrato
+ok 1 - cada operación de /v1 declara exactamente un permiso en el contrato
+  ---
+  duration_ms: 1.4636
+  type: 'test'
+  ...
+# Subtest: una clave sin el permiso que pide la operación recibe 403
+ok 2 - una clave sin el permiso que pide la operación recibe 403
+  ---
+  duration_ms: 0.9375
+  type: 'test'
+  ...
+# Subtest: el límite de tasa responde 429 con Retry-After y se recupera con el tiempo
+ok 3 - el límite de tasa responde 429 con Retry-After y se recupera con el tiempo
+  ---
+  duration_ms: 0.8408
+  type: 'test'
+  ...
+# Subtest: un tenant saturado no consume el cupo de otro
+ok 4 - un tenant saturado no consume el cupo de otro
+  ---
+  duration_ms: 0.3492
+  type: 'test'
+  ...
+# Subtest: con el balde agotado, la clave recibe 429 sin consultar la base
+ok 5 - con el balde agotado, la clave recibe 429 sin consultar la base
+  ---
+  duration_ms: 1.7837
+  type: 'test'
+  ...
+# Subtest: el límite propio del tenant reemplaza al de la plataforma
+ok 6 - el límite propio del tenant reemplaza al de la plataforma
+  ---
+  duration_ms: 0.4504
+  type: 'test'
+  ...
+# Subtest: /admin: sin clave 401, clave de tenant 403, clave del operador pasa
+ok 7 - /admin: sin clave 401, clave de tenant 403, clave del operador pasa
+  ---
+  duration_ms: 1.6161
+  type: 'test'
+  ...
+# Subtest: sin hash del operador configurado, /admin no acepta ninguna clave
+ok 8 - sin hash del operador configurado, /admin no acepta ninguna clave
+  ---
+  duration_ms: 0.6586
+  type: 'test'
+  ...
+# Subtest: 50 admisiones comparten un commit y todas quedan persistidas
+ok 9 - 50 admisiones comparten un commit y todas quedan persistidas
+  ---
+  duration_ms: 5.9208
+  type: 'test'
+  ...
+# Subtest: ninguna admision se resuelve antes de confirmar el lote
+ok 10 - ninguna admision se resuelve antes de confirmar el lote
+  ---
+  duration_ms: 5.5826
+  type: 'test'
+  ...
+# Subtest: una duplicada revierte el lote y no pierde solicitudes validas
+ok 11 - una duplicada revierte el lote y no pierde solicitudes validas
+  ---
+  duration_ms: 0.8707
+  type: 'test'
+  ...
+# Subtest: si falla el commit nunca se informa una escritura no persistida
+ok 12 - si falla el commit nunca se informa una escritura no persistida
+  ---
+  duration_ms: 0.6604
+  type: 'test'
+  ...
+# Subtest: un lote incompleto termina sin esperar mas solicitudes
+ok 13 - un lote incompleto termina sin esperar mas solicitudes
+  ---
+  duration_ms: 12.5298
+  type: 'test'
+  ...
+# Subtest: varios lotes conservan todas las admisiones sin transacciones superpuestas
+ok 14 - varios lotes conservan todas las admisiones sin transacciones superpuestas
+  ---
+  duration_ms: 97.2693
+  type: 'test'
+  ...
+# Subtest: un lote SQL usa solo dos consultas y conserva tenant, idempotencia y outbox
+ok 15 - un lote SQL usa solo dos consultas y conserva tenant, idempotencia y outbox
+  ---
+  duration_ms: 2.2621
+  type: 'test'
+  ...
+# Subtest: si falla la escritura masiva revierte y recupera cada admision individual
+ok 16 - si falla la escritura masiva revierte y recupera cada admision individual
+  ---
+  duration_ms: 0.5188
+  type: 'test'
+  ...
+# Subtest: cada ruta de la API está en el contrato y viceversa
+ok 17 - cada ruta de la API está en el contrato y viceversa
+  ---
+  duration_ms: 2.8335
+  type: 'test'
+  ...
+# Subtest: uuidv7 genera UUID versión 7 ordenados por tiempo
+ok 18 - uuidv7 genera UUID versión 7 ordenados por tiempo
+  ---
+  duration_ms: 7.5825
+  type: 'test'
+  ...
+# Subtest: jsonCanonico no depende del orden de las claves
+ok 19 - jsonCanonico no depende del orden de las claves
+  ---
+  duration_ms: 0.4797
+  type: 'test'
+  ...
+# Subtest: metadata acepta objetos de hasta 16 KB y rechaza el resto
+ok 20 - metadata acepta objetos de hasta 16 KB y rechaza el resto
+  ---
+  duration_ms: 1.5171
+  type: 'test'
+  ...
+# Subtest: cache-aside comparte resultado y reduce lecturas MySQL
+ok 21 - cache-aside comparte resultado y reduce lecturas MySQL
+  ---
+  duration_ms: 2.9681
+  type: 'test'
+  ...
+# Subtest: una rafaga fria del mismo hash comparte la consulta en vuelo
+ok 22 - una rafaga fria del mismo hash comparte la consulta en vuelo
+  ---
+  duration_ms: 11.4877
+  type: 'test'
+  ...
+# Subtest: cambio de permisos invalida cache de todas las instancias
+ok 23 - cambio de permisos invalida cache de todas las instancias
+  ---
+  duration_ms: 1.4058
+  type: 'test'
+  ...
+# Subtest: lectura anterior a rotacion no repuebla la generacion nueva
+ok 24 - lectura anterior a rotacion no repuebla la generacion nueva
+  ---
+  duration_ms: 6.1065
+  type: 'test'
+  ...
+# Subtest: durante una mutacion no se autentica con permisos intermedios
+ok 25 - durante una mutacion no se autentica con permisos intermedios
+  ---
+  duration_ms: 1.3193
+  type: 'test'
+  ...
+# Subtest: limite usa tenant como clave global y respeta Retry-After
+ok 26 - limite usa tenant como clave global y respeta Retry-After
+  ---
+  duration_ms: 0.6694
+  type: 'test'
+  ...
+# Subtest: si Redis falla no hay fallback a un limite por instancia
+ok 27 - si Redis falla no hay fallback a un limite por instancia
+  ---
+  duration_ms: 0.5646
+  type: 'test'
+  ...
+# Subtest: autenticacion usa cache sin cambiar el aislamiento por tenant
+ok 28 - autenticacion usa cache sin cambiar el aislamiento por tenant
+  ---
+  duration_ms: 1.5234
+  type: 'test'
+  ...
+1..28
+# tests 28
+# suites 0
+# pass 28
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1341.2519

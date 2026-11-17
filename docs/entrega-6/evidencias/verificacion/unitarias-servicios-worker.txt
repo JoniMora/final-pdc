@@ -1,0 +1,46 @@
+TAP version 13
+# Subtest: un comando válido se ejecuta y se confirma
+ok 1 - un comando válido se ejecuta y se confirma
+  ---
+  duration_ms: 5.4597
+  type: 'test'
+  ...
+# Subtest: un mensaje fuera de contrato va a la DLQ sin ejecutarse
+ok 2 - un mensaje fuera de contrato va a la DLQ sin ejecutarse
+  ---
+  duration_ms: 0.5504
+  type: 'test'
+  ...
+# Subtest: un error de infraestructura reencola sin consumir reintentos
+ok 3 - un error de infraestructura reencola sin consumir reintentos
+  ---
+  duration_ms: 0.393
+  type: 'test'
+  ...
+# Subtest: una reserva inexistente va a la DLQ sin reintentos
+ok 4 - una reserva inexistente va a la DLQ sin reintentos
+  ---
+  duration_ms: 0.3834
+  type: 'test'
+  ...
+# Subtest: agotados los reintentos, un reservar deja la reserva fallida
+ok 5 - agotados los reintentos, un reservar deja la reserva fallida
+  ---
+  duration_ms: 0.4775
+  type: 'test'
+  ...
+# Subtest: agotados los reintentos, un cancelar va a la DLQ y no se marca fallida
+ok 6 - agotados los reintentos, un cancelar va a la DLQ y no se marca fallida
+  ---
+  duration_ms: 2.5266
+  type: 'test'
+  ...
+1..6
+# tests 6
+# suites 0
+# pass 6
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 590.2007

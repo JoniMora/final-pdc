@@ -24,6 +24,12 @@ const argumentos = ['compose', '-f', 'docker-compose.yml',
 const carpeta = path.resolve(RAIZ, '../docs/entrega-6/evidencias');
 const informe = { particiones: n, fecha: new Date().toISOString(), actividades,
     porActividad, capacidad, total, conexionesHttpMaximas: 64, comprobaciones: [], aprobada: false };
+const { createHash } = require('node:crypto');
+informe.codigoPrueba = createHash('sha256').update([
+    __filename, path.resolve(RAIZ, 'servicios/api/src/server.js'),
+    path.resolve(RAIZ, 'servicios/api/src/admisiones.js'),
+    path.resolve(RAIZ, 'servicios/worker/src/main.js')
+].map(archivo => fs.readFileSync(archivo, 'utf8')).join('\n')).digest('hex');
 
 async function docker(args) {
     return ejecutar('docker', [...argumentos, ...args], {
@@ -144,12 +150,16 @@ async function main() {
         const anterior = path.join(carpeta, 'multi-particiones-n1.json');
         if (fs.existsSync(anterior)) {
             const base = JSON.parse(fs.readFileSync(anterior, 'utf8'));
-            if (base.aprobada && base.total === total && base.actividades === actividades) {
+            if (base.aprobada && base.total === total && base.actividades === actividades
+                && base.codigoPrueba === informe.codigoPrueba && !process.env.CI) {
                 informe.comparacion = { referencia: base.fecha,
                     factor: informe.decisionesPorSegundo / base.decisionesPorSegundo };
                 informe.mejoraObservada = informe.comparacion.factor > 1;
                 console.log(`Comparacion N4/N1: ${informe.comparacion.factor.toFixed(2)}x. `
                     + (informe.mejoraObservada ? 'Hay mejora observada.' : 'No se demostro mejora: investigar cuello de botella.'));
+            } else {
+                informe.comparacionPendiente = 'Repetir N=1 y N=4 con el mismo codigo y en el mismo entorno; no comparar con evidencia historica o de otro runner CI';
+                console.log(informe.comparacionPendiente);
             }
         }
     }

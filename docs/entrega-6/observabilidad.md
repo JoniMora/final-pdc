@@ -86,3 +86,12 @@ de carga, escalado y fallos parciales de los issues #46 a #50.
 
 El cierre del issue #45 queda sujeto a revisar sus criterios y
 la implementación en el pull request.
+
+## Ampliacion preparada para Redis y circuitos
+
+El dashboard incorpora paneles de estado y transiciones del circuito por tenant,
+cache de autenticacion, consultas a MySQL, limite distribuido y demora total de
+webhooks. Prometheus tambien consulta los workers de las particiones adicionales.
+Estas ampliaciones requieren ejecutar `scripts/verificar-e6.js todo` y revisar
+los paneles con trafico real. Las capturas anteriores corresponden a la base ya
+verificada; no acreditan las nuevas integraciones.

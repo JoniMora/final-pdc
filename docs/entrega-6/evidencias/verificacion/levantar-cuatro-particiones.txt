@@ -1,0 +1,520 @@
+#1 [internal] load local bake definitions
+#1 reading from stdin 7.77kB 0.0s done
+#1 DONE 0.0s
+
+#2 [worker-p3 internal] load build definition from Dockerfile
+#2 transferring dockerfile:
+#2 transferring dockerfile: 612B 0.1s done
+#2 ...
+
+#3 [mysql-replica internal] load build definition from Dockerfile
+#3 transferring dockerfile: 191B 0.1s done
+#3 DONE 0.4s
+
+#4 [mysql-primary internal] load build definition from Dockerfile
+#4 transferring dockerfile: 193B 0.1s done
+#4 DONE 0.4s
+
+#2 [worker-p3 internal] load build definition from Dockerfile
+#2 DONE 0.5s
+
+#5 [aula internal] load build definition from Dockerfile
+#5 transferring dockerfile: 517B 0.1s done
+#5 DONE 0.5s
+
+#6 [worker-p1 context contrato] load .dockerignore
+#6 ...
+
+#7 [notificador internal] load build definition from Dockerfile
+#7 transferring dockerfile: 622B 0.1s done
+#7 DONE 0.6s
+
+#8 [api internal] load build definition from Dockerfile
+#8 transferring dockerfile: 577B 0.0s done
+#8 DONE 0.7s
+
+#9 [rabbitmq internal] load build definition from Dockerfile
+#9 transferring dockerfile: 176B 0.1s done
+#9 DONE 0.7s
+
+#6 [notificador context contrato] load .dockerignore
+#6 ...
+
+#10 [relay internal] load build definition from Dockerfile
+#10 transferring dockerfile: 610B 0.0s done
+#10 DONE 0.8s
+
+#6 [api context contrato] load .dockerignore
+#6 transferring contrato: 2B 0.0s done
+#6 DONE 0.5s
+
+#11 [rabbitmq internal] load metadata for docker.io/library/rabbitmq:4-management
+#11 DONE 0.3s
+
+#12 [rabbitmq internal] load .dockerignore
+#12 transferring context: 2B done
+#12 DONE 0.1s
+
+#13 [relay context compartido] load .dockerignore
+#13 transferring compartido: 54B 0.0s done
+#13 DONE 0.6s
+
+#14 [relay internal] load metadata for docker.io/library/node:22-alpine
+#14 ...
+
+#15 [rabbitmq 1/2] FROM docker.io/library/rabbitmq:4-management@sha256:8dd6e3570ddaa2ef82a6c3a8950e79c1f73893adfbdddbc374fc1f1ac8a0f5dd
+#15 resolve docker.io/library/rabbitmq:4-management@sha256:8dd6e3570ddaa2ef82a6c3a8950e79c1f73893adfbdddbc374fc1f1ac8a0f5dd 0.1s done
+#15 DONE 0.1s
+
+#16 [rabbitmq 2/2] RUN rabbitmq-plugins enable --offline     rabbitmq_consistent_hash_exchange     rabbitmq_prometheus
+#16 CACHED
+
+#17 [rabbitmq] exporting to image
+#17 exporting layers done
+#17 exporting manifest sha256:dafe7c9be59f9995114e428cec4b9c12b9cd51e28b6fec5e36dd9aa6952772a6 0.1s done
+#17 exporting config sha256:529049d6565993307a3b3e30f29efc6b1605e148addecfd687d974b93056027f
+#17 exporting config sha256:529049d6565993307a3b3e30f29efc6b1605e148addecfd687d974b93056027f 0.0s done
+#17 ...
+
+#14 [aula internal] load metadata for docker.io/library/node:22-alpine
+#14 DONE 1.2s
+
+#18 [mysql-primary internal] load metadata for docker.io/library/mysql:8.4
+#18 DONE 1.4s
+
+#17 [rabbitmq] exporting to image
+#17 exporting attestation manifest sha256:31de3abaeaf1e53e22d3a786314ffd595ef316c753dee74d9d95d151c7ed37fc
+#17 exporting attestation manifest sha256:31de3abaeaf1e53e22d3a786314ffd595ef316c753dee74d9d95d151c7ed37fc 0.3s done
+#17 exporting manifest list sha256:f9a7bc49ca9fc56cb954e37d246201d121d445874385b0d87cd07361a53c81d5
+#17 ...
+
+#19 [relay internal] load .dockerignore
+#19 transferring context: 85B 0.0s done
+#19 DONE 0.4s
+
+#20 [relay context compartido] load from client
+#20 DONE 0.0s
+
+#21 [relay context compartido] load from client
+#21 DONE 0.0s
+
+#22 [relay context contrato] load from client
+#22 DONE 0.0s
+
+#23 [api internal] load .dockerignore
+#23 transferring context: 2B 0.0s done
+#23 DONE 0.6s
+
+#24 [worker internal] load .dockerignore
+#24 transferring context: 2B done
+#24 DONE 0.7s
+
+#20 [api context compartido] load from client
+#20 DONE 0.0s
+
+#21 [api context compartido] load from client
+#21 DONE 0.0s
+
+#22 [api context contrato] load from client
+#22 DONE 0.0s
+
+#25 [notificador internal] load .dockerignore
+#25 transferring context: 85B 0.0s done
+#25 DONE 0.8s
+
+#17 [rabbitmq] exporting to image
+#17 exporting manifest list sha256:f9a7bc49ca9fc56cb954e37d246201d121d445874385b0d87cd07361a53c81d5 0.4s done
+#17 naming to docker.io/library/reserva-cupos-infra-rabbitmq:latest
+#17 ...
+
+#20 [worker-p1 context compartido] load from client
+#20 DONE 0.0s
+
+#21 [worker-p1 context compartido] load from client
+#21 DONE 0.0s
+
+#22 [worker-p1 context contrato] load from client
+#22 DONE 0.0s
+
+#26 [aula internal] load .dockerignore
+#26 transferring context: 87B 0.0s done
+#26 DONE 0.9s
+
+#17 [rabbitmq] exporting to image
+#17 naming to docker.io/library/reserva-cupos-infra-rabbitmq:latest 0.1s done
+#17 unpacking to docker.io/library/reserva-cupos-infra-rabbitmq:latest
+#17 ...
+
+#20 [notificador context compartido] load from client
+#20 DONE 0.0s
+
+#21 [notificador context compartido] load from client
+#21 DONE 0.0s
+
+#22 [notificador context contrato] load from client
+#22 DONE 0.0s
+
+#27 [mysql-primary internal] load .dockerignore
+#27 transferring context: 2B done
+#27 DONE 1.0s
+
+#28 [notificador internal] load build context
+#28 DONE 0.0s
+
+#29 [mysql-replica internal] load .dockerignore
+#29 transferring context: 2B done
+#29 DONE 1.1s
+
+#17 [rabbitmq] exporting to image
+#17 unpacking to docker.io/library/reserva-cupos-infra-rabbitmq:latest 0.1s done
+#17 DONE 1.4s
+
+#20 [aula context compartido] load from client
+#20 DONE 0.0s
+
+#21 [aula context compartido] load from client
+#21 DONE 0.0s
+
+#22 [aula context contrato] load from client
+#22 DONE 0.0s
+
+#30 [worker stage-0  1/10] FROM docker.io/library/node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a
+#30 resolve docker.io/library/node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a 0.5s done
+#30 DONE 0.6s
+
+#31 [worker internal] load build context
+#31 transferring context: 13.78kB 0.1s done
+#31 DONE 0.6s
+
+#32 [mysql-replica 1/4] FROM docker.io/library/mysql:8.4@sha256:a81d043930e51745522bd5c430961cf8286f0a23f0a9a2a6e0108f7ea71b0902
+#32 resolve docker.io/library/mysql:8.4@sha256:a81d043930e51745522bd5c430961cf8286f0a23f0a9a2a6e0108f7ea71b0902 0.3s done
+#32 DONE 0.4s
+
+#33 [api internal] load build context
+#33 transferring context: 477B 0.0s done
+#33 DONE 0.9s
+
+#34 [relay internal] load build context
+#34 transferring context: 31.28kB 0.1s done
+#34 DONE 1.2s
+
+#22 [api context contrato] load from client
+#22 transferring contrato: 68B 0.0s done
+#22 ...
+
+#28 [notificador internal] load build context
+#28 transferring context: 296B 0.0s done
+#28 DONE 0.6s
+
+#22 [notificador context contrato] load from client
+#22 DONE 0.7s
+
+#21 [notificador context compartido] load from client
+#21 transferring compartido: 16.84kB 0.0s done
+#21 DONE 0.9s
+
+#35 [aula internal] load build context
+#35 transferring context: 369B 0.0s done
+#35 DONE 1.0s
+
+#20 [notificador context compartido] load from client
+#20 transferring compartido: 6.28kB 0.0s done
+#20 ...
+
+#36 [mysql-replica internal] load build context
+#36 transferring context: 97B done
+#36 DONE 1.0s
+
+#37 [mysql-primary internal] load build context
+#37 transferring context: 212B 0.1s done
+#37 DONE 1.2s
+
+#20 [notificador context compartido] load from client
+#20 DONE 1.4s
+
+#38 [mysql-primary 2/4] COPY primary.cnf /etc/mysql/conf.d/primary.cnf
+#38 CACHED
+
+#39 [mysql-primary 3/4] RUN chmod 644 /etc/mysql/conf.d/primary.cnf
+#39 CACHED
+
+#40 [mysql-primary 4/4] COPY init/ /docker-entrypoint-initdb.d/
+#40 CACHED
+
+#41 [mysql-replica 3/4] RUN chmod 644 /etc/mysql/conf.d/replica.cnf
+#41 CACHED
+
+#42 [mysql-replica 2/4] COPY replica.cnf /etc/mysql/conf.d/replica.cnf
+#42 CACHED
+
+#43 [mysql-replica 4/4] COPY init/ /docker-entrypoint-initdb.d/
+#43 CACHED
+
+#44 [mysql-primary] exporting to image
+#44 ...
+
+#45 [relay stage-0  8/10] COPY package.json package-lock.json ./
+#45 CACHED
+
+#46 [relay stage-0  7/10] WORKDIR /app/servicios/relay
+#46 CACHED
+
+#47 [relay stage-0  9/10] RUN npm ci --omit=dev
+#47 CACHED
+
+#48 [worker-p2 stage-0  9/10] RUN npm ci --omit=dev
+#48 CACHED
+
+#49 [worker-p2 stage-0  8/10] COPY package.json package-lock.json ./
+#49 CACHED
+
+#50 [worker-p2 stage-0  7/10] WORKDIR /app/servicios/worker
+#50 CACHED
+
+#51 [worker-p2 stage-0  2/10] WORKDIR /app/compartido
+#51 CACHED
+
+#52 [worker-p2 stage-0  5/10] COPY --from=compartido src ./src
+#52 CACHED
+
+#53 [api stage-0  9/10] RUN npm ci --omit=dev
+#53 CACHED
+
+#54 [api stage-0  7/10] WORKDIR /app/servicios/api
+#54 CACHED
+
+#55 [api stage-0  8/10] COPY package.json package-lock.json ./
+#55 CACHED
+
+#56 [worker-p2 stage-0  6/10] COPY --from=contrato openapi.yaml asyncapi.yaml /app/contrato/
+#56 CACHED
+
+#57 [worker-p2 stage-0  4/10] RUN npm ci --omit=dev
+#57 CACHED
+
+#58 [worker-p2 stage-0  3/10] COPY --from=compartido package.json package-lock.json ./
+#58 CACHED
+
+#44 [mysql-primary] exporting to image
+#44 exporting layers done
+#44 exporting manifest sha256:71f7be88f958ba5b77bc1e207dd4346edc84ed17a0cf9f957d6a3fcf70144100 0.0s done
+#44 exporting config sha256:70cb0441f1d6652082d183a8a83ed7e5d23b4bf96559dc2cae5e17e55cf2f802 0.0s done
+#44 ...
+
+#59 [relay stage-0 10/10] COPY src ./src
+#59 CACHED
+
+#60 [aula stage-0  9/11] RUN npm install --omit=dev
+#60 CACHED
+
+#61 [aula stage-0 10/11] COPY src ./src
+#61 CACHED
+
+#62 [aula stage-0  8/11] COPY package.json ./
+#62 CACHED
+
+#63 [aula stage-0  7/11] WORKDIR /app/clientes/aula
+#63 CACHED
+
+#64 [aula stage-0 11/11] COPY public ./public
+#64 CACHED
+
+#65 [worker-p1 stage-0 10/10] COPY src ./src
+#65 CACHED
+
+#66 [notificador stage-0  9/10] RUN npm ci --omit=dev
+#66 CACHED
+
+#67 [notificador stage-0  8/10] COPY package.json package-lock.json ./
+#67 CACHED
+
+#58 [notificador stage-0  3/10] COPY --from=compartido package.json package-lock.json ./
+#58 CACHED
+
+#56 [notificador stage-0  6/10] COPY --from=contrato openapi.yaml asyncapi.yaml /app/contrato/
+#56 CACHED
+
+#52 [notificador stage-0  5/10] COPY --from=compartido src ./src
+#52 CACHED
+
+#51 [notificador stage-0  2/10] WORKDIR /app/compartido
+#51 CACHED
+
+#68 [notificador stage-0  7/10] WORKDIR /app/servicios/notificador
+#68 CACHED
+
+#57 [notificador stage-0  4/10] RUN npm ci --omit=dev
+#57 CACHED
+
+#69 [api stage-0 10/10] COPY src ./src
+#69 CACHED
+
+#70 [notificador stage-0 10/10] COPY src ./src
+#70 CACHED
+
+#71 [api] exporting to image
+#71 exporting layers done
+#71 exporting manifest sha256:25fe005b2120ddc607ffd7b4491dff3b22085498d2d9d33563d357cefa012829
+#71 exporting manifest sha256:25fe005b2120ddc607ffd7b4491dff3b22085498d2d9d33563d357cefa012829 0.3s done
+#71 exporting config sha256:c8a8ad60c3668afb7e2286b1019c8ef215b67e01ab16733540df226bc20a1fd1
+#71 ...
+
+#72 [rabbitmq] resolving provenance for metadata file
+#72 DONE 0.3s
+
+#73 [aula] exporting to image
+#73 exporting layers done
+#73 exporting manifest sha256:6e03add0a30485f4da60828334d251d82b307346670eec2aa704abb96078c316 0.4s done
+#73 exporting config sha256:d96637d73e1d7677175dcf97c6de27fdd3d96888d202c4f123dd3c7fb55c521d
+#73 exporting config sha256:d96637d73e1d7677175dcf97c6de27fdd3d96888d202c4f123dd3c7fb55c521d 0.3s done
+#73 exporting attestation manifest sha256:e7e99e8e045f182d812936cf497ede1a99422af2fdfb4397ed72e3be55428670
+#73 exporting attestation manifest sha256:e7e99e8e045f182d812936cf497ede1a99422af2fdfb4397ed72e3be55428670 2.8s done
+#73 exporting manifest list sha256:05772d8a24d84008e57d646f47a34d5e78cd8b6c6eefe39e5f915b5258271008
+#73 ...
+
+#74 [mysql-replica] exporting to image
+#74 exporting layers done
+#74 exporting manifest sha256:37c89e920704cd49295e4b2640895fc4e55b30f6f37922b753a9251dda2a76d6 0.0s done
+#74 exporting config sha256:48718821694389b09439bf1ad609b4081c63c66916fd696118dc1dfe6fc202bb 0.1s done
+#74 exporting attestation manifest sha256:14003e7d671344bd09feec51f319dd090e0279f46915ca0164b12ecc126b8835 1.4s done
+#74 exporting manifest list sha256:109b0313b27f60edaba7487457e3227e8810a60193392040570f1ec9cb6f8e54 1.8s done
+#74 naming to docker.io/library/reserva-cupos-infra-mysql-replica:latest 0.5s done
+#74 unpacking to docker.io/library/reserva-cupos-infra-mysql-replica:latest
+#74 ...
+
+#44 [mysql-primary] exporting to image
+#44 exporting attestation manifest sha256:2aa13023f625852f724978cc75993b190560191326dc39c610eeb1504f0e00bc 1.3s done
+#44 exporting manifest list sha256:819e95ab7ecd5284fc79930cc64ec8807e95a4c1b0e87eafa1a43d35af036f6d 1.1s done
+#44 naming to docker.io/library/reserva-cupos-infra-mysql-primary:latest 0.9s done
+#44 unpacking to docker.io/library/reserva-cupos-infra-mysql-primary:latest 2.1s done
+#44 DONE 7.2s
+
+#75 [worker] exporting to image
+#75 exporting layers done
+#75 exporting manifest sha256:3347bbf778a60e497ed97d36e3f62eace99ca7da4381028ebed185dc15bda105 0.4s done
+#75 exporting config sha256:0a6a0897aa20dc553a09333c38f528640b162af25678562ce9aa87b646479789 0.3s done
+#75 exporting attestation manifest sha256:5869610f3093a8ecf7600e91716d32490f49d6242d2fed4387e4afec85787b52 1.6s done
+#75 exporting manifest list sha256:ab0ba34991be6d515a10d72ba214035bfba1703c3ab1f67262ea5c0653070fc8 3.0s done
+#75 naming to docker.io/library/reserva-cupos-infra-worker:latest
+#75 naming to docker.io/library/reserva-cupos-infra-worker:latest 0.5s done
+#75 unpacking to docker.io/library/reserva-cupos-infra-worker:latest
+#75 ...
+
+#73 [aula] exporting to image
+#73 exporting manifest list sha256:05772d8a24d84008e57d646f47a34d5e78cd8b6c6eefe39e5f915b5258271008 2.2s done
+#73 naming to docker.io/library/reserva-cupos-infra-aula:latest
+#73 ...
+
+#74 [mysql-replica] exporting to image
+#74 unpacking to docker.io/library/reserva-cupos-infra-mysql-replica:latest 2.6s done
+#74 DONE 7.4s
+
+#73 [aula] exporting to image
+#73 naming to docker.io/library/reserva-cupos-infra-aula:latest 0.2s done
+#73 unpacking to docker.io/library/reserva-cupos-infra-aula:latest
+#73 ...
+
+#76 [notificador] exporting to image
+#76 exporting layers done
+#76 exporting manifest sha256:71728f79d7e8c00166a13aa8eabfdb6222fc55f55c070f41956414561e62e0f5 0.3s done
+#76 exporting config sha256:7a27b68a92854bfd2e0b7982aea9cede14af3df9b70bf26230abca1eb5fd7401 0.3s done
+#76 exporting attestation manifest sha256:b1984c102188ee3b9155b7a87749ed6f4a4432f6ca1c4c3d1c7f62be7f779f9e 2.3s done
+#76 exporting manifest list sha256:c13e46a96caee8477db96928171675c0fee5b173fe08358bc8bec6f6d1d24683 2.0s done
+#76 naming to docker.io/library/reserva-cupos-infra-notificador:latest 1.0s done
+#76 unpacking to docker.io/library/reserva-cupos-infra-notificador:latest 0.9s done
+#76 DONE 8.3s
+
+#77 [worker-p1] exporting to image
+#77 exporting layers done
+#77 exporting manifest sha256:60a9ab9a206125fb091540107dcbac682ccf4976e57b28c0fc665bf9f271c773 0.4s done
+#77 exporting config sha256:91b04927a59c9d07e9bfa8733255329d50b49a3a652c0e23f0cc1285f28b5572 0.3s done
+#77 exporting attestation manifest sha256:db138d48488d45de521e1dce5260286128488bf97d1a656aea9351f0871cab2d 2.2s done
+#77 exporting manifest list sha256:513c4b20d957db55f5de8afbd467a0ccca1f2ba93ce94b75d46235ae27beb5a6 2.1s done
+#77 naming to docker.io/library/reserva-cupos-infra-worker-p1:latest 0.9s done
+#77 unpacking to docker.io/library/reserva-cupos-infra-worker-p1:latest 1.0s done
+#77 DONE 8.4s
+
+#75 [worker] exporting to image
+#75 unpacking to docker.io/library/reserva-cupos-infra-worker:latest 1.1s done
+#75 DONE 8.6s
+
+#78 [worker-p3] exporting to image
+#78 exporting layers done
+#78 exporting manifest sha256:bca65256c863e8a097a7607bee0a6acd3b1ac58e58fb668a3c4d26f547a32226 0.4s done
+#78 exporting config sha256:5da7296ca4e2e90aa613fa0183d670577cf73c988fc37c1727c0d4b1fd367719 0.3s done
+#78 exporting attestation manifest sha256:1365a31135db23dddd69dc5882aee339d8add7e85e940b081007b44d3199606f 2.7s done
+#78 exporting manifest list sha256:3d5bbfb727006675af5f8de0b81325059c32f1fa9e66b477201857d1e1006839 2.4s done
+#78 naming to docker.io/library/reserva-cupos-infra-worker-p3:latest 0.2s done
+#78 unpacking to docker.io/library/reserva-cupos-infra-worker-p3:latest 1.2s done
+#78 ...
+
+#73 [aula] exporting to image
+#73 unpacking to docker.io/library/reserva-cupos-infra-aula:latest 1.6s done
+#73 ...
+
+#79 [relay] exporting to image
+#79 exporting layers done
+#79 exporting manifest sha256:91ed03791bf916e73673ce65e239d88c9fca118be33c24872d6b8f4d8514b3a6 0.3s done
+#79 exporting config sha256:e4bf1bf25e752db00e0743e51e7cddf5e7be96512bda4204fe8e8a6446bf4575 0.3s done
+#79 exporting attestation manifest sha256:b34047058085c7e2ed821e9c5c42948ab56bd20810702e6785e51e24ab4492c6 2.0s done
+#79 exporting manifest list sha256:2449a8a4c6eaf5060eec449fe3874464f4061b0e0a7498cf957db0d2fc831f59 3.0s done
+#79 naming to docker.io/library/reserva-cupos-infra-relay:latest 0.4s done
+#79 unpacking to docker.io/library/reserva-cupos-infra-relay:latest 1.1s done
+#79 DONE 8.9s
+
+#80 [worker-p2] exporting to image
+#80 exporting layers done
+#80 exporting manifest sha256:8badc6dcb28e35286525b4690f7852918cab960e6dd16de82408f4738b78afd6 0.3s done
+#80 exporting config sha256:ebe595b812a1246310d4e9f5b9e558fc4e0bdada87dd90073f43ff3798b94c32 0.3s done
+#80 exporting attestation manifest sha256:a38f6b4141f6aa5297b57c1ef342c00b29f3b7d1fb891d92c468293dc69f646a 2.3s done
+#80 exporting manifest list sha256:9bc52d0e0fb9ef25c72e737efea4d77b0e60a4ac425641135ccd9f1e90381ad4 2.9s done
+#80 naming to docker.io/library/reserva-cupos-infra-worker-p2:latest 0.3s done
+#80 unpacking to docker.io/library/reserva-cupos-infra-worker-p2:latest 1.1s done
+#80 DONE 9.0s
+
+#71 [api] exporting to image
+#71 exporting config sha256:c8a8ad60c3668afb7e2286b1019c8ef215b67e01ab16733540df226bc20a1fd1 0.3s done
+#71 exporting attestation manifest sha256:ea7e2f40c84dac8568a3efedddaee27811744eb05db9631663cad0c3b0849d2a 2.2s done
+#71 exporting manifest list sha256:98951b4fa46d4edff764a35fb2524e83f3b6aacd87c373a8c4ff983e9cfb0796 3.0s done
+#71 naming to docker.io/library/reserva-cupos-infra-api:latest 0.2s done
+#71 unpacking to docker.io/library/reserva-cupos-infra-api:latest 1.1s done
+#71 DONE 8.9s
+
+#78 [worker-p3] exporting to image
+#78 DONE 8.9s
+
+#73 [aula] exporting to image
+#73 DONE 9.1s
+
+#81 [mysql-primary] resolving provenance for metadata file
+#81 DONE 5.1s
+
+#82 [mysql-replica] resolving provenance for metadata file
+#82 ...
+
+#83 [worker-p3] resolving provenance for metadata file
+#83 DONE 3.5s
+
+#84 [worker] resolving provenance for metadata file
+#84 DONE 3.9s
+
+#85 [aula] resolving provenance for metadata file
+#85 DONE 4.7s
+
+#86 [api] resolving provenance for metadata file
+#86 DONE 3.0s
+
+#87 [relay] resolving provenance for metadata file
+#87 DONE 2.5s
+
+#88 [worker-p2] resolving provenance for metadata file
+#88 DONE 2.0s
+
+#89 [notificador] resolving provenance for metadata file
+#89 DONE 1.8s
+
+#90 [worker-p1] resolving provenance for metadata file
+#90 DONE 3.4s
+
+#82 [mysql-replica] resolving provenance for metadata file
+#82 DONE 4.8s

@@ -133,6 +133,10 @@ async function main() {
             return nodo("scripts/preparar-seguridad.js");
         case "levantar":
             return levantar();
+        case "replica":
+            return configurarReplica();
+        case "comprobar-topologia":
+            return exigirTopologiaOriginal();
         case "estado":
             return estado();
         case "tenant":

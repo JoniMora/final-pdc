@@ -1,0 +1,130 @@
+TAP version 13
+# Subtest: cada ejemplo de asyncapi.yaml cumple el esquema de su mensaje
+ok 1 - cada ejemplo de asyncapi.yaml cumple el esquema de su mensaje
+  ---
+  duration_ms: 146.2529
+  type: 'test'
+  ...
+# Subtest: los ejemplos cubren cada mensaje y cada una de sus propiedades
+ok 2 - los ejemplos cubren cada mensaje y cada una de sus propiedades
+  ---
+  duration_ms: 3.4166
+  type: 'test'
+  ...
+# Subtest: el contrato es compatible consigo mismo
+ok 3 - el contrato es compatible consigo mismo
+  ---
+  duration_ms: 140.5252
+  type: 'test'
+  ...
+# Subtest: un campo obligatorio nuevo rompe a los mensajes que siguen en las colas
+ok 4 - un campo obligatorio nuevo rompe a los mensajes que siguen en las colas
+  ---
+  duration_ms: 103.7375
+  type: 'test'
+  ...
+# Subtest: un campo opcional nuevo rompe a los consumidores que todavía no se actualizaron
+ok 5 - un campo opcional nuevo rompe a los consumidores que todavía no se actualizaron
+  ---
+  duration_ms: 66.1294
+  type: 'test'
+  ...
+# Subtest: quitar un mensaje es incompatible y agregar uno solo se informa
+ok 6 - quitar un mensaje es incompatible y agregar uno solo se informa
+  ---
+  duration_ms: 128.2883
+  type: 'test'
+  ...
+# Subtest: un comando reservar válido cumple el contrato de mensajería
+ok 7 - un comando reservar válido cumple el contrato de mensajería
+  ---
+  duration_ms: 131.3442
+  type: 'test'
+  ...
+# Subtest: un comando sin reserva_id o con campos de más se rechaza
+ok 8 - un comando sin reserva_id o con campos de más se rechaza
+  ---
+  duration_ms: 74.8374
+  type: 'test'
+  ...
+# Subtest: la entrega de webhook reutiliza el evento definido en openapi.yaml
+ok 9 - la entrega de webhook reutiliza el evento definido en openapi.yaml
+  ---
+  duration_ms: 58.3794
+  type: 'test'
+  ...
+# Subtest: las rutas se arman desde las plantillas del contrato
+ok 10 - las rutas se arman desde las plantillas del contrato
+  ---
+  duration_ms: 45.5913
+  type: 'test'
+  ...
+# Subtest: una respuesta que no cumple el esquema documentado se detecta
+ok 11 - una respuesta que no cumple el esquema documentado se detecta
+  ---
+  duration_ms: 44.1945
+  type: 'test'
+  ...
+# Subtest: el evento de webhook se valida como esquema del contrato
+ok 12 - el evento de webhook se valida como esquema del contrato
+  ---
+  duration_ms: 35.0122
+  type: 'test'
+  ...
+# Subtest: la firma del webhook trae un vector de prueba en el contrato
+ok 13 - la firma del webhook trae un vector de prueba en el contrato
+  ---
+  duration_ms: 55.373
+  type: 'test'
+  ...
+# Subtest: sin configuración conserva una partición
+ok 14 - sin configuración conserva una partición
+  ---
+  duration_ms: 3.0752
+  type: 'test'
+  ...
+# Subtest: cuatro particiones generan cuatro colas distintas
+ok 15 - cuatro particiones generan cuatro colas distintas
+  ---
+  duration_ms: 2.7743
+  type: 'test'
+  ...
+# Subtest: rechaza cantidades inválidas
+ok 16 - rechaza cantidades inválidas
+  ---
+  duration_ms: 0.724
+  type: 'test'
+  ...
+# Subtest: rechaza workers fuera de las particiones configuradas
+ok 17 - rechaza workers fuera de las particiones configuradas
+  ---
+  duration_ms: 0.6007
+  type: 'test'
+  ...
+# Subtest: con la CA, MySQL exige TLS y verifica la identidad del servidor
+ok 18 - con la CA, MySQL exige TLS y verifica la identidad del servidor
+  ---
+  duration_ms: 3.1503
+  type: 'test'
+  ...
+# Subtest: con la CA, RabbitMQ usa AMQPS en el 5671 y verifica el nombre del broker
+ok 19 - con la CA, RabbitMQ usa AMQPS en el 5671 y verifica el nombre del broker
+  ---
+  duration_ms: 0.6346
+  type: 'test'
+  ...
+# Subtest: sin la CA (pruebas fuera de Docker) la conexión es en texto plano
+ok 20 - sin la CA (pruebas fuera de Docker) la conexión es en texto plano
+  ---
+  duration_ms: 0.3378
+  type: 'test'
+  ...
+1..20
+# tests 20
+# suites 0
+# pass 20
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1026.2145

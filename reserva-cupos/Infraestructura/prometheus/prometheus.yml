@@ -23,7 +23,7 @@ scrape_configs:
       ca_file: /tls/ca.crt
       server_name: worker
     dns_sd_configs:
-      - names: [worker]
+      - names: [worker, worker-p1, worker-p2, worker-p3]
         type: A
         port: 9464
         refresh_interval: 5s
