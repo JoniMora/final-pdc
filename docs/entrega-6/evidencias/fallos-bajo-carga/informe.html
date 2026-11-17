@@ -1,104 +1,104 @@
 <!doctype html><html lang="es"><meta charset="utf-8"><title>E6: fallos bajo carga</title>
 <style>body{font:16px system-ui;max-width:1100px;margin:32px auto;padding:0 20px;color:#172033}table{border-collapse:collapse;width:100%}td,th{padding:8px;border:1px solid #ddd;text-align:left}pre{white-space:pre-wrap}svg{width:100%;border:1px solid #ddd}h1{font-size:28px}</style>
 <h1>E6: fallos bajo carga</h1><p>Generado con los resultados reales de k6. Las tasas generales de k6 incluyen setup y teardown; usar los histogramas de admision para su latencia.</p>
-<h2>Admisiones/s y momentos de detencion y recuperacion</h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 350" role="img" aria-label="Serie temporal y fallos"><path d="M50 40V290H920" fill="none" stroke="#333"/><polyline fill="none" stroke="#2463eb" stroke-width="2" points="114.52058871214338,238.32841173917978 147.24889751580406,168.90020154177648 179.97720631946476,163.56285090837324 212.70551512312545,50 245.43382392678615,60.311586507271386 278.16213273044684,118.9369386181425 310.89044153410754,156.91902033096747 343.6187503377682,183.95630522825473 376.34705914142893,290 409.0753679450896,290 441.8036767487503,290 474.531985552411,290 507.2602943560717,290 539.9886031597324,290 572.716911963393,290 605.4452207670538,290 638.1735295707145,290 670.9018383743751,290 703.6301471780358,290 736.3584559816965,290 769.0867647853572,290 801.8150735890179,290 834.5433823926786,290 867.2716911963392,290 900,290"/><line x1="50" x2="50" y1="40" y2="290" stroke="#b91c1c" stroke-dasharray="5 4"/><text x="50" y="20" font-size="10">detener_api</text><line x1="135.40125010342467" x2="135.40125010342467" y1="40" y2="290" stroke="#b91c1c" stroke-dasharray="5 4"/><text x="135.40125010342467" y="35" font-size="10">detener_worker-p1</text><line x1="213.78554906394908" x2="213.78554906394908" y1="40" y2="290" stroke="#b91c1c" stroke-dasharray="5 4"/><text x="213.78554906394908" y="20" font-size="10">recuperar_worker-p1</text><line x1="219.72900989275442" x2="219.72900989275442" y1="40" y2="290" stroke="#b91c1c" stroke-dasharray="5 4"/><text x="219.72900989275442" y="35" font-size="10">recuperar_api</text><text x="50" y="325">2026-11-17T13:36:11.399Z</text><text x="650" y="325">2026-11-17T13:38:21.256Z</text></svg><table><thead><tr><th>Metrica</th><th>Valores</th></tr></thead><tbody><tr><td>http_req_duration{expected_response:true}</td><td><pre>{
-  &quot;max&quot;: 17791.873318,
-  &quot;min&quot;: 5.482254,
-  &quot;med&quot;: 4009.042369,
-  &quot;avg&quot;: 5628.364863092829,
-  &quot;p(95)&quot;: 14888.1203495
-}</pre></td></tr><tr><td>admisiones_por_estado</td><td><pre>{
-  &quot;rate&quot;: 3.749423471174759,
+<h2>Admisiones/s y momentos de detencion y recuperacion</h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 350" role="img" aria-label="Serie temporal y fallos"><path d="M50 40V290H920" fill="none" stroke="#333"/><polyline fill="none" stroke="#2463eb" stroke-width="2" points="99.92469976474511,165.4984239816207 133.26117060788073,57.08187763104209 166.59764145101636,50 199.93411229415196,61.33254844920492 233.2705831372876,67.27186585563189 266.6070539804232,180.9269529481425 299.94352482355885,265.54444503132027 333.27999566669445,290 366.6164665098301,290 399.9529373529657,290 433.2894081961013,290 466.62587903923696,290 499.96234988237256,290 533.2988207255082,290 566.6352915686438,290 599.9717624117794,290 633.308233254915,290 666.6447040980507,290 699.9811749411863,290 733.3176457843219,290 766.6541166274575,290 799.9905874705931,290 833.3270583137288,290 866.6635291568643,290 900,290"/><line x1="50" x2="50" y1="40" y2="290" stroke="#b91c1c" stroke-dasharray="5 4"/><text x="50" y="20" font-size="10">detener_api</text><line x1="144.9956082810802" x2="144.9956082810802" y1="40" y2="290" stroke="#b91c1c" stroke-dasharray="5 4"/><text x="144.9956082810802" y="35" font-size="10">detener_worker-p2</text><line x1="206.35471538315556" x2="206.35471538315556" y1="40" y2="290" stroke="#b91c1c" stroke-dasharray="5 4"/><text x="206.35471538315556" y="20" font-size="10">recuperar_worker-p2</text><line x1="212.98200550700014" x2="212.98200550700014" y1="40" y2="290" stroke="#b91c1c" stroke-dasharray="5 4"/><text x="212.98200550700014" y="35" font-size="10">recuperar_api</text><text x="50" y="325">2026-11-17T14:23:04.619Z</text><text x="650" y="325">2026-11-17T14:25:12.107Z</text></svg><table><thead><tr><th>Metrica</th><th>Valores</th></tr></thead><tbody><tr><td>admisiones_por_estado</td><td><pre>{
+  &quot;rate&quot;: 3.9306469497774907,
   &quot;count&quot;: 500
-}</pre></td></tr><tr><td>data_received</td><td><pre>{
-  &quot;count&quot;: 7553727,
-  &quot;rate&quot;: 56644.24261729299
+}</pre></td></tr><tr><td>admision_reintentos</td><td><pre>{
+  &quot;count&quot;: 45,
+  &quot;rate&quot;: 0.3537582254799742
+}</pre></td></tr><tr><td>admision_duracion_ms</td><td><pre>{
+  &quot;avg&quot;: 4973.678290264005,
+  &quot;p(95)&quot;: 7440.6121783,
+  &quot;max&quot;: 8935.758506,
+  &quot;min&quot;: 1089.635683,
+  &quot;med&quot;: 4834.751442000001
+}</pre></td></tr><tr><td>http_req_blocked</td><td><pre>{
+  &quot;p(95)&quot;: 1156.2829389,
+  &quot;max&quot;: 1204.343174,
+  &quot;min&quot;: 0.000221,
+  &quot;med&quot;: 55.9489345,
+  &quot;avg&quot;: 338.0896268125003
+}</pre></td></tr><tr><td>data_sent</td><td><pre>{
+  &quot;rate&quot;: 3367.919809859546,
+  &quot;count&quot;: 428418
+}</pre></td></tr><tr><td>http_req_tls_handshaking</td><td><pre>{
+  &quot;min&quot;: 0,
+  &quot;med&quot;: 26.832133,
+  &quot;avg&quot;: 327.27764063577547,
+  &quot;p(95)&quot;: 1150.8291499000002,
+  &quot;max&quot;: 1197.760383
+}</pre></td></tr><tr><td>http_req_waiting</td><td><pre>{
+  &quot;min&quot;: 3.831951,
+  &quot;med&quot;: 2986.7500295,
+  &quot;avg&quot;: 2721.2436919482757,
+  &quot;p(95)&quot;: 7311.61474775,
+  &quot;max&quot;: 8935.308897
+}</pre></td></tr><tr><td>espera_decisiones_ms</td><td><pre>{
+  &quot;max&quot;: 116511,
+  &quot;min&quot;: 116511,
+  &quot;med&quot;: 116511,
+  &quot;avg&quot;: 116511,
+  &quot;p(95)&quot;: 116511
+}</pre></td></tr><tr><td>http_req_duration{expected_response:true}</td><td><pre>{
+  &quot;min&quot;: 4.034964,
+  &quot;med&quot;: 3094.482223,
+  &quot;avg&quot;: 2825.3275680679503,
+  &quot;p(95)&quot;: 7321.1944576999995,
+  &quot;max&quot;: 8935.758506
 }</pre></td></tr><tr><td>http_req_connecting</td><td><pre>{
   &quot;min&quot;: 0,
-  &quot;med&quot;: 2.073295,
-  &quot;avg&quot;: 157.74441389236114,
-  &quot;p(95)&quot;: 513.5553901999999,
-  &quot;max&quot;: 2437.906766
-}</pre></td></tr><tr><td>data_sent</td><td><pre>{
-  &quot;count&quot;: 421884,
-  &quot;rate&quot;: 3163.643543426184
-}</pre></td></tr><tr><td>espera_decisiones_ms</td><td><pre>{
-  &quot;min&quot;: 112684,
-  &quot;med&quot;: 112684,
-  &quot;avg&quot;: 112684,
-  &quot;p(95)&quot;: 112684,
-  &quot;max&quot;: 112684
-}</pre></td></tr><tr><td>http_req_waiting</td><td><pre>{
-  &quot;med&quot;: 3819.8129865,
-  &quot;avg&quot;: 5544.545464752322,
-  &quot;p(95)&quot;: 14844.53829845,
-  &quot;max&quot;: 17791.389687,
-  &quot;min&quot;: 5.021318
+  &quot;med&quot;: 0.3079805,
+  &quot;avg&quot;: 8.909780191810347,
+  &quot;p(95)&quot;: 43.95388145,
+  &quot;max&quot;: 47.650347
 }</pre></td></tr><tr><td>http_reqs</td><td><pre>{
-  &quot;count&quot;: 864,
-  &quot;rate&quot;: 6.479003758189983
-}</pre></td></tr><tr><td>admision_duracion_ms</td><td><pre>{
-  &quot;med&quot;: 12059.746951000001,
-  &quot;avg&quot;: 9563.891009870002,
-  &quot;p(95)&quot;: 15431.095484149999,
-  &quot;max&quot;: 17791.873318,
-  &quot;min&quot;: 1803.334698
-}</pre></td></tr><tr><td>http_req_receiving</td><td><pre>{
-  &quot;avg&quot;: 4.6710303738425925,
-  &quot;p(95)&quot;: 10.717171099999943,
-  &quot;max&quot;: 904.222093,
-  &quot;min&quot;: 0.020231,
-  &quot;med&quot;: 0.32512399999999997
+  &quot;count&quot;: 928,
+  &quot;rate&quot;: 7.2952807387870235
 }</pre></td></tr><tr><td>http_req_failed</td><td><pre>{
-  &quot;rate&quot;: 0.015046296296296295,
-  &quot;passes&quot;: 13,
-  &quot;fails&quot;: 851
-}</pre></td></tr><tr><td>admision_reintentos</td><td><pre>{
-  &quot;count&quot;: 13,
-  &quot;rate&quot;: 0.09748501025054374
-}</pre></td></tr><tr><td>http_req_sending</td><td><pre>{
-  &quot;avg&quot;: 40.877078271990776,
-  &quot;p(95)&quot;: 65.9478501999999,
-  &quot;max&quot;: 2345.287933,
-  &quot;min&quot;: 0.096724,
-  &quot;med&quot;: 0.27188049999999997
+  &quot;rate&quot;: 0.04849137931034483,
+  &quot;passes&quot;: 45,
+  &quot;fails&quot;: 883
+}</pre></td></tr><tr><td>iterations</td><td><pre>{
+  &quot;count&quot;: 500,
+  &quot;rate&quot;: 3.9306469497774907
+}</pre></td></tr><tr><td>http_req_receiving</td><td><pre>{
+  &quot;min&quot;: 0.012775,
+  &quot;med&quot;: 0.2896065,
+  &quot;avg&quot;: 2.129217255387933,
+  &quot;p(95)&quot;: 6.417639299999994,
+  &quot;max&quot;: 261.533775
 }</pre></td></tr><tr><td>vus_max</td><td><pre>{
+  &quot;min&quot;: 500,
   &quot;max&quot;: 500,
-  &quot;value&quot;: 500,
-  &quot;min&quot;: 500
+  &quot;value&quot;: 500
+}</pre></td></tr><tr><td>iteration_duration</td><td><pre>{
+  &quot;min&quot;: 1150.675995,
+  &quot;med&quot;: 5342.7159965,
+  &quot;avg&quot;: 5696.020187094004,
+  &quot;p(95)&quot;: 8627.5612929,
+  &quot;max&quot;: 10342.615186
+}</pre></td></tr><tr><td>http_req_duration</td><td><pre>{
+  &quot;min&quot;: 4.034964,
+  &quot;med&quot;: 2990.2008575,
+  &quot;avg&quot;: 2726.7655300571114,
+  &quot;p(95)&quot;: 7316.65446025,
+  &quot;max&quot;: 8935.758506
+}</pre></td></tr><tr><td>checks</td><td><pre>{
+  &quot;fails&quot;: 0,
+  &quot;rate&quot;: 1,
+  &quot;passes&quot;: 1004
+}</pre></td></tr><tr><td>http_req_sending</td><td><pre>{
+  &quot;min&quot;: 0.073764,
+  &quot;med&quot;: 0.161541,
+  &quot;avg&quot;: 3.392620853448275,
+  &quot;p(95)&quot;: 4.439140699999997,
+  &quot;max&quot;: 427.946944
+}</pre></td></tr><tr><td>data_received</td><td><pre>{
+  &quot;count&quot;: 8305116,
+  &quot;rate&quot;: 65288.95774589647
 }</pre></td></tr><tr><td>vus</td><td><pre>{
   &quot;value&quot;: 0,
   &quot;min&quot;: 0,
   &quot;max&quot;: 500
-}</pre></td></tr><tr><td>http_req_tls_handshaking</td><td><pre>{
-  &quot;max&quot;: 4981.389163,
-  &quot;min&quot;: 0,
-  &quot;med&quot;: 411.28238050000004,
-  &quot;avg&quot;: 1062.7977702175922,
-  &quot;p(95)&quot;: 3217.9708082999987
-}</pre></td></tr><tr><td>iteration_duration</td><td><pre>{
-  &quot;min&quot;: 2732.468834,
-  &quot;med&quot;: 14997.9826145,
-  &quot;avg&quot;: 12182.657511729998,
-  &quot;p(95)&quot;: 19570.2272081,
-  &quot;max&quot;: 19980.655496
-}</pre></td></tr><tr><td>iterations</td><td><pre>{
-  &quot;count&quot;: 500,
-  &quot;rate&quot;: 3.749423471174759
-}</pre></td></tr><tr><td>http_req_duration</td><td><pre>{
-  &quot;min&quot;: 5.482254,
-  &quot;med&quot;: 3848.6383055,
-  &quot;avg&quot;: 5590.093573398145,
-  &quot;p(95)&quot;: 14870.263204199999,
-  &quot;max&quot;: 17791.873318
-}</pre></td></tr><tr><td>checks</td><td><pre>{
-  &quot;rate&quot;: 1,
-  &quot;passes&quot;: 1004,
-  &quot;fails&quot;: 0
-}</pre></td></tr><tr><td>http_req_blocked</td><td><pre>{
-  &quot;med&quot;: 706.409219,
-  &quot;avg&quot;: 1443.4501202199071,
-  &quot;p(95)&quot;: 4767.847404049997,
-  &quot;max&quot;: 5362.265301,
-  &quot;min&quot;: 0.000291
 }</pre></td></tr></tbody></table></html>

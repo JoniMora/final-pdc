@@ -21,7 +21,7 @@ Ver [revisión del PR #59](https://github.com/JoniMora/final-pdc/pull/59).
 | [#47](https://github.com/JoniMora/final-pdc/issues/47) | Circuit Breaker por tenant en el notificador | Integracion Docker y Aula real aprobadas: ciclo completo y once entregas recuperadas. [Detalle](circuit-breaker.md) |
 | [#48](https://github.com/JoniMora/final-pdc/issues/48) | Redis, límite global, caché y curva 1/2/4 API | Redis real, invalidacion, curva de lecturas y curva POST repetida aprobados en Docker. [Detalle](redis.md) |
 | [#49](https://github.com/JoniMora/final-pdc/issues/49) | Escenarios k6, métricas de admisión y gráficos | Caliente, multitenant y rampa aprobados; reportes HTML generados. Capturas pendientes. [Detalle](carga.md) |
-| [#50](https://github.com/JoniMora/final-pdc/issues/50) | Fallos parciales bajo carga con gráficos | Ejecucion Docker aprobada; invariantes y grafico registrados. Grabacion pendiente. [Detalle](fallos-bajo-carga.md) |
+| [#50](https://github.com/JoniMora/final-pdc/issues/50) | Fallos parciales bajo carga con gráficos | Ejecucion Docker aprobada; invariantes y grafico registrados. Grabacion enlazada; pendiente revision del contenido y acceso. [Detalle](fallos-bajo-carga.md) |
 | [#51](https://github.com/JoniMora/final-pdc/issues/51) | Documento de patrones, evidencias y release | Evidencias locales revisadas; falta CI completo, capturas, grabacion, revision y release |
 
 El orden de asignación debe confirmarse en el Project. Las dependencias están

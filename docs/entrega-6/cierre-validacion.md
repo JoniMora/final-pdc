@@ -21,7 +21,7 @@ No se deben mezclar mediciones anteriores a Redis con las posteriores.
 - Repeticiones y estadistica aprobadas: nueve corridas POST, tres por configuracion. Ver [resultado](evidencias/curva-admisiones/resultado.json) e [informe](evidencias/curva-admisiones/informe.html). Cada corrida usa 100 solicitudes; la rafaga de 500 esta documentada por separado.
 - Curva de admisiones aprobada con 1/2/4 APIs y cuatro workers constantes. Se registran media y desvio muestral de admisiones/s y de los p95 por corrida. No hay mejora sostenida con mas APIs en esta muestra.
 - Circuito con Aula real aprobado: detencion, apertura, recuperacion, ciclo completo y once webhooks entregados. Ver [resultado](evidencias/circuito-aula/resultado.json).
-- Capturas actuales de Grafana por escenario y grabacion del fallo pendientes.
+- Capturas generales de Grafana aportadas. Falta identificar las capturas por escenario. [Grabacion del fallo](https://drive.google.com/file/d/1A_N1ycuPNV_gmTaPBNMfOlLRruA-ttKp/view?usp=sharing) aportada; revisar contenido y acceso sin sesion.
 - [CI de c9a28ca](https://github.com/JoniMora/final-pdc/actions/runs/44098389774) completo: todos los jobs aprobaron. Los commits nuevos requieren su propio CI.
 - La descripcion del PR sigue describiendo el antiguo escalado de tres APIs y dos workers; actualizarla cuando las mediciones y la revision esten completas.
 - Revisar integracion de E5 y base de merge con el companero. No rebasar ni forzar el push automaticamente.

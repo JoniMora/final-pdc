@@ -2,7 +2,8 @@
 
 Estado: prueba automatica ejecutada y aprobada en Docker el 17/11/2026.
 Se registraron 10 confirmadas, 490 rechazadas, cero duplicadas y cero cupos
-negativos. La grabacion sigue pendiente; no se declara cerrado el issue.
+negativos. La grabacion fue aportada el 17/11/2026 y se enlaza abajo;
+el cierre del issue requiere revision.
 
 ```powershell
 node reserva-cupos/scripts/verificar-e6.js fallos
@@ -49,5 +50,11 @@ Archivos generados en `evidencias/fallos-bajo-carga/`:
 Ver [resultado aprobado](evidencias/fallos-bajo-carga/resultado.json) e
 [informe con marcas temporales](evidencias/fallos-bajo-carga/informe.html).
 La corrida detuvo una API y `worker-p1` y registro ambas recuperaciones.
-No se ejecuta esta falla en la demo en vivo: falta grabar una repeticion
-controlada y adjuntar su enlace. El HTML no sustituye esa grabacion.
+## Grabacion
+
+[Ver video de fallos bajo carga (fallo.mp4)](https://drive.google.com/file/d/1A_N1ycuPNV_gmTaPBNMfOlLRruA-ttKp/view?usp=sharing).
+
+Video editado y aportado por la integrante el 17/11/2026; archivo original
+de 53.908.241 bytes. El enlace complementa los registros y el informe HTML.
+La revision del contenido del video y del acceso sin sesion debe confirmarse
+antes de entregar. El video no se incorpora al historial Git.

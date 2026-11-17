@@ -7,6 +7,7 @@
 - [Redis y curva de lecturas 1/2/4 APIs](redis-escalado.json). No es una curva de admision de reservas.
 - [Carga caliente](carga-caliente/informe.html), [multitenant](carga-multitenant/informe.html) y [rampa](carga-rampa/informe.html).
 - [Fallos bajo carga](fallos-bajo-carga/informe.html) e [invariantes](fallos-bajo-carga/resultado.json).
+- [Video de fallos bajo carga](https://drive.google.com/file/d/1A_N1ycuPNV_gmTaPBNMfOlLRruA-ttKp/view?usp=sharing): aportado el 17/11/2026; revisar acceso y contenido antes de entregar.
 - [107 pruebas unitarias](verificacion-local.json).
 
 Cada carpeta de carga contiene JSON y salida k6. Los resultados aprobados
