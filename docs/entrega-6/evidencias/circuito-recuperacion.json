@@ -1,0 +1,48 @@
+{
+  "inicio": "2026-11-17T12:48:32.759Z",
+  "aprobada": true,
+  "pasos": [
+    "abierto",
+    "mensajes diferidos sin intento HTTP"
+  ],
+  "tenant": "01a1e98d-cb39-7bca-ac61-86cf4e761ca7",
+  "transiciones": [
+    {
+      "tenant": "01a1e98d-cb39-7bca-ac61-86cf4e761ca7",
+      "estado": "cerrado",
+      "instante": "2026-11-17T12:49:14.055Z"
+    },
+    {
+      "tenant": "01a1e98d-cb39-7bca-ac61-86cf4e761ca7",
+      "estado": "abierto",
+      "instante": "2026-11-17T12:49:15.661Z"
+    },
+    {
+      "tenant": "01a1e98d-cb39-7bca-ac61-86cf4e761ca7",
+      "estado": "semiabierto",
+      "instante": "2026-11-17T12:49:25.663Z"
+    },
+    {
+      "tenant": "01a1e98d-cb39-7bca-ac61-86cf4e761ca7",
+      "estado": "cerrado",
+      "instante": "2026-11-17T12:49:25.675Z"
+    }
+  ],
+  "receptor": {
+    "fallar": false,
+    "intentos": 14,
+    "entregas": [
+      "15758",
+      "15760",
+      "15762",
+      "15764",
+      "15767",
+      "15771",
+      "15773",
+      "15775",
+      "15777",
+      "15779",
+      "15756"
+    ]
+  }
+}

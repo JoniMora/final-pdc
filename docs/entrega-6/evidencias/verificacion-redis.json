@@ -1,0 +1,12 @@
+{
+  "accion": "redis",
+  "inicio": "2026-11-17T12:57:44.692Z",
+  "pasos": [
+    {
+      "nombre": "redis",
+      "aprobada": true
+    }
+  ],
+  "aprobada": true,
+  "fin": "2026-11-17T12:58:36.334Z"
+}
