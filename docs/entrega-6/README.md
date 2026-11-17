@@ -16,13 +16,13 @@ Ver [revisión del PR #59](https://github.com/JoniMora/final-pdc/pull/59).
 
 | Issue | Trabajo | Estado en esta integración |
 |---|---|---|
-| [#45](https://github.com/JoniMora/final-pdc/issues/45) | Métricas, Prometheus y Grafana | Pendiente |
+| [#45](https://github.com/JoniMora/final-pdc/issues/45) | Métricas, Prometheus y Grafana | Base verificada; nuevos paneles y scraping de todos los workers preparados para validar |
 | [#46](https://github.com/JoniMora/final-pdc/issues/46) | Particionado por actividad y pruebas N=1/4 | Criterios comprobados localmente; pendiente CI y revision. Ver [resultados](particionado.md) |
-| [#47](https://github.com/JoniMora/final-pdc/issues/47) | Circuit Breaker por tenant en el notificador | Pendiente |
-| [#48](https://github.com/JoniMora/final-pdc/issues/48) | Redis, límite global, caché y curva 1/2/4 API | Pendiente |
-| [#49](https://github.com/JoniMora/final-pdc/issues/49) | Escenarios k6, métricas de admisión y gráficos | Parcial: ráfaga previa; faltan escenarios e informe |
-| [#50](https://github.com/JoniMora/final-pdc/issues/50) | Fallos parciales bajo carga con gráficos | Pendiente; E5 incorpora un arnés reutilizable |
-| [#51](https://github.com/JoniMora/final-pdc/issues/51) | Documento de patrones, evidencias y release | Parcial: documento de patrones; faltan mediciones finales y release |
+| [#47](https://github.com/JoniMora/final-pdc/issues/47) | Circuit Breaker por tenant en el notificador | Implementado; pruebas locales aprobadas. Falta integracion Docker. [Detalle](circuit-breaker.md) |
+| [#48](https://github.com/JoniMora/final-pdc/issues/48) | Redis, límite global, caché y curva 1/2/4 API | Implementado y pruebas locales aprobadas; falta Redis real y curva. [Detalle](redis.md) |
+| [#49](https://github.com/JoniMora/final-pdc/issues/49) | Escenarios k6, métricas de admisión y gráficos | Escenarios e informe preparados; nuevas corridas y capturas pendientes. [Detalle](carga.md) |
+| [#50](https://github.com/JoniMora/final-pdc/issues/50) | Fallos parciales bajo carga con gráficos | Runner preparado; ejecucion y grabacion pendientes. [Detalle](fallos-bajo-carga.md) |
+| [#51](https://github.com/JoniMora/final-pdc/issues/51) | Documento de patrones, evidencias y release | Documentado; falta validar integracion, CI, revision y publicar release |
 
 El orden de asignación debe confirmarse en el Project. Las dependencias están
 expresadas en cada issue. No se cierra un issue por haber agregado documentación
@@ -36,7 +36,8 @@ no cierra #51 ni reemplaza las nuevas pruebas de escalabilidad pendientes.
 ## Avances conservados
 
 - Recorrido funcional HTTPS en `pruebas/final/recorrido.js`.
-- Prueba preliminar de una API/un worker y tres API/dos workers.
+- La prueba preliminar de escalado ahora delega en la curva 1/2/4 APIs con
+  Redis. No se levantan dos consumidores de una misma particion.
 - Control de respuestas HTTP y JSON en la ráfaga de k6.
 - Pool MySQL exclusivo para salud, usando las opciones TLS compartidas de E5.
 - Corrección de la carrera del feed trasladada a `pruebas/seguridad/aula.js`:
@@ -44,7 +45,22 @@ no cierra #51 ni reemplaza las nuevas pruebas de escalabilidad pendientes.
 
 El tenant de carga se crea ahora mediante `scripts/sistema.js tenant`, con
 límite alto, sin SQL de alta ni contraseña root escrita en ese script.
-Se utiliza un único compose con TLS por defecto.
+El Compose base usa TLS y Redis. Los archivos adicionales seleccionan
+cuatro particiones y los receptores o reintentos especificos de pruebas.
+
+## Continuar la verificacion
+
+Ver [pasos pendientes y comandos por requisito](continuar.md). La verificacion
+local ejecutada durante esta preparacion aprobo **107 pruebas**. Eso no
+equivale a ejecutar los nuevos escenarios con Docker ni a publicar una release.
+
+```powershell
+node reserva-cupos/scripts/verificar-e6.js todo
+```
+
+El comando conserva datos, termina al primer error y deja un archivo con
+su causa. Las pruebas de fallos restauran los servicios que detienen; no
+se usan borrados de volumenes en el entorno local.
 
 ## Uso actual
 

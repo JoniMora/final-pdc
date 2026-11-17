@@ -1,0 +1,69 @@
+[
+  {
+    "titulo": "Entrega 6: fijar dependencias y actualizar drivers compatibles (refs #47, refs #48)",
+    "archivos": [
+      "reserva-cupos/servicios/api/package.json", "reserva-cupos/servicios/api/package-lock.json",
+      "reserva-cupos/servicios/notificador/package.json", "reserva-cupos/servicios/notificador/package-lock.json",
+      "reserva-cupos/servicios/worker/package.json", "reserva-cupos/servicios/worker/package-lock.json",
+      "reserva-cupos/servicios/relay/package.json", "reserva-cupos/servicios/relay/package-lock.json",
+      "reserva-cupos/servicios/notificador/Dockerfile", "reserva-cupos/servicios/worker/Dockerfile", "reserva-cupos/servicios/relay/Dockerfile"
+    ]
+  },
+  {
+    "titulo": "Entrega 6: circuit breaker por tenant y recuperacion de webhooks (refs #47)",
+    "archivos": [
+      "reserva-cupos/compartido/src/metricas.js", "reserva-cupos/servicios/notificador/src/main.js",
+      "reserva-cupos/servicios/notificador/src/circuitos.js", "reserva-cupos/servicios/notificador/src/reintento.js",
+      "reserva-cupos/servicios/notificador/test/circuitos.test.js", "reserva-cupos/servicios/notificador/test/reintento.test.js",
+      "reserva-cupos/scripts/preparar-seguridad.js", "reserva-cupos/docker-compose.pruebas-e6.yml",
+      "reserva-cupos/pruebas/final/util-e6.js", "reserva-cupos/pruebas/final/receptor-circuito.js",
+      "reserva-cupos/pruebas/final/circuito.js", "docs/entrega-6/circuit-breaker.md"
+    ]
+  },
+  {
+    "titulo": "Entrega 6: Redis para limite global y cache de autenticacion (refs #48)",
+    "archivos": [
+      "reserva-cupos/Infraestructura/redis/redis.conf", "reserva-cupos/docker-compose.yml",
+      "reserva-cupos/servicios/api/src/redis.js", "reserva-cupos/servicios/api/src/limite-redis.js",
+      "reserva-cupos/servicios/api/src/cache-autenticacion.js", "reserva-cupos/servicios/api/src/acceso.js",
+      "reserva-cupos/servicios/api/src/admin.js", "reserva-cupos/servicios/api/src/db.js",
+      "reserva-cupos/servicios/api/src/server.js", "reserva-cupos/servicios/api/test/redis.test.js",
+      "reserva-cupos/pruebas/final/redis.js", "reserva-cupos/pruebas/final/carga-escalado.js", "docs/entrega-6/redis.md"
+    ]
+  },
+  {
+    "titulo": "Entrega 6: escenarios k6 y reportes seguros de carga (refs #49)",
+    "archivos": [
+      "reserva-cupos/pruebas/carga/rafaga.js", "reserva-cupos/pruebas/carga/multitenant.js",
+      "reserva-cupos/pruebas/carga/resumen.js", "reserva-cupos/pruebas/final/informe-carga.js",
+      "reserva-cupos/pruebas/final/carga.js", "reserva-cupos/pruebas/final/test/informe.test.js",
+      "docs/entrega-6/carga.md", "docs/entrega-6/evidencias/comparacion-particiones.png"
+    ]
+  },
+  {
+    "titulo": "Entrega 6: automatizar fallos parciales e invariantes bajo carga (refs #50)",
+    "archivos": [
+      "reserva-cupos/servicios/worker/src/main.js", "reserva-cupos/docker-compose.fallos-e6.yml",
+      "reserva-cupos/pruebas/final/fallos-carga.js", "docs/entrega-6/fallos-bajo-carga.md"
+    ]
+  },
+  {
+    "titulo": "Entrega 6: completar observabilidad y verificacion continua (refs #45, refs #51)",
+    "archivos": [
+      "reserva-cupos/Infraestructura/prometheus/prometheus.yml",
+      "reserva-cupos/Infraestructura/grafana/dashboards/reserva-cupos.json",
+      "reserva-cupos/scripts/sistema.js", "reserva-cupos/scripts/verificar-e6.js",
+      "reserva-cupos/pruebas/final/particiones.js", ".github/workflows/ci.yml",
+      "docs/entrega-6/observabilidad.md",
+      "docs/entrega-6/evidencias/verificacion-local.json", "docs/entrega-6/evidencias/verificacion-dependencias.json",
+      "docs/entrega-6/evidencias/verificacion"
+    ]
+  },
+  {
+    "titulo": "Entrega 6: actualizar patrones y pasos pendientes para revision (refs #51)",
+    "archivos": [
+      "docs/entrega-6/README.md", "docs/entrega-6/patrones.md", "docs/entrega-6/continuar.md",
+      "docs/entrega-6/commits.json", "reserva-cupos/scripts/preparar-commit-e6.js"
+    ]
+  }
+]

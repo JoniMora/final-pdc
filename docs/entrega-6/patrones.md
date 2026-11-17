@@ -225,6 +225,21 @@ El [issue #48](https://github.com/JoniMora/final-pdc/issues/48) exige Redis y pr
 sobre varias instancias. La caché Cache-aside de autenticación también sigue
 pendiente; este documento no la declara implementada.
 
+## Incorporaciones de E6 preparadas para verificar
+
+| Problema | Patron | Codigo | Evidencia y estado |
+|---|---|---|---|
+| Un receptor caido recibe intentos que agravan la caida | Circuit Breaker por tenant | `servicios/notificador/src/circuitos.js`, `reintento.js` | Pruebas locales con receptor HTTP real aprobadas; [integracion Docker pendiente](circuit-breaker.md) |
+| Todas las solicitudes repiten la misma lectura de credenciales | Cache-aside con invalidacion de generacion | `servicios/api/src/cache-autenticacion.js`, `acceso.js`, `admin.js` | Pruebas de carreras e invalidacion aprobadas; [metricas y Redis real pendientes](redis.md) |
+| Varias API multiplican los limites locales | Token bucket distribuido y atomico | `servicios/api/src/limite-redis.js` | Script Lua preparado; falta ejecutar `pruebas/final/redis.js` |
+| Una sola cola limita actividades independientes | Competing Consumers por particion | `compartido/src/particiones.js`, relay y worker | [Medicion real N1/N4](particionado.md): 4,72 frente a 6,74 decisiones/s, orden conservado |
+| Reintentos simultaneos crean reservas adicionales | Idempotent Consumer y restriccion unica | admision de API y transaccion del worker | [k6 de duplicados aprobado](evidencias/diagnostico-2026-11-17T03-58-42-009Z/k6.txt): exactamente dos reservas en 40 solicitudes de dos casos |
+| Los commits semisincronos saturan la admision | Escritura en lote manteniendo Transactional Outbox | `servicios/api/src/admisiones.js` | [Rafaga aprobada](evidencias/diagnostico-2026-11-17T03-55-55-916Z/k6.txt): 500 admisiones correctas y 10/490/0 |
+
+Las afirmaciones anteriores sobre circuitos y cache pendientes describen
+la base historica de E5. Los nuevos modulos ya estan implementados, pero
+no se equiparan pruebas unitarias con las verificaciones Docker pendientes.
+
 ## Cierre de este documento
 
 Se presenta la trazabilidad de los patrones ya implementados. Para cerrar #51
