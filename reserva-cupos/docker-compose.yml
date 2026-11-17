@@ -86,6 +86,10 @@ services:
       - --providers.docker.exposedByDefault=false
       - --providers.docker.network=reserva-cupos-infra_publica
       - --providers.file.filename=/etc/traefik/tls.yml
+      - --entryPoints.metrics.address=:9464
+      - --metrics.prometheus=true
+      - --metrics.prometheus.manualRouting=true
+      - --metrics.prometheus.addRoutersLabels=true
       - --entryPoints.websecure.address=:443
       - --entryPoints.traefik.address=:8080
       - --entryPoints.ping.address=:8082
@@ -109,6 +113,7 @@ services:
     networks:
       - publica
       - docker
+      - interna
 
     depends_on:
       - socket-proxy

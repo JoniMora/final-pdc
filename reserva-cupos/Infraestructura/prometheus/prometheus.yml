@@ -61,3 +61,13 @@ scrape_configs:
     static_configs:
       - targets:
           - rabbitmq:15691
+
+  - job_name: traefik
+    scheme: https
+    metrics_path: /metrics
+    tls_config:
+      ca_file: /tls/ca.crt
+      server_name: traefik
+    static_configs:
+      - targets:
+          - traefik:9464

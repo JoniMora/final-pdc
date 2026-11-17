@@ -43,3 +43,8 @@ http:
       entryPoints: [traefik]
       service: api@internal
       tls: {}
+    metricas:
+      rule: Path(`/metrics`)
+      entryPoints: [metrics]
+      service: prometheus@internal
+      tls: {}
