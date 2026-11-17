@@ -10,8 +10,8 @@ const { crearPool, esErrorDeInfraestructura } = require("./db");
 const { reservar } = require("./reservar");
 const { cancelar, marcarFallida } = require("./cancelar");
 const { procesar } = require("./procesar");
-
-const COLA = "reservas.comandos.0";
+const { configurarParticiones } = require("../../../compartido/src/particiones");
+const { cola: COLA } = configurarParticiones();
 const PAUSA_INFRAESTRUCTURA_MS = 5000;
 
 const pool = crearPool();
