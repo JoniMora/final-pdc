@@ -1,8 +1,8 @@
 # Fallos parciales bajo carga — #50
 
-Estado: prueba automatica preparada, sin ejecutar en Docker. La grabacion
-de la ejecucion y las evidencias resultantes estan pendientes. No se declara
-cerrado el issue.
+Estado: prueba automatica ejecutada y aprobada en Docker el 17/11/2026.
+Se registraron 10 confirmadas, 490 rechazadas, cero duplicadas y cero cupos
+negativos. La grabacion sigue pendiente; no se declara cerrado el issue.
 
 ```powershell
 node reserva-cupos/scripts/verificar-e6.js fallos
@@ -40,12 +40,14 @@ logica idempotente del worker evita descontar el cupo otra vez. No se cambia
 la declaracion de las colas existentes, evitando un error de argumentos
 incompatibles al actualizar una instalacion con volumenes.
 
-Archivos que se generaran en `evidencias/fallos-bajo-carga/`:
+Archivos generados en `evidencias/fallos-bajo-carga/`:
 
 - `k6.txt`: salida capturada de la carga.
 - `resultado.json`: invariantes, instantes de fallo y series de Prometheus.
 - `informe.html`: grafico con lineas de fallo y recuperacion.
 
-No se ejecuta esta falla en la demo en vivo. Todavia hay que ejecutar y
-grabar el escenario y revisar el grafico. Un archivo de codigo o un reporte
-vacio no constituyen evidencia de aceptacion.
+Ver [resultado aprobado](evidencias/fallos-bajo-carga/resultado.json) e
+[informe con marcas temporales](evidencias/fallos-bajo-carga/informe.html).
+La corrida detuvo una API y `worker-p1` y registro ambas recuperaciones.
+No se ejecuta esta falla en la demo en vivo: falta grabar una repeticion
+controlada y adjuntar su enlace. El HTML no sustituye esa grabacion.

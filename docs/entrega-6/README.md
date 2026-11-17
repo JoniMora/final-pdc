@@ -12,17 +12,17 @@ La E6 corresponde a patrones y escalabilidad; la integración final se cierra
 por separado. Versiones previstas: `v6-escalabilidad` y `v7-final`.
 Ver [revisión del PR #59](https://github.com/JoniMora/final-pdc/pull/59).
 
-## Requerimientos pendientes
+## Requerimientos y validacion
 
 | Issue | Trabajo | Estado en esta integración |
 |---|---|---|
 | [#45](https://github.com/JoniMora/final-pdc/issues/45) | Métricas, Prometheus y Grafana | Base verificada; nuevos paneles y scraping de todos los workers preparados para validar |
 | [#46](https://github.com/JoniMora/final-pdc/issues/46) | Particionado por actividad y pruebas N=1/4 | Criterios comprobados localmente; pendiente CI y revision. Ver [resultados](particionado.md) |
-| [#47](https://github.com/JoniMora/final-pdc/issues/47) | Circuit Breaker por tenant en el notificador | Implementado; pruebas locales aprobadas. Falta integracion Docker. [Detalle](circuit-breaker.md) |
-| [#48](https://github.com/JoniMora/final-pdc/issues/48) | Redis, límite global, caché y curva 1/2/4 API | Implementado y pruebas locales aprobadas; falta Redis real y curva. [Detalle](redis.md) |
-| [#49](https://github.com/JoniMora/final-pdc/issues/49) | Escenarios k6, métricas de admisión y gráficos | Escenarios e informe preparados; nuevas corridas y capturas pendientes. [Detalle](carga.md) |
-| [#50](https://github.com/JoniMora/final-pdc/issues/50) | Fallos parciales bajo carga con gráficos | Runner preparado; ejecucion y grabacion pendientes. [Detalle](fallos-bajo-carga.md) |
-| [#51](https://github.com/JoniMora/final-pdc/issues/51) | Documento de patrones, evidencias y release | Documentado; falta validar integracion, CI, revision y publicar release |
+| [#47](https://github.com/JoniMora/final-pdc/issues/47) | Circuit Breaker por tenant en el notificador | Integracion Docker y Aula real aprobadas: ciclo completo y once entregas recuperadas. [Detalle](circuit-breaker.md) |
+| [#48](https://github.com/JoniMora/final-pdc/issues/48) | Redis, límite global, caché y curva 1/2/4 API | Redis real, invalidacion, curva de lecturas y curva POST repetida aprobados en Docker. [Detalle](redis.md) |
+| [#49](https://github.com/JoniMora/final-pdc/issues/49) | Escenarios k6, métricas de admisión y gráficos | Caliente, multitenant y rampa aprobados; reportes HTML generados. Capturas pendientes. [Detalle](carga.md) |
+| [#50](https://github.com/JoniMora/final-pdc/issues/50) | Fallos parciales bajo carga con gráficos | Ejecucion Docker aprobada; invariantes y grafico registrados. Grabacion pendiente. [Detalle](fallos-bajo-carga.md) |
+| [#51](https://github.com/JoniMora/final-pdc/issues/51) | Documento de patrones, evidencias y release | Evidencias locales revisadas; falta CI completo, capturas, grabacion, revision y release |
 
 El orden de asignación debe confirmarse en el Project. Las dependencias están
 expresadas en cada issue. No se cierra un issue por haber agregado documentación
@@ -31,7 +31,7 @@ si faltan sus pruebas y criterios de aceptación.
 ## Documento de patrones
 
 Ver [problema, patrón, código y evidencia](patrones.md). Este aporte documental
-no cierra #51 ni reemplaza las nuevas pruebas de escalabilidad pendientes.
+no cierra #51 por si solo. Ver [resultados y pendientes de cierre](cierre-validacion.md).
 
 ## Avances conservados
 
@@ -52,7 +52,10 @@ cuatro particiones y los receptores o reintentos especificos de pruebas.
 
 Ver [pasos pendientes y comandos por requisito](continuar.md). La verificacion
 local ejecutada durante esta preparacion aprobo **107 pruebas**. Eso no
-equivale a ejecutar los nuevos escenarios con Docker ni a publicar una release.
+publica una release. Ademas, el 17/11/2026 aprobaron por separado circuito,
+Redis, carga caliente, multitenant, rampa y fallos en Docker; ver
+[indice de evidencias](evidencias/README.md). La primera ejecucion de `todo`
+fallo y no se presenta como una corrida completa aprobada.
 
 ```powershell
 node reserva-cupos/scripts/verificar-e6.js todo

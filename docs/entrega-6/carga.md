@@ -1,8 +1,14 @@
 # Escenarios de carga e informe — #49
 
-Estado: escenarios, exportacion y graficos preparados. Las nuevas corridas
-con Redis y sus reportes requieren Docker y todavia no fueron ejecutadas
-por el asistente. No se declaran resultados inexistentes.
+Estado: caliente, multitenant y rampa aprobados en Docker el 17/11/2026.
+Cada escenario conserva k6, JSON y un reporte HTML con series reales de
+Prometheus. Faltan las capturas nuevas de Grafana y la revision del CI.
+
+Reportes: [caliente](evidencias/carga-caliente/informe.html),
+[multitenant](evidencias/carga-multitenant/informe.html) y
+[rampa](evidencias/carga-rampa/informe.html). Los JSON `resultado.json` de
+esas carpetas registran `aprobada: true`. Las corridas fallidas anteriores
+siguen siendo antecedentes, no se reclasifican como aprobadas.
 
 ## Mediciones reales ya disponibles
 
@@ -101,3 +107,28 @@ respuestas excedieron el anterior timeout de 20 segundos. Esa corrida tambien
 se conserva como fallida: persistir la reserva no acredita haber respondido
 HTTP 202 al cliente. La nueva corrida sigue exigiendo 500 respuestas 202.
 
+
+## Curva repetida de admisiones POST
+
+El 17/11/2026 aprobaron nueve corridas: tres con cada configuracion de 1, 2
+y 4 APIs, con cuatro workers constantes y orden de configuraciones rotado.
+Cada corrida contiene 100 solicitudes sobre una actividad de 10 cupos,
+64 conexiones maximas, autenticacion calentada y sin reintentos. Todas
+respondieron 202 y terminaron con 10 confirmadas, 90 rechazadas y cero cupos.
+Esta curva no reemplaza la rafaga separada de 500 solicitudes.
+
+| APIs | Admisiones/s: media +/- desvio muestral | p95 cliente ms: media +/- desvio muestral |
+|---|---|---|
+| 1 | 62.93 +/- 32.79 | 1816 +/- 730 |
+| 2 | 69.63 +/- 34.38 | 1546 +/- 987 |
+| 4 | 36.96 +/- 12.91 | 2892 +/- 1226 |
+
+La dispersion es alta y no hay crecimiento sostenido al agregar APIs. No
+se atribuye causalidad a un componente sin medirlo. Todas las APIs comparten
+MySQL, Redis y almacenamiento; sumar instancias no elimina esos recursos
+compartidos. El limite semisincrono historico de E3 no es una medicion de
+esta corrida. El p95 incluye espera del cliente por conexion y excluye
+consultas de drenaje; la media de tres p95 no es el percentil combinado.
+
+[Datos por corrida](evidencias/curva-admisiones/resultado.json) y
+[graficos de media y desvio](evidencias/curva-admisiones/informe.html).

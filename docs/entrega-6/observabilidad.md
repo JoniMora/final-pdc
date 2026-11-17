@@ -92,6 +92,7 @@ la implementación en el pull request.
 El dashboard incorpora paneles de estado y transiciones del circuito por tenant,
 cache de autenticacion, consultas a MySQL, limite distribuido y demora total de
 webhooks. Prometheus tambien consulta los workers de las particiones adicionales.
-Estas ampliaciones requieren ejecutar `scripts/verificar-e6.js todo` y revisar
-los paneles con trafico real. Las capturas anteriores corresponden a la base ya
-verificada; no acreditan las nuevas integraciones.
+Las integraciones Docker de circuito, Redis, carga y fallos aprobaron por
+separado el 17/11/2026. Los reportes de carga contienen series reales de
+Prometheus; falta revisar visualmente los paneles nuevos y guardar sus capturas.
+Las capturas anteriores corresponden a la base, no a estas ampliaciones.

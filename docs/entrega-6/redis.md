@@ -1,7 +1,7 @@
 # API sin estado con Redis — #48
 
-Estado: implementado; pruebas unitarias aprobadas. Pruebas con Redis real,
-cuatro APIs y gateway pendientes de ejecutar. No se declara cerrado #48.
+Estado: pruebas unitarias e integracion con Redis real, cuatro APIs y gateway
+aprobadas el 17/11/2026. El cierre de #48 requiere revision y CI.
 
 ## Limite global
 
@@ -66,7 +66,10 @@ mas recarga. Comprueba 429 y `Retry-After`. Finalmente calienta cache, rota
 una clave y cambia permisos; exige invalidacion en todas las instancias.
 Restaura la cantidad inicial de APIs en `finally`.
 
-Evidencia preparada: `redis-escalado.json`, que se genera al ejecutar.
+Evidencia aprobada: [redis-escalado.json](evidencias/redis-escalado.json).
+Contiene la curva medida con 1, 2 y 4 APIs, las consultas MySQL, el limite
+global y las comprobaciones de invalidacion de clave y permisos. La curva
+es una medicion de esta corrida; no implica crecimiento lineal garantizado.
 Las pruebas locales usan un doble de transporte para carreras de cache;
 no se presentan como una validacion del motor Lua de Redis.
 

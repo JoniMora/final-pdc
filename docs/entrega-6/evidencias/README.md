@@ -1,13 +1,26 @@
-# Evidencias previas — base anterior a las correcciones de E5
+# Indice de evidencias de E6
 
-Estas ejecuciones del 14/11/2026 se conservan como antecedentes de la PR #59.
-No corresponden a la integración local con `c1b2c3b` ni acreditan todos los
-requerimientos de E6. No sobrescribirlas con resultados inventados.
+## Ejecuciones aprobadas del 17/11/2026
 
-- [01-recorrido.txt](01-recorrido.txt): recorrido autenticado previo.
-- [02-carga-escalado.txt](02-carga-escalado.txt): 500 solicitudes/10 cupos en dos configuraciones; las métricas HTTP mezclan admisiones y consultas.
-- [03-seguridad-recuperacion.txt](03-seguridad-recuperacion.txt): suite antigua de veinte comprobaciones, reemplazada por las suites de E5 corregida.
+- [Recorrido funcional](01-recorrido.txt).
+- [Circuito por tenant](circuito-recuperacion.json) y [metricas](circuito-metricas.txt).
+- [Redis y curva de lecturas 1/2/4 APIs](redis-escalado.json). No es una curva de admision de reservas.
+- [Carga caliente](carga-caliente/informe.html), [multitenant](carga-multitenant/informe.html) y [rampa](carga-rampa/informe.html).
+- [Fallos bajo carga](fallos-bajo-carga/informe.html) e [invariantes](fallos-bajo-carga/resultado.json).
+- [107 pruebas unitarias](verificacion-local.json).
 
-Para las nuevas ejecuciones usar `scripts/sistema.js seguridad` y los scripts
-de `pruebas/final/`. Las nuevas pruebas deben registrar el commit y las métricas
-de admisión, gráficos y escenarios exigidos por los issues #45 a #50.
+Cada carpeta de carga contiene JSON y salida k6. Los resultados aprobados
+incluyen repeticiones y estadistica; el material visual pendiente se detalla,
+en [cierre de validacion](../cierre-validacion.md).
+
+- [Curva repetida de admisiones POST](curva-admisiones/informe.html): nueve corridas con media y desvio.
+- [Circuito con Aula real](circuito-aula/resultado.json): detencion y recuperacion aprobadas.
+
+## Antecedentes
+
+02-carga-escalado.txt y 03-seguridad-recuperacion.txt pertenecen a la base
+anterior. Las mediciones N1/N4 y su comparacion se describen en
+[particionado](../particionado.md), con sus limites y fecha.
+Los diagnosticos fallidos no acreditan aprobacion. La primera ejecucion de
+verificacion-todo.json fallo; las pruebas posteriores estan registradas
+por requisito, sin modificar retroactivamente ese resultado.

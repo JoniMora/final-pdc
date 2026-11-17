@@ -1,7 +1,7 @@
 # Circuit Breaker del notificador — #47
 
-Estado: implementado y probado localmente; integracion con RabbitMQ y TLS
-pendiente de ejecutar en Docker. No se declara cerrado el issue.
+Estado: implementado; pruebas locales e integracion con RabbitMQ y TLS
+aprobadas en Docker el 17/11/2026. El cierre del issue requiere revision.
 
 El problema es un receptor de webhooks que responde con errores o no
 termina de responder. Repetir cada mensaje inmediatamente consume capacidad
@@ -43,7 +43,7 @@ y se observa cerrado -> abierto -> semiabierto -> cerrado. Es una prueba
 local, no una evidencia de la integracion Docker. Ver el registro real de
 [pruebas del notificador](evidencias/verificacion/unitarias-servicios-notificador.txt).
 
-Para probar la integracion preparada:
+Para repetir la integracion:
 
 ```powershell
 node reserva-cupos/scripts/verificar-e6.js circuito
@@ -62,3 +62,20 @@ Esos archivos solo acreditan la integracion cuando la prueba fue ejecutada
 y `aprobada` es verdadero.
 
 Referencia: [opossum](https://github.com/nodeshift/opossum).
+
+## Resultado Docker
+
+[circuito-recuperacion.json](evidencias/circuito-recuperacion.json) registra
+`aprobada: true`, las transiciones cerrado -> abierto -> semiabierto -> cerrado
+y once entregas recuperadas. [circuito-metricas.txt](evidencias/circuito-metricas.txt)
+conserva las metricas observadas. La ejecucion reemplaza el estado anterior
+de integracion pendiente; la prueba de loopback sigue siendo evidencia unitaria.
+
+## Aula real
+
+La prueba `pruebas/final/circuito-aula.js` tambien aprobo el 17/11/2026.
+Detuvo Aula, observo apertura, la recupero y verifico once entregas HTTP 204
+y el ciclo completo. Ver [resultado](evidencias/circuito-aula/resultado.json),
+[registros](evidencias/circuito-aula/notificador.txt) y
+[metricas](evidencias/circuito-aula/metricas.txt). Es una corrida distinta de
+la prueba anterior con receptor HTTPS temporal.
