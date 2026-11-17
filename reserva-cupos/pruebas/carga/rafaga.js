@@ -11,7 +11,10 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
 import exec from "k6/execution";
+import { Counter, Trend } from "k6/metrics";
 
+const admisionesPorEstado = new Counter("admisiones_por_estado");
+const duracionAdmision = new Trend("admision_duracion_ms", true);
 const API_URL = __ENV.API_URL || "https://traefik";
 const API_KEY = __ENV.API_KEY;
 const SOLICITUDES = Number(__ENV.SOLICITUDES || 500);
@@ -81,7 +84,20 @@ export default function (datos) {
         JSON.stringify({ participante: `alumno-${n}` }),
         opciones({ "Idempotency-Key": `rafaga-${datos.corrida}-${n}` })
     );
+    admisionesPorEstado.add(1, {
+        estado: String(respuesta.status)
+    });
 
+    duracionAdmision.add(respuesta.timings.duration);
+
+    if (respuesta.status !== 202) {
+        console.warn(
+            `Admisión fallida: participante=alumno-${n}, ` +
+            `HTTP=${respuesta.status}, ` +
+            `duracion_ms=${respuesta.timings.duration.toFixed(1)}, ` +
+            `error=${respuesta.error || "ninguno"}`
+        );
+    }
     check(respuesta, {
         "admisión responde 202": r => r.status === 202,
         "admisión devuelve Location": r => Boolean(r.headers["Location"])
