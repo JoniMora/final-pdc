@@ -11,8 +11,8 @@ COPY --from=contrato openapi.yaml asyncapi.yaml /app/contrato/
 
 WORKDIR /app/servicios/notificador
 
-COPY package.json ./
-RUN npm install --omit=dev
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
 COPY src ./src
 
