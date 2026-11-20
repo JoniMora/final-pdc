@@ -1,6 +1,6 @@
 const { crearAdmisor, insertarAdmisiones } = require("./admisiones");
 const express = require("express");
-const { pool, enTransaccion } = require("./db");
+const { pool, enTransaccion, esErrorDeInfraestructura } = require("./db");
 const { problemas } = require("./problemas");
 const {
     uuidv7,
@@ -24,7 +24,14 @@ const CLAVE_IDEMPOTENCIA = /^[\x21-\x7e]{1,128}$/;
 const PEDIDO_CANCELACION = "reserva.cancelacion_solicitada";
 
 const rutas = express.Router();
-const admitirReserva = crearAdmisor(enTransaccion, { escribirLote: insertarAdmisiones });
+// Tamaño de cada lote de admisiones (lo registra server.js en Prometheus).
+let observarLoteAdmision = () => {};
+
+const admitirReserva = crearAdmisor(enTransaccion, {
+    escribirLote: insertarAdmisiones,
+    esErrorDeInfraestructura,
+    observarLote: tamano => observarLoteAdmision(tamano)
+});
 
 function entero(valor, porDefecto, minimo, maximo, nombre) {
     if (valor === undefined) return porDefecto;
@@ -378,4 +385,8 @@ rutas.get("/cambios", async (req, res) => {
     });
 });
 
-module.exports = { rutas };
+function alObservarLoteAdmision(observador) {
+    observarLoteAdmision = observador;
+}
+
+module.exports = { rutas, alObservarLoteAdmision };

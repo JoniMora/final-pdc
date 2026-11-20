@@ -287,7 +287,7 @@
     },
     {
       "id": 10,
-      "title": "Cache de autenticacion: proporcion de aciertos",
+      "title": "Caché de autenticación: proporción de aciertos",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -316,7 +316,7 @@
     },
     {
       "id": 11,
-      "title": "Consultas de autenticacion a MySQL por segundo",
+      "title": "Consultas de autenticación a MySQL por segundo",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -374,7 +374,7 @@
     },
     {
       "id": 13,
-      "title": "Limite global: solicitudes aceptadas y rechazadas",
+      "title": "Límite global: solicitudes aceptadas y rechazadas",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -396,6 +396,40 @@
       "fieldConfig": {
         "defaults": {
           "unit": "ops",
+          "min": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 14,
+      "title": "Admisión por lotes: admisiones por commit y commits por segundo",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 61
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(pdc_admision_lote_tamano_sum[1m])) / clamp_min(sum(rate(pdc_admision_lote_tamano_count[1m])), 0.001)",
+          "legendFormat": "admisiones por commit"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(pdc_admision_lote_tamano_count[1m]))",
+          "legendFormat": "commits de admisión por segundo"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
           "min": 0
         },
         "overrides": []

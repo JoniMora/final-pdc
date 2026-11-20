@@ -1,8 +1,10 @@
 const { randomUUID } = require('node:crypto');
 const { noRedis } = require('./redis');
 
-// Version global: una rotacion o cambio de permisos invalida todas las
-// entradas; una lectura MySQL anterior nunca repuebla la generacion nueva.
+// Versión global: una rotación o un cambio de permisos invalida todas las
+// entradas; una lectura de MySQL anterior nunca repuebla la generación nueva.
+// Mientras dura el cambio (la clave pdc:auth:mutacion), las lecturas van a
+// MySQL sin pasar por la caché.
 const LEER = `
 if redis.call('EXISTS',KEYS[2]) == 1 then return {'-1',''} end
 local g = redis.call('GET',KEYS[1]) or '0'
@@ -30,7 +32,11 @@ function crearCacheAutenticacion(redis, { ttl = 30, observar = () => {} } = {}) 
     return {
         async buscar(hash, cargar) {
             const [generacion, valor] = await redis.eval(LEER, { keys: KEYS, arguments: [hash] });
-            if (generacion === '-1') throw noRedis(new Error('Actualizando permisos'));
+            // Hay una rotación o un cambio de permisos en curso: se consulta
+            // MySQL directo, sin guardar, como si no hubiera caché. Así un
+            // cambio de un tenant no deja sin servicio a los demás (antes
+            // respondía 503 a todos, hasta 30 s si la API caía a mitad).
+            if (generacion === '-1') { observar('bypass'); return cargar(); }
             if (valor) { observar('hit'); return JSON.parse(valor); }
             observar('miss');
             const llave = `${generacion}:${hash}`;
@@ -48,7 +54,7 @@ function crearCacheAutenticacion(redis, { ttl = 30, observar = () => {} } = {}) 
         async mutar(fn) {
             const token = randomUUID();
             const adquirido = await redis.eval(INICIAR, { keys: KEYS, arguments: [token] });
-            if (!Number(adquirido)) throw noRedis(new Error('Otra actualizacion de permisos en curso'));
+            if (!Number(adquirido)) throw noRedis(new Error('Otra actualización de permisos en curso'));
             try { return await fn(); }
             finally { await redis.eval(FINALIZAR, { keys: KEYS, arguments: [token] }); }
         }

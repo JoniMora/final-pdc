@@ -122,3 +122,44 @@ test('si falla la escritura masiva revierte y recupera cada admision individual'
     ]), [1, 2]);
     assert.deepEqual(base.filas, [1, 2]);
 });
+
+function errorDeInfraestructura() {
+    return Object.assign(new Error('MySQL no responde'), { code: 'ECONNREFUSED' });
+}
+
+const esInfraestructura = error => error.code === 'ECONNREFUSED';
+
+test('con la base caida el lote se rechaza en un solo intento, sin repetir cada admision', async () => {
+    let transacciones = 0;
+    const admitir = crearAdmisor(async () => {
+        transacciones++;
+        throw errorDeInfraestructura();
+    }, { maximo: 50, escribirLote: async () => {}, esErrorDeInfraestructura: esInfraestructura });
+    const resultados = await Promise.allSettled(Array.from({ length: 50 }, (_, i) =>
+        admitir(async () => i, {})));
+    assert.equal(transacciones, 1);
+    assert.ok(resultados.every(r => r.status === 'rejected' && r.reason.code === 'ECONNREFUSED'));
+});
+
+test('si la base cae durante la recuperacion individual, el resto falla sin mas intentos', async () => {
+    let transacciones = 0;
+    const admitir = crearAdmisor(async operacion => {
+        transacciones++;
+        if (transacciones === 1) throw new Error('clave duplicada en el lote');
+        if (transacciones === 2) return operacion();
+        throw errorDeInfraestructura();
+    }, { maximo: 4, escribirLote: async () => {}, esErrorDeInfraestructura: esInfraestructura });
+    const resultados = await Promise.allSettled([1, 2, 3, 4].map(n => admitir(async () => n, {})));
+    assert.deepEqual(resultados.map(r => r.status), ['fulfilled', 'rejected', 'rejected', 'rejected']);
+    assert.equal(resultados[0].value, 1);
+    // Lote + primera individual + la que encuentra la base caida.
+    assert.equal(transacciones, 3);
+});
+
+test('informa el tamano de cada lote', async () => {
+    const tamanos = [];
+    const base = baseDePrueba();
+    const admitir = crearAdmisor(base.transaccion, { maximo: 10, observarLote: n => tamanos.push(n) });
+    await Promise.all(Array.from({ length: 25 }, (_, i) => admitir(c => c.insertar(i))));
+    assert.deepEqual(tamanos, [10, 10, 5]);
+});

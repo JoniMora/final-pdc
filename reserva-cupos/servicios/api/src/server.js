@@ -8,8 +8,8 @@ const yaml = require("js-yaml");
 const OpenApiValidator = require("express-openapi-validator");
 const { pool, esErrorDeInfraestructura } = require("./db");
 const { Problema, enviarProblema, problemas } = require("./problemas");
-const { rutas } = require("./rutas");
-const { crearMetricas } = require("../../../compartido/src/metricas");
+const { rutas, alObservarLoteAdmision } = require("./rutas");
+const { crearMetricas, crearMetricaLoteAdmision } = require("../../../compartido/src/metricas");
 const { rutasAdmin } = require("./admin");
 const { crearRedis } = require('./redis');
 const { crearLimitadorRedis } = require('./limite-redis');
@@ -36,13 +36,18 @@ const CONTRATO = path.join(
 const VALIDAR_RESPUESTAS = process.env.VALIDAR_RESPUESTAS === "true";
 const contrato = yaml.load(fs.readFileSync(CONTRATO, "utf8"));
 
-// Límite de tasa por defecto de cada tenant; el operador puede fijar otro
-// por tenant con PATCH /admin/v1/tenants/{id}.
-const metricas = crearMetricas('api');
+const metricas = crearMetricas("api");
+
+// Cuántas admisiones comparte cada commit (ver compartido/src/metricas.js).
+const loteAdmision = crearMetricaLoteAdmision(metricas.registro);
+alObservarLoteAdmision(tamano => loteAdmision.observe(tamano));
+
 const redis = crearRedis();
 const cache = redis ? crearCacheAutenticacion(redis, {
     observar: resultado => metricas.eventos.inc({ tipo: 'auth_cache', resultado })
 }) : null;
+// Límite de tasa por defecto de cada tenant; el operador puede fijar otro
+// por tenant con PATCH /admin/v1/tenants/{id}.
 const opcionesLimite = {
     porSegundo: Number(process.env.LIMITE_POR_SEGUNDO || 50),
     rafaga: Number(process.env.LIMITE_RAFAGA || 100),
@@ -91,8 +96,11 @@ app.use(express.json({ limit: "24kb" }));
 // Salud del proceso. Informa la base sin fallar si no responde. La
 // instancia permite ver a qué réplica llegó cada solicitud detrás del
 // gateway.
-// Pool exclusivo para salud: no espera detrás de las reservas.
-// Conserva la verificación TLS cuando el entorno seguro está activo.
+//
+// La consulta usa un pool propio de una conexión, así no espera detrás de
+// las reservas. Los chequeos simultáneos (Docker, Traefik, Prometheus)
+// comparten la misma consulta en curso: con una sola conexión y sin cola,
+// el segundo informaría "no disponible" aunque la base respondiera.
 const { opcionesMysql } = require("../../../compartido/src/tls");
 const poolSalud = require("mysql2/promise").createPool({
     host: process.env.DB_HOST,
@@ -105,24 +113,22 @@ const poolSalud = require("mysql2/promise").createPool({
     connectTimeout: 1000
 });
 
+let saludEnCurso = null;
+
+function estadoMysql() {
+    saludEnCurso ??= poolSalud.query({ sql: "SELECT 1", timeout: 500 })
+        .then(() => "conectado", () => "no disponible")
+        .finally(() => { saludEnCurso = null; });
+
+    return saludEnCurso;
+}
+
 app.get("/health", async (req, res) => {
-    let mysql = "conectado";
-
-    try {
-        await poolSalud.query({
-            sql: "SELECT 1",
-            timeout: 500
-        });
-    } catch {
-        mysql = "no disponible";
-    }
-
-
     res.json({
         servicio: "api",
         instancia: INSTANCIA,
         estado: "ok",
-        mysql
+        mysql: await estadoMysql()
     });
 });
 

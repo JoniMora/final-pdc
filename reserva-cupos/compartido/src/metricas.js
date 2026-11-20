@@ -47,4 +47,17 @@ function crearMetricasCircuitos(registro) {
     };
 }
 
-module.exports = { crearMetricas, crearMetricasCircuitos };
+// Cuántas admisiones comparte cada commit de la API. Explica la curva de
+// 1/2/4 instancias: el agrupamiento es por proceso, así que con la misma
+// carga más instancias forman lotes más chicos y pagan más commits
+// semisincrónicos.
+function crearMetricaLoteAdmision(registro) {
+    return new Histogram({
+        name: "pdc_admision_lote_tamano",
+        help: "Admisiones confirmadas en cada transacción de lote",
+        buckets: [1, 2, 5, 10, 20, 30, 40, 50],
+        registers: [registro]
+    });
+}
+
+module.exports = { crearMetricas, crearMetricasCircuitos, crearMetricaLoteAdmision };

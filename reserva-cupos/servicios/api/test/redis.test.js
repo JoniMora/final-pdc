@@ -70,11 +70,18 @@ test('lectura anterior a rotacion no repuebla la generacion nueva', async () => 
     assert.equal(await cache.buscar('anterior', async () => null), null);
 });
 
-test('durante una mutacion no se autentica con permisos intermedios', async () => {
-    const cache = crearCacheAutenticacion(transporte());
+test('durante una mutacion se autentica contra MySQL sin usar ni poblar la cache', async () => {
+    const resultados = [];
+    const cache = crearCacheAutenticacion(transporte(), { observar: r => resultados.push(r) });
+    await cache.buscar('hash', async () => ({ id: 'tenant', scopes: 'lectura' }));
     await cache.mutar(async () => {
-        await assert.rejects(cache.buscar('hash', async () => ({})), e => e.code === 'REDIS_UNAVAILABLE');
+        // Otro tenant sigue atendido (antes recibia 503) y la fila sale de MySQL.
+        assert.deepEqual(await cache.buscar('otro', async () => ({ id: 'otro' })), { id: 'otro' });
+        assert.deepEqual(await cache.buscar('hash', async () => ({ id: 'tenant', scopes: 'escribir' })),
+            { id: 'tenant', scopes: 'escribir' });
     });
+    assert.deepEqual(resultados, ['miss', 'bypass', 'bypass']);
+    // Lo leido durante la mutacion no quedo guardado en la generacion nueva.
     assert.deepEqual(await cache.buscar('hash', async () => ({ id: 'nuevo' })), { id: 'nuevo' });
 });
 
