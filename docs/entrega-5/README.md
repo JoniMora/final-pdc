@@ -79,6 +79,7 @@ Respecto del plan de la Entrega 5 (issues #30 a #44):
 - **Los permisos se aplican desde el contrato.** La API lee el `security` de cada operación en vez de tener una lista propia, así que el permiso documentado y el aplicado no pueden diferir.
 - **TLS siempre, en un solo `docker-compose.yml`.** Un overlay opcional dejaba el compose base con Aula inutilizable y las pruebas de carga sin cifrar, y requería Compose 2.24.4 para `!override`.
 - **El certificado de la réplica también vale para `mysql-primary`.** Sin eso, la verificación de identidad que exigen los clientes rompería el failover.
+
 La matriz de fallos, Schemathesis y k6 (en el CI y en local) encontraron seis problemas que se corrigieron antes de esta ejecución:
 
 - **Aula terminaba si `aula-db` caía con una conexión en uso.** La conexión tomada del pool emitía un error sin manejador; se perdían las sesiones y el alumno veía `401` en plena contingencia. Ahora la transacción registra la pérdida, falla la operación y descarta la conexión.
