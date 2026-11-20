@@ -10,11 +10,19 @@ function crearSalud({ servicio, pool, rabbitmq, plazoMs = 1500 }) {
 
     // Los chequeos simultáneos comparten la misma consulta.
     function mysql() {
-        enCurso ??= Promise.race([
-            pool.query({ sql: "SELECT 1", timeout: plazoMs }),
-            new Promise((_, rechazar) => setTimeout(() => rechazar(new Error("plazo vencido")), plazoMs).unref())
-        ]).then(() => "conectado", () => "no disponible")
-            .finally(() => { enCurso = null; });
+        if (enCurso) return enCurso;
+
+        let temporizador;
+        const plazo = new Promise((_, rechazar) => {
+            temporizador = setTimeout(() => rechazar(new Error("plazo vencido")), plazoMs);
+        });
+
+        enCurso = Promise.race([pool.query({ sql: "SELECT 1", timeout: plazoMs }), plazo])
+            .then(() => "conectado", () => "no disponible")
+            .finally(() => {
+                clearTimeout(temporizador);
+                enCurso = null;
+            });
 
         return enCurso;
     }
