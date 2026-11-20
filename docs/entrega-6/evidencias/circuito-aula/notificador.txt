@@ -1,49 +1,49 @@
-notificador-1  | npm error path /app/servicios/notificador
-notificador-1  | npm error command failed
-notificador-1  | npm error signal SIGTERM
-notificador-1  | npm error command sh -c node src/main.js
-notificador-1  | npm notice
-notificador-1  | npm notice New major version of npm available! 10.9.9 -> 12.2.2
-notificador-1  | npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
-notificador-1  | npm notice To update run: npm install -g npm@12.2.2
-notificador-1  | npm notice
-notificador-1  | npm error A complete log of this run can be found in: /home/node/.npm/_logs/2026-11-17T13_29_17_794Z-debug-0.log
-notificador-1  | 
-notificador-1  | > reserva-cupos-notificador@0.2.0 start
-notificador-1  | > node src/main.js
-notificador-1  | 
-notificador-1  | [notificador] Métricas disponibles en puerto interno 9464
-notificador-1  | [notificador] Entregando webhooks desde webhooks.entregas · hosts permitidos: aula
-notificador-1  | [notificador] circuito {"tenant":"01a1542d-7ee2-7d8b-b3b3-40474b8dec7e","estado":"cerrado","instante":"2026-11-17T14:16:08.458Z"}
-notificador-1  | [notificador] webhook-24454: ENOTFOUND. Reintento 1 en webhooks.espera.10s
-notificador-1  | [notificador] webhook-24458: ENOTFOUND. Reintento 1 en webhooks.espera.10s
-notificador-1  | [notificador] webhook-24456: Sin respuesta completa en 5000 ms. Reintento 1 en webhooks.espera.10s
-notificador-1  | [notificador] circuito {"tenant":"01a1542d-7ee2-7d8b-b3b3-40474b8dec7e","estado":"abierto","instante":"2026-11-17T14:16:14.159Z"}
-notificador-1  | [notificador] webhook-24460: Sin respuesta completa en 5000 ms. Reintento 1 en webhooks.espera.10s
-notificador-1  | [notificador] webhook-24462: Sin respuesta completa en 5000 ms. Reintento 1 en webhooks.espera.10s
-notificador-1  | [notificador] webhook-24464: Sin respuesta completa en 5000 ms. Reintento 1 en webhooks.espera.10s
-notificador-1  | [notificador] webhook-24466: Sin respuesta completa en 5000 ms. Reintento 1 en webhooks.espera.10s
-notificador-1  | [notificador] webhook-24468: Sin respuesta completa en 5000 ms. Reintento 1 en webhooks.espera.10s
-notificador-1  | [notificador] webhook-24473: circuito abierto o prueba de recuperacion en curso. Diferido sin intento HTTP en webhooks.espera.10s
-notificador-1  | [notificador] webhook-24475: circuito abierto o prueba de recuperacion en curso. Diferido sin intento HTTP en webhooks.espera.10s
-notificador-1  | [notificador] webhook-24477: circuito abierto o prueba de recuperacion en curso. Diferido sin intento HTTP en webhooks.espera.10s
-notificador-1  | [notificador] webhook-24454: circuito abierto o prueba de recuperacion en curso. Diferido sin intento HTTP en webhooks.espera.10s
-notificador-1  | [notificador] webhook-24458: circuito abierto o prueba de recuperacion en curso. Diferido sin intento HTTP en webhooks.espera.10s
-notificador-1  | [notificador] webhook-24456: circuito abierto o prueba de recuperacion en curso. Diferido sin intento HTTP en webhooks.espera.10s
-notificador-1  | [notificador] circuito {"tenant":"01a1542d-7ee2-7d8b-b3b3-40474b8dec7e","estado":"semiabierto","instante":"2026-11-17T14:16:24.159Z"}
-notificador-1  | [notificador] webhook-24462: circuito abierto o prueba de recuperacion en curso. Diferido sin intento HTTP en webhooks.espera.10s
-notificador-1  | [notificador] webhook-24464: circuito abierto o prueba de recuperacion en curso. Diferido sin intento HTTP en webhooks.espera.10s
-notificador-1  | [notificador] webhook-24466: circuito abierto o prueba de recuperacion en curso. Diferido sin intento HTTP en webhooks.espera.10s
-notificador-1  | [notificador] webhook-24468: circuito abierto o prueba de recuperacion en curso. Diferido sin intento HTTP en webhooks.espera.10s
-notificador-1  | [notificador] circuito {"tenant":"01a1542d-7ee2-7d8b-b3b3-40474b8dec7e","estado":"cerrado","instante":"2026-11-17T14:16:24.192Z"}
-notificador-1  | [notificador] webhook-24460: reserva.confirmada entregado a aula:3001 (204)
-notificador-1  | [notificador] webhook-24473: reserva.confirmada entregado a aula:3001 (204)
-notificador-1  | [notificador] webhook-24475: reserva.confirmada entregado a aula:3001 (204)
-notificador-1  | [notificador] webhook-24477: reserva.confirmada entregado a aula:3001 (204)
-notificador-1  | [notificador] webhook-24454: reserva.confirmada entregado a aula:3001 (204)
-notificador-1  | [notificador] webhook-24458: reserva.confirmada entregado a aula:3001 (204)
-notificador-1  | [notificador] webhook-24456: reserva.confirmada entregado a aula:3001 (204)
-notificador-1  | [notificador] webhook-24462: reserva.confirmada entregado a aula:3001 (204)
-notificador-1  | [notificador] webhook-24464: reserva.confirmada entregado a aula:3001 (204)
-notificador-1  | [notificador] webhook-24468: reserva.confirmada entregado a aula:3001 (204)
-notificador-1  | [notificador] webhook-24466: reserva.confirmada entregado a aula:3001 (204)
+reserva-cupos-infra-notificador-1  | npm error path /app/servicios/notificador
+reserva-cupos-infra-notificador-1  | npm error command failed
+reserva-cupos-infra-notificador-1  | npm error signal SIGTERM
+reserva-cupos-infra-notificador-1  | npm error command sh -c node src/main.js
+reserva-cupos-infra-notificador-1  | npm notice
+reserva-cupos-infra-notificador-1  | npm notice New major version of npm available! 10.9.9 -> 12.2.3
+reserva-cupos-infra-notificador-1  | npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+reserva-cupos-infra-notificador-1  | npm notice To update run: npm install -g npm@12.2.3
+reserva-cupos-infra-notificador-1  | npm notice
+reserva-cupos-infra-notificador-1  | npm error A complete log of this run can be found in: /home/node/.npm/_logs/2026-11-20T04_41_53_150Z-debug-0.log
+reserva-cupos-infra-notificador-1  | 
+reserva-cupos-infra-notificador-1  | > reserva-cupos-notificador@0.2.0 start
+reserva-cupos-infra-notificador-1  | > node src/main.js
+reserva-cupos-infra-notificador-1  | 
+reserva-cupos-infra-notificador-1  | [notificador] Métricas disponibles en puerto interno 9464
+reserva-cupos-infra-notificador-1  | [notificador] Entregando webhooks desde webhooks.entregas · hosts permitidos: aula
+reserva-cupos-infra-notificador-1  | [notificador] circuito {"tenant":"01a1542d-7ee2-7d8b-b3b3-40474b8dec7e","estado":"cerrado","instante":"2026-11-20T04:42:10.549Z"}
+reserva-cupos-infra-notificador-1  | [notificador] circuito {"tenant":"01a1542d-7ee2-7d8b-b3b3-40474b8dec7e","estado":"abierto","instante":"2026-11-20T04:42:10.668Z"}
+reserva-cupos-infra-notificador-1  | [notificador] webhook-60: ENOTFOUND. Reintento 1 en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] webhook-56: ENOTFOUND. Reintento 1 en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] webhook-62: ENOTFOUND. Reintento 1 en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] webhook-58: ENOTFOUND. Reintento 1 en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] webhook-64: ENOTFOUND. Reintento 1 en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] webhook-66: ENOTFOUND. Reintento 1 en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] webhook-68: ENOTFOUND. Reintento 1 en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] webhook-70: ENOTFOUND. Reintento 1 en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] webhook-75: circuito abierto o prueba de recuperación en curso. Diferido sin intento HTTP en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] webhook-77: circuito abierto o prueba de recuperación en curso. Diferido sin intento HTTP en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] webhook-79: circuito abierto o prueba de recuperación en curso. Diferido sin intento HTTP en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] circuito {"tenant":"01a1542d-7ee2-7d8b-b3b3-40474b8dec7e","estado":"semiabierto","instante":"2026-11-20T04:42:20.669Z"}
+reserva-cupos-infra-notificador-1  | [notificador] webhook-60: circuito abierto o prueba de recuperación en curso. Diferido sin intento HTTP en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] webhook-62: circuito abierto o prueba de recuperación en curso. Diferido sin intento HTTP en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] webhook-58: circuito abierto o prueba de recuperación en curso. Diferido sin intento HTTP en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] webhook-64: circuito abierto o prueba de recuperación en curso. Diferido sin intento HTTP en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] webhook-66: circuito abierto o prueba de recuperación en curso. Diferido sin intento HTTP en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] webhook-68: circuito abierto o prueba de recuperación en curso. Diferido sin intento HTTP en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] webhook-70: circuito abierto o prueba de recuperación en curso. Diferido sin intento HTTP en webhooks.espera.10s
+reserva-cupos-infra-notificador-1  | [notificador] circuito {"tenant":"01a1542d-7ee2-7d8b-b3b3-40474b8dec7e","estado":"cerrado","instante":"2026-11-20T04:42:20.730Z"}
+reserva-cupos-infra-notificador-1  | [notificador] webhook-56: reserva.confirmada entregado a aula:3001 (204)
+reserva-cupos-infra-notificador-1  | [notificador] webhook-75: reserva.confirmada entregado a aula:3001 (204)
+reserva-cupos-infra-notificador-1  | [notificador] webhook-79: reserva.confirmada entregado a aula:3001 (204)
+reserva-cupos-infra-notificador-1  | [notificador] webhook-77: reserva.confirmada entregado a aula:3001 (204)
+reserva-cupos-infra-notificador-1  | [notificador] webhook-60: reserva.confirmada entregado a aula:3001 (204)
+reserva-cupos-infra-notificador-1  | [notificador] webhook-62: reserva.confirmada entregado a aula:3001 (204)
+reserva-cupos-infra-notificador-1  | [notificador] webhook-58: reserva.confirmada entregado a aula:3001 (204)
+reserva-cupos-infra-notificador-1  | [notificador] webhook-64: reserva.confirmada entregado a aula:3001 (204)
+reserva-cupos-infra-notificador-1  | [notificador] webhook-66: reserva.confirmada entregado a aula:3001 (204)
+reserva-cupos-infra-notificador-1  | [notificador] webhook-68: reserva.confirmada entregado a aula:3001 (204)
+reserva-cupos-infra-notificador-1  | [notificador] webhook-70: reserva.confirmada entregado a aula:3001 (204)

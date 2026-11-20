@@ -1,0 +1,1 @@
+Grafana: contraseña del admin tomada de seguridad/local/grafana-admin.txt.

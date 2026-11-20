@@ -1,0 +1,55 @@
+
+
+  █ THRESHOLDS
+
+    checks
+    ✓ 'rate==1' rate=100.00%
+
+    respuestas{caso:clave,status:200}
+    ✓ 'count==19' count=19
+
+    respuestas{caso:clave,status:202}
+    ✓ 'count==1' count=1
+
+    respuestas{caso:participante,status:202}
+    ✓ 'count==1' count=1
+
+    respuestas{caso:participante,status:409}
+    ✓ 'count==19' count=19
+
+
+  █ TOTAL RESULTS
+
+    checks_total.......................: 41      47.06267/s
+    checks_succeeded...................: 100.00% 41 out of 41
+    checks_failed......................: 0.00%   0 out of 41
+
+    ✓ mismo participante: 202 o 409
+    ✓ misma clave: 202 o 200
+    ✓ exactamente 2 reservas en la actividad
+
+    CUSTOM
+    respuestas...................................................................: 40    45.9148/s
+      { caso:clave,status:200 }..................................................: 19    21.80953/s
+      { caso:clave,status:202 }..................................................: 1     1.14787/s
+      { caso:participante,status:202 }...........................................: 1     1.14787/s
+      { caso:participante,status:409 }...........................................: 19    21.80953/s
+
+    HTTP
+    http_req_duration............................................................: avg=465.24ms min=26.92ms med=521.22ms max=624.09ms p(90)=593.82ms p(95)=601.21ms
+      { expected_response:true }.................................................: avg=465.24ms min=26.92ms med=521.22ms max=624.09ms p(90)=593.82ms p(95)=601.21ms
+    http_req_failed..............................................................: 0.00% 0 out of 42
+    http_reqs....................................................................: 42    48.21054/s
+
+    EXECUTION
+    iteration_duration...........................................................: avg=546.6ms  min=97.52ms med=569.7ms  max=754.16ms p(90)=703.9ms  p(95)=728.67ms
+    iterations...................................................................: 40    45.9148/s
+
+    NETWORK
+    data_received................................................................: 86 kB 99 kB/s
+    data_sent....................................................................: 30 kB 35 kB/s
+
+
+
+
+time="2026-11-20T04:43:51Z" level=info msg="Reservas creadas: 2 (alumno-reintento, alumno-repetido)" source=console

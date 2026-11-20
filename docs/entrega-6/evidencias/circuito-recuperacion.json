@@ -1,48 +1,48 @@
 {
-  "inicio": "2026-11-17T12:48:32.759Z",
+  "inicio": "2026-11-20T04:41:18.953Z",
   "aprobada": true,
   "pasos": [
     "abierto",
     "mensajes diferidos sin intento HTTP"
   ],
-  "tenant": "01a1e98d-cb39-7bca-ac61-86cf4e761ca7",
+  "tenant": "01a1f742-6456-752d-a710-80c18e479ed4",
   "transiciones": [
     {
-      "tenant": "01a1e98d-cb39-7bca-ac61-86cf4e761ca7",
+      "tenant": "01a1f742-6456-752d-a710-80c18e479ed4",
       "estado": "cerrado",
-      "instante": "2026-11-17T12:49:14.055Z"
+      "instante": "2026-11-20T04:41:28.337Z"
     },
     {
-      "tenant": "01a1e98d-cb39-7bca-ac61-86cf4e761ca7",
+      "tenant": "01a1f742-6456-752d-a710-80c18e479ed4",
       "estado": "abierto",
-      "instante": "2026-11-17T12:49:15.661Z"
+      "instante": "2026-11-20T04:41:28.486Z"
     },
     {
-      "tenant": "01a1e98d-cb39-7bca-ac61-86cf4e761ca7",
+      "tenant": "01a1f742-6456-752d-a710-80c18e479ed4",
       "estado": "semiabierto",
-      "instante": "2026-11-17T12:49:25.663Z"
+      "instante": "2026-11-20T04:41:38.486Z"
     },
     {
-      "tenant": "01a1e98d-cb39-7bca-ac61-86cf4e761ca7",
+      "tenant": "01a1f742-6456-752d-a710-80c18e479ed4",
       "estado": "cerrado",
-      "instante": "2026-11-17T12:49:25.675Z"
+      "instante": "2026-11-20T04:41:38.505Z"
     }
   ],
   "receptor": {
     "fallar": false,
-    "intentos": 14,
+    "intentos": 19,
     "entregas": [
-      "15758",
-      "15760",
-      "15762",
-      "15764",
-      "15767",
-      "15771",
-      "15773",
-      "15775",
-      "15777",
-      "15779",
-      "15756"
+      "26",
+      "36",
+      "41",
+      "43",
+      "45",
+      "22",
+      "24",
+      "28",
+      "30",
+      "32",
+      "34"
     ]
   }
 }

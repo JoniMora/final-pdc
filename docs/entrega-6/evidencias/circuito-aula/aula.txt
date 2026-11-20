@@ -1,26 +1,26 @@
-aula-1  | npm error path /app/clientes/aula
-aula-1  | npm error command failed
-aula-1  | npm error signal SIGTERM
-aula-1  | npm error command sh -c node src/server.js
-aula-1  | npm notice
-aula-1  | npm notice New major version of npm available! 10.9.9 -> 12.2.2
-aula-1  | npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
-aula-1  | npm notice To update run: npm install -g npm@12.2.2
-aula-1  | npm notice
-aula-1  | npm error A complete log of this run can be found in: /home/node/.npm/_logs/2026-11-17T12_46_45_147Z-debug-0.log
-aula-1  | 
-aula-1  | > reserva-cupos-aula@0.2.0 start
-aula-1  | > node src/server.js
-aula-1  | 
-aula-1  | [AULA] Pagina disponible en puerto 3001 · contrato openapi.yaml 1.2.0
-aula-1  | [AULA] Webhook 24460: reserva.confirmada v2 repetido o atrasado, sin cambios
-aula-1  | [AULA] Webhook 24473: reserva.confirmada v2 repetido o atrasado, sin cambios
-aula-1  | [AULA] Webhook 24475: reserva.confirmada v2 repetido o atrasado, sin cambios
-aula-1  | [AULA] Webhook 24477: reserva.confirmada v2 repetido o atrasado, sin cambios
-aula-1  | [AULA] Webhook 24454: reserva.confirmada v2 repetido o atrasado, sin cambios
-aula-1  | [AULA] Webhook 24458: reserva.confirmada v2 repetido o atrasado, sin cambios
-aula-1  | [AULA] Webhook 24456: reserva.confirmada v2 repetido o atrasado, sin cambios
-aula-1  | [AULA] Webhook 24462: reserva.confirmada v2 repetido o atrasado, sin cambios
-aula-1  | [AULA] Webhook 24464: reserva.confirmada v2 repetido o atrasado, sin cambios
-aula-1  | [AULA] Webhook 24468: reserva.confirmada v2 repetido o atrasado, sin cambios
-aula-1  | [AULA] Webhook 24466: reserva.confirmada v2 repetido o atrasado, sin cambios
+reserva-cupos-infra-aula-1  | npm error path /app/clientes/aula
+reserva-cupos-infra-aula-1  | npm error command failed
+reserva-cupos-infra-aula-1  | npm error signal SIGTERM
+reserva-cupos-infra-aula-1  | npm error command sh -c node src/server.js
+reserva-cupos-infra-aula-1  | npm notice
+reserva-cupos-infra-aula-1  | npm notice New major version of npm available! 10.9.9 -> 12.2.3
+reserva-cupos-infra-aula-1  | npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.3
+reserva-cupos-infra-aula-1  | npm notice To update run: npm install -g npm@12.2.3
+reserva-cupos-infra-aula-1  | npm notice
+reserva-cupos-infra-aula-1  | npm error A complete log of this run can be found in: /home/node/.npm/_logs/2026-11-20T04_39_27_841Z-debug-0.log
+reserva-cupos-infra-aula-1  | 
+reserva-cupos-infra-aula-1  | > reserva-cupos-aula@0.2.0 start
+reserva-cupos-infra-aula-1  | > node src/server.js
+reserva-cupos-infra-aula-1  | 
+reserva-cupos-infra-aula-1  | [AULA] Pagina disponible en puerto 3001 · contrato openapi.yaml 1.3.0
+reserva-cupos-infra-aula-1  | [AULA] Webhook 56: reserva.confirmada v2 repetido o atrasado, sin cambios
+reserva-cupos-infra-aula-1  | [AULA] Webhook 75: reserva.confirmada v2 repetido o atrasado, sin cambios
+reserva-cupos-infra-aula-1  | [AULA] Webhook 79: reserva.confirmada v2 repetido o atrasado, sin cambios
+reserva-cupos-infra-aula-1  | [AULA] Webhook 77: reserva.confirmada v2 repetido o atrasado, sin cambios
+reserva-cupos-infra-aula-1  | [AULA] Webhook 60: reserva.confirmada v2 repetido o atrasado, sin cambios
+reserva-cupos-infra-aula-1  | [AULA] Webhook 62: reserva.confirmada v2 repetido o atrasado, sin cambios
+reserva-cupos-infra-aula-1  | [AULA] Webhook 58: reserva.confirmada v2 repetido o atrasado, sin cambios
+reserva-cupos-infra-aula-1  | [AULA] Webhook 64: reserva.confirmada v2 repetido o atrasado, sin cambios
+reserva-cupos-infra-aula-1  | [AULA] Webhook 66: reserva.confirmada v2 repetido o atrasado, sin cambios
+reserva-cupos-infra-aula-1  | [AULA] Webhook 68: reserva.confirmada v2 repetido o atrasado, sin cambios
+reserva-cupos-infra-aula-1  | [AULA] Webhook 70: reserva.confirmada v2 repetido o atrasado, sin cambios

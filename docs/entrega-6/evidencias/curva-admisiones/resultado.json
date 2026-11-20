@@ -1,5 +1,5 @@
 {
-  "inicio": "2026-11-17T14:08:29.099Z",
+  "inicio": "2026-11-20T04:48:12.307Z",
   "aprobada": true,
   "parametros": {
     "solicitudesPorCorrida": 100,
@@ -13,139 +13,166 @@
     {
       "apis": 1,
       "repeticion": 1,
-      "actividad": "01a1e9d6-8282-783b-85d3-f15c106f074f",
+      "actividad": "01a1f748-a2cd-7406-89a1-8c05bc12edc4",
       "solicitudes": 100,
-      "duracionMs": 2197.5739000000003,
+      "duracionMs": 2485.446759,
       "errores": [],
       "instanciasObservadas": [
-        "27ffd150723e"
+        "9ec252e3f335"
       ],
-      "admisionesPorSegundo": 45.50472682625143,
-      "p95ClienteMs": 2122.5356,
+      "admisionesPorSegundo": 40.234215292639874,
+      "p95ClienteMs": 2324.565298,
+      "lotes": 13,
+      "admisionesEnLotes": 100,
+      "tamanoMedioLote": 7.6923076923076925,
       "estados": "confirmada\t10\nrechazada\t90"
     },
     {
       "apis": 2,
       "repeticion": 1,
-      "actividad": "01a1e9d7-3991-743b-ba01-e17cf46ab5d8",
+      "actividad": "01a1f748-f0ba-73eb-9e65-21c04bf4bcef",
       "solicitudes": 100,
-      "duracionMs": 3045.6656000000003,
+      "duracionMs": 1306.0136349999993,
       "errores": [],
       "instanciasObservadas": [
-        "27ffd150723e",
-        "3ec00b41e2be"
+        "9ec252e3f335",
+        "50968895bd80"
       ],
-      "admisionesPorSegundo": 32.8335454818152,
-      "p95ClienteMs": 2684.122199999998,
+      "admisionesPorSegundo": 76.56887900714761,
+      "p95ClienteMs": 1296.009607,
+      "lotes": 13,
+      "admisionesEnLotes": 100,
+      "tamanoMedioLote": 7.6923076923076925,
       "estados": "confirmada\t10\nrechazada\t90"
     },
     {
       "apis": 4,
       "repeticion": 1,
-      "actividad": "01a1e9d7-f223-7605-8806-3705585167dd",
+      "actividad": "01a1f749-4bd7-762f-a83e-7a9316c5c9ad",
       "solicitudes": 100,
-      "duracionMs": 2024.6777000000002,
+      "duracionMs": 1613.318803000002,
       "errores": [],
       "instanciasObservadas": [
-        "3ec00b41e2be",
-        "27ffd150723e",
-        "2c866390e548",
-        "901b31416e36"
+        "50968895bd80",
+        "9ec252e3f335",
+        "3aeb91dbaeac",
+        "01fcd8cf1900"
       ],
-      "admisionesPorSegundo": 49.390577078020854,
-      "p95ClienteMs": 1816.8372999999992,
+      "admisionesPorSegundo": 61.98402932764919,
+      "p95ClienteMs": 1595.935411999999,
+      "lotes": 23,
+      "admisionesEnLotes": 100,
+      "tamanoMedioLote": 4.3478260869565215,
       "estados": "confirmada\t10\nrechazada\t90"
     },
     {
       "apis": 4,
       "repeticion": 2,
-      "actividad": "01a1e9d8-55ce-7e7e-b329-bf80c095d802",
+      "actividad": "01a1f749-7a3b-7db8-b6a3-d51e98897365",
       "solicitudes": 100,
-      "duracionMs": 4235.3321,
+      "duracionMs": 1439.6829199999993,
       "errores": [],
       "instanciasObservadas": [
-        "3ec00b41e2be",
-        "27ffd150723e",
-        "2c866390e548",
-        "901b31416e36"
+        "9ec252e3f335",
+        "3aeb91dbaeac",
+        "50968895bd80",
+        "01fcd8cf1900"
       ],
-      "admisionesPorSegundo": 23.610899367253868,
-      "p95ClienteMs": 4227.341899999999,
+      "admisionesPorSegundo": 69.45973909310534,
+      "p95ClienteMs": 1343.423963000001,
+      "lotes": 30,
+      "admisionesEnLotes": 100,
+      "tamanoMedioLote": 3.3333333333333335,
       "estados": "confirmada\t10\nrechazada\t90"
     },
     {
       "apis": 1,
       "repeticion": 2,
-      "actividad": "01a1e9d8-b5af-71c1-a42b-34c561b3f684",
+      "actividad": "01a1f749-a874-7a21-a612-1d54c8e82e0b",
       "solicitudes": 100,
-      "duracionMs": 992.5383000000147,
+      "duracionMs": 1363.3985229999962,
       "errores": [],
       "instanciasObservadas": [
-        "27ffd150723e"
+        "3aeb91dbaeac"
       ],
-      "admisionesPorSegundo": 100.75177955349281,
-      "p95ClienteMs": 983.2023000000045,
+      "admisionesPorSegundo": 73.34612610549254,
+      "p95ClienteMs": 1330.330633999998,
+      "lotes": 7,
+      "admisionesEnLotes": 100,
+      "tamanoMedioLote": 14.285714285714286,
       "estados": "confirmada\t10\nrechazada\t90"
     },
     {
       "apis": 2,
       "repeticion": 2,
-      "actividad": "01a1e9d9-29c6-7e74-9220-49549b989094",
+      "actividad": "01a1f749-f17f-71d7-920f-88cdae7469e7",
       "solicitudes": 100,
-      "duracionMs": 990.8575000000128,
+      "duracionMs": 1146.3236380000017,
       "errores": [],
       "instanciasObservadas": [
-        "27ffd150723e",
-        "238a3a1fdb93"
+        "3aeb91dbaeac",
+        "1b807b1c950e"
       ],
-      "admisionesPorSegundo": 100.92268565358663,
-      "p95ClienteMs": 923.6712000000116,
+      "admisionesPorSegundo": 87.23539904879799,
+      "p95ClienteMs": 1124.1772760000022,
+      "lotes": 13,
+      "admisionesEnLotes": 100,
+      "tamanoMedioLote": 7.6923076923076925,
       "estados": "confirmada\t10\nrechazada\t90"
     },
     {
       "apis": 2,
       "repeticion": 3,
-      "actividad": "01a1e9d9-5ad5-703d-9651-29d2d4f78b77",
+      "actividad": "01a1f74a-17b7-7b41-a358-a81da3178d1b",
       "solicitudes": 100,
-      "duracionMs": 1330.9534000000276,
+      "duracionMs": 2498.0695220000052,
       "errores": [],
       "instanciasObservadas": [
-        "27ffd150723e",
-        "238a3a1fdb93"
+        "3aeb91dbaeac",
+        "1b807b1c950e"
       ],
-      "admisionesPorSegundo": 75.13411063076883,
-      "p95ClienteMs": 1029.323000000004,
+      "admisionesPorSegundo": 40.03091151760179,
+      "p95ClienteMs": 2483.846936999995,
+      "lotes": 16,
+      "admisionesEnLotes": 100,
+      "tamanoMedioLote": 6.25,
       "estados": "confirmada\t10\nrechazada\t90"
     },
     {
       "apis": 4,
       "repeticion": 3,
-      "actividad": "01a1e9da-260a-73a2-b56d-8c8ae15718cd",
+      "actividad": "01a1f74a-7fd8-70c9-b5f3-01c6d97e58e1",
       "solicitudes": 100,
-      "duracionMs": 2639.0077000000165,
+      "duracionMs": 2498.0111730000062,
       "errores": [],
       "instanciasObservadas": [
-        "238a3a1fdb93",
-        "27ffd150723e",
-        "f126ef58c963",
-        "f9671a81806d"
+        "3aeb91dbaeac",
+        "1b807b1c950e",
+        "fe21823b9117",
+        "4d729e42542a"
       ],
-      "admisionesPorSegundo": 37.893030778197186,
-      "p95ClienteMs": 2630.7062999999907,
+      "admisionesPorSegundo": 40.03184656692476,
+      "p95ClienteMs": 2421.464426000006,
+      "lotes": 29,
+      "admisionesEnLotes": 100,
+      "tamanoMedioLote": 3.4482758620689653,
       "estados": "confirmada\t10\nrechazada\t90"
     },
     {
       "apis": 1,
       "repeticion": 3,
-      "actividad": "01a1e9da-615d-7939-b5d4-23efdf284ea2",
+      "actividad": "01a1f74a-b2df-78da-9d03-2d5e69d91740",
       "solicitudes": 100,
-      "duracionMs": 2351.623200000002,
+      "duracionMs": 1245.174469999998,
       "errores": [],
       "instanciasObservadas": [
-        "27ffd150723e"
+        "4d729e42542a"
       ],
-      "admisionesPorSegundo": 42.52381929213826,
-      "p95ClienteMs": 2343.0319000000018,
+      "admisionesPorSegundo": 80.31003077022625,
+      "p95ClienteMs": 1215.7900580000132,
+      "lotes": 10,
+      "admisionesEnLotes": 100,
+      "tamanoMedioLote": 10,
       "estados": "confirmada\t10\nrechazada\t90"
     }
   ],
@@ -154,41 +181,71 @@
       "apis": 1,
       "throughput": {
         "muestras": 3,
-        "media": 62.926775223960824,
-        "desvio": 32.79130474422401
+        "media": 64.63012405611956,
+        "desvio": 21.412479196531482
       },
       "p95": {
         "muestras": 3,
-        "media": 1816.2566000000022,
-        "desvio": 729.8213854360445
+        "media": 1623.5619966666702,
+        "desvio": 609.782016172806
+      },
+      "commits": {
+        "muestras": 3,
+        "media": 10,
+        "desvio": 3
+      },
+      "lote": {
+        "muestras": 3,
+        "media": 10.659340659340659,
+        "desvio": 3.3457884280523804
       }
     },
     {
       "apis": 2,
       "throughput": {
         "muestras": 3,
-        "media": 69.63011392205688,
-        "desvio": 34.376637956029356
+        "media": 67.94506319118246,
+        "desvio": 24.755677332512686
       },
       "p95": {
         "muestras": 3,
-        "media": 1545.705466666671,
-        "desvio": 987.3120427508223
+        "media": 1634.677939999999,
+        "desvio": 740.4036578743431
+      },
+      "commits": {
+        "muestras": 3,
+        "media": 14,
+        "desvio": 1.7320508075688772
+      },
+      "lote": {
+        "muestras": 3,
+        "media": 7.211538461538463,
+        "desvio": 0.8327167344081142
       }
     },
     {
       "apis": 4,
       "throughput": {
         "muestras": 3,
-        "media": 36.9648357411573,
-        "desvio": 12.91487921886392
+        "media": 57.15853832922644,
+        "desvio": 15.295889551281514
       },
       "p95": {
         "muestras": 3,
-        "media": 2891.6284999999966,
-        "desvio": 1226.2517696194866
+        "media": 1786.941267000002,
+        "desvio": 563.8308589014332
+      },
+      "commits": {
+        "muestras": 3,
+        "media": 27.333333333333332,
+        "desvio": 3.7859388972001824
+      },
+      "lote": {
+        "muestras": 3,
+        "media": 3.7098117607862733,
+        "desvio": 0.5555174673463402
       }
     }
   ],
-  "fin": "2026-11-17T14:13:28.266Z"
+  "fin": "2026-11-20T04:50:38.426Z"
 }

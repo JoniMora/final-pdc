@@ -1,0 +1,16 @@
+Seguridad de los componentes de la Entrega 6 (Redis, Prometheus, Grafana, métricas)
+Ejecución: 2026-11-20T04:52:18.817Z
+
+  · redis-cli sin TLS: conexión rechazada
+  · Con TLS y sin contraseña: NOAUTH Authentication required.; con TLS y contraseña: PONG
+OK: Redis solo atiende TLS, exige contraseña y no publica puertos en el equipo
+  · 3 entradas en la caché; campos guardados: id, scopes, limite_por_segundo, limite_rafaga
+OK: La caché de autenticación no contiene claves de API ni secretos de webhook (la clave de cada entrada es el hash)
+  · Prometheus: publicado en 127.0.0.1:9090; HTTP → HTTP 400; 9 destinos, todos por HTTPS, todos up
+OK: Prometheus solo por HTTPS en 127.0.0.1 y recolecta cada destino por HTTPS
+  · Grafana: publicado en 127.0.0.1:3002; HTTP → HTTP 400; admin/admin → 401; contraseña generada → 200
+OK: Grafana solo por HTTPS en 127.0.0.1, sin la contraseña de fábrica
+  · Puerto 9464 sin publicar en api, worker, relay y notificador; GET https://localhost:3000/metrics → 404
+OK: Las métricas de los servicios solo se leen desde la red interna (Prometheus), no por el gateway
+
+Resultado: APROBADA

@@ -1,0 +1,21 @@
+consulta	ejecuciones	tiempo_ps	bloqueo_ps
+COMMIT	420	22605608791000	0
+INSERT INTO `cambios` ( `tenant_id` , `entidad` , `entidad_id` , `tipo` , `version` , SNAPSHOT , `publicado_comando` , `publicado_webhook` ) VALUES ( ?, ... , TRUE , FALSE )	346	1141312576000	1720000000
+UPDATE `cambios` SET `publicado_webhook` = TRUE WHERE `id` IN (...)	20	967878568000	68000000
+UPDATE `reservas` SET `estado` = ? , `version` = `version` + ? WHERE `id` = ? AND `estado` = ?	346	881698685000	650000000
+SELECT `secuencia` , `tipo` , SNAPSHOT , `creado_en` FROM `cambios` WHERE `tenant_id` = ? AND `secuencia` > ? AND `tipo` != ? ORDER BY `secuencia` LIMIT ?	641	711057735000	1467000000
+UPDATE `cambios` SET `publicado_comando` = TRUE WHERE `id` IN (...)	16	599681555000	22000000
+UPDATE `actividades` SET `cupos_disponibles` = `cupos_disponibles` - ? , `version` = `version` + ? WHERE `id` = ? AND `tenant_id` = ? AND `estado` = ? AND `cupos_disponibles` > ?	345	594520804000	603000000
+SELECT `id` , `tenant_id` , `actividad_id` , `participante_id` , `estado` , `version` , `metadata` , `creado_en` FROM `reservas` WHERE `id` = ? AND `tenant_id` = ? FOR UPDATE	346	567939668000	3473000000
+START TRANSACTION	727	375609053000	0
+SELECT `id` , `tenant_id` , `tipo` , SNAPSHOT , `secuencia` , `creado_en` FROM `cambios` WHERE `publicado_webhook` = FALSE AND `secuencia` IS NOT NULL ORDER BY `id` LIMIT ?	338	336072822000	668000000
+INSERT INTO `reservas` ( `id` , `tenant_id` , `actividad_id` , `participante_id` , `idempotency_key` , `request_hash` , `metadata` , `creado_en` ) VALUES (...) /* , ... */	20	325020858000	29000000
+INSERT INTO `cambios` ( `tenant_id` , `entidad` , `entidad_id` , `tipo` , `version` , SNAPSHOT , `publicado_comando` , `publicado_webhook` ) VALUES ( ?, ... , TRUE , TRUE )	116	318635634000	154000000
+SELECT `id` , `tenant_id` , `entidad_id` , `tipo` , SNAPSHOT FROM `cambios` WHERE `publicado_comando` = FALSE AND `secuencia` IS NOT NULL ORDER BY `id` LIMIT ?	338	288075438000	676000000
+SELECT `id` , `nombre` , `capacidad` , `cupos_disponibles` , `estado` , `version` , `metadata` , `creado_en` FROM `actividades` WHERE `id` = ? AND `tenant_id` = ?	355	245842684000	676000000
+SELECT `id` , `nombre` , `capacidad` , `cupos_disponibles` , `estado` , `version` , `metadata` , `creado_en` FROM `actividades` WHERE `id` = ?	105	231599623000	3708000000
+SELECT `id` FROM `cambios` WHERE `secuencia` IS NULL ORDER BY `id` LIMIT ?	338	231101172000	704000000
+SELECT `id` , `actividad_id` , `participante_id` , `estado` , `version` , `metadata` , `creado_en` , `request_hash` FROM `reservas` WHERE `tenant_id` = ? AND `idempotency_key` = ?	345	230431008000	2602000000
+INSERT INTO `cambios` ( `tenant_id` , `entidad` , `entidad_id` , `tipo` , `version` , SNAPSHOT , `publicado_comando` , `publicado_webhook` ) VALUES ( ?, ... , FALSE , TRUE ) , ( ?,	1	195031895000	2000000
+UPDATE `cambios` SET `secuencia` = CASE `id` WHEN ? THEN ? WHEN ? THEN ? WHEN ? THEN ? WHEN ? THEN ? WHEN ? THEN ? WHEN ? THEN ? WHEN ? THEN ? WHEN ? THEN ? WHEN ? THEN ? WHEN ? TH	2	190081881000	4000000
+SELECT `id` , `scopes` , `limite_por_segundo` , `limite_rafaga` FROM `tenants` WHERE `api_key_hash` = ? AND `activo` = TRUE	20	161698761000	435000000

@@ -1,0 +1,13 @@
+Matriz de fallos · Redis detenido con una ráfaga en curso (límite global y caché de autenticación)
+Ejecución: 2026-11-20T05:06:46.515Z
+
+  · Ráfaga de 200 solicitudes; Redis detenido tras 40 admisiones durante 15 s
+  · Sin Redis: GET /v1/cambios → 503 (urn:reserva-cupos:problema:no-disponible, Retry-After 5) a los 0.7 s; /health → 200
+OK: Sin Redis la API responde 503 con Retry-After: no autentica sin la caché ni limita por instancia
+  · 200 admitidas en 23.9 s · latencia de admisión p50 0.71 s, p95 19.04 s, máx 20.27 s · reintentos 521 (errores vistos: 503×521)
+  · Invariantes: 10 confirmadas, 190 rechazadas, 0 pendientes, 0 duplicadas, cupos_disponibles = 0
+OK: Los clientes reintentaron con la misma Idempotency-Key: 10 confirmadas, ninguna duplicada ni perdida
+  · Redis en marcha 22.4 s después de detenerlo; /v1 volvió a responder 0.0 s después de que Redis quedó sano
+OK: Al volver Redis, la API reconecta sola e invalida la caché de permisos (nueva generación)
+
+Resultado: APROBADA

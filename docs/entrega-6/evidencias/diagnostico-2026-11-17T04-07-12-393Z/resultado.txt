@@ -1,7 +1,0 @@
-Corrida: 2026-11-17T04-07-12-393Z
-Particiones previstas: 1
-Prueba: rafaga.js
-Tenant: 01a1e7af-fdd9-7906-848e-322e42d79895
-Muestras: 39
-Codigo k6: 0
-El estado de la base es una instantanea; k6 conserva sus criterios originales.

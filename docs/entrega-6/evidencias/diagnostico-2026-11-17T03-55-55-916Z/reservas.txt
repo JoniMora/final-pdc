@@ -1,5 +1,0 @@
-actividad_id	estado	cantidad
-01a1e7a5-b61e-752b-81c3-af83ce2a9886	confirmada	10
-01a1e7a5-b61e-752b-81c3-af83ce2a9886	rechazada	490
-id	capacidad	cupos_disponibles
-01a1e7a5-b61e-752b-81c3-af83ce2a9886	10	0

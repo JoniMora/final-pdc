@@ -1,6 +1,6 @@
 {
   "accion": "carga",
-  "inicio": "2026-11-17T13:22:59.910Z",
+  "inicio": "2026-11-20T04:45:18.486Z",
   "pasos": [
     {
       "nombre": "carga-caliente",
@@ -16,5 +16,5 @@
     }
   ],
   "aprobada": true,
-  "fin": "2026-11-17T13:29:22.064Z"
+  "fin": "2026-11-20T04:48:12.195Z"
 }

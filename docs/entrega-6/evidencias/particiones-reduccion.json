@@ -1,0 +1,33 @@
+{
+  "inicio": "2026-11-20T05:16:51.999Z",
+  "actividades": 8,
+  "porActividad": 5,
+  "comprobaciones": [
+    "Workers de las particiones 1 a 3 detenidos",
+    "35 de 40 comandos esperan en las particiones 1 a 3 sin consumidor",
+    "Relay recreado con una partición",
+    "El relay desenlazó las colas 1 a 3 y reenvió 35 comandos al exchange",
+    "Solo queda enlazada reservas.comandos.0",
+    "Las 40 reservas quedaron confirmadas; ningún comando varado"
+  ],
+  "aprobada": true,
+  "antes": {
+    "reservas.comandos.3": 0,
+    "reservas.comandos.0": 0,
+    "reservas.comandos.1": 15,
+    "reservas.comandos.2": 20
+  },
+  "relay": [
+    "reserva-cupos-infra-relay-1  | [colas] reservas.comandos.1 desenlazada; 15 comandos reenviados al exchange",
+    "reserva-cupos-infra-relay-1  | [colas] reservas.comandos.2 desenlazada; 20 comandos reenviados al exchange",
+    "reserva-cupos-infra-relay-1  | [colas] reservas.comandos.3 desenlazada; 0 comandos reenviados al exchange",
+    "reserva-cupos-infra-relay-1  | [colas] Topología de RabbitMQ configurada (1 particiones)"
+  ],
+  "despues": {
+    "reservas.comandos.3": 0,
+    "reservas.comandos.0": 0,
+    "reservas.comandos.1": 0,
+    "reservas.comandos.2": 0
+  },
+  "fin": "2026-11-20T05:17:08.671Z"
+}

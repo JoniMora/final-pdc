@@ -1,6 +1,6 @@
 {
   "particiones": 1,
-  "fecha": "2026-11-17T04:15:31.493Z",
+  "fecha": "2026-11-20T05:17:08.820Z",
   "actividades": 8,
   "porActividad": 40,
   "capacidad": 10,
@@ -13,8 +13,9 @@
     "Orden de decisiones coincide con el registro de comandos dentro de cada actividad"
   ],
   "aprobada": true,
-  "admisionMs": 3117.6301000000003,
-  "p95AdmisionClienteMs": 2989.4594000000006,
-  "tiempoTotalMs": 67801.4246,
-  "decisionesPorSegundo": 4.719664843148443
+  "codigoPrueba": "dd683afb869e45a41edd22984ea192dc7ea528c3fc94028120e1b3c1d81ebaf7",
+  "admisionMs": 4820.468202,
+  "p95AdmisionClienteMs": 4743.546359999999,
+  "tiempoTotalMs": 11154.49945,
+  "decisionesPorSegundo": 28.68797487815556
 }

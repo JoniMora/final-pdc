@@ -1,5 +1,5 @@
 1/3 Midiendo la misma lectura autenticada con 1, 2 y 4 APIs...
-OK: N=1: 200 lecturas; 0 consultas de autenticacion a MySQL
+OK: N=1: 200 lecturas; 1 consultas de autenticacion a MySQL
 OK: N=2: 200 lecturas; 0 consultas de autenticacion a MySQL
 OK: N=4: 200 lecturas; 0 consultas de autenticacion a MySQL
 2/3 Verificando limite global con cuatro instancias...

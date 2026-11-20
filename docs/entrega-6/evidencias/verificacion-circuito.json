@@ -1,0 +1,12 @@
+{
+  "accion": "circuito",
+  "inicio": "2026-11-20T04:41:18.872Z",
+  "pasos": [
+    {
+      "nombre": "circuito",
+      "aprobada": true
+    }
+  ],
+  "aprobada": true,
+  "fin": "2026-11-20T04:42:03.599Z"
+}

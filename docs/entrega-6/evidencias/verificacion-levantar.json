@@ -1,0 +1,28 @@
+{
+  "accion": "levantar",
+  "inicio": "2026-11-20T05:15:48.037Z",
+  "pasos": [
+    {
+      "nombre": "preparar",
+      "aprobada": true
+    },
+    {
+      "nombre": "topologia-original",
+      "aprobada": true
+    },
+    {
+      "nombre": "levantar-cuatro-particiones",
+      "aprobada": true
+    },
+    {
+      "nombre": "replica",
+      "aprobada": true
+    },
+    {
+      "nombre": "grafana",
+      "aprobada": true
+    }
+  ],
+  "aprobada": true,
+  "fin": "2026-11-20T05:16:51.799Z"
+}

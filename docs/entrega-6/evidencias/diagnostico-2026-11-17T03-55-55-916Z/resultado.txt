@@ -1,5 +1,0 @@
-Corrida: 2026-11-17T03-55-55-916Z
-Tenant: 01a1e7a5-ab5d-73d0-8d06-f89ddc668542
-Muestras: 30
-Codigo k6: 0
-El estado de la base es una instantanea; k6 conserva sus criterios originales.
