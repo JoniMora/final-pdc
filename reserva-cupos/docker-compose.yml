@@ -203,7 +203,11 @@ services:
       traefik.http.services.api.loadbalancer.serverstransport: api-tls@file
       traefik.http.services.api.loadbalancer.healthcheck.path: /health
       traefik.http.services.api.loadbalancer.healthcheck.interval: 5s
-      traefik.http.services.api.loadbalancer.healthcheck.timeout: 3s
+      # Traefik saca la instancia con un solo chequeo fallido. Con 3 s, una
+      # API sola y ocupada por una ráfaga de 500 quedaba afuera y Traefik
+      # respondía 503 (visto en el ensayo de la demo). Una instancia caída
+      # se detecta igual al instante: la conexión se rechaza.
+      traefik.http.services.api.loadbalancer.healthcheck.timeout: 10s
 
     volumes:
       - *ca

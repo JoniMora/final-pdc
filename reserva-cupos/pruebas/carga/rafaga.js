@@ -3,6 +3,7 @@
 //
 // Uso (desde reserva-cupos):
 //   docker compose run --rm k6 run -e API_KEY=<clave> /pruebas/carga/rafaga.js
+//   ... -e ACTIVIDAD_ID=<id>   usa una actividad existente en lugar de crearla
 //
 // Criterio de aceptación: todas las admisiones responden 202 y, cuando no
 // quedan pendientes, hay exactamente CAPACIDAD confirmadas, el resto
@@ -58,6 +59,14 @@ function opciones(extra = {}) {
 export function setup() {
     if (!API_KEY) {
         exec.test.abort("Falta API_KEY: ejecutar con -e API_KEY=<clave>");
+    }
+
+    // Para la demo: la ráfaga va a una actividad que ya existe (por ejemplo,
+    // una materia recién creada en Aula, con la clave de Aula), vacía y con
+    // CAPACIDAD cupos.
+    if (__ENV.ACTIVIDAD_ID) {
+        console.log(`Actividad ${__ENV.ACTIVIDAD_ID}: ${CAPACIDAD} cupos, ${SOLICITUDES} solicitudes simultáneas`);
+        return { actividadId: __ENV.ACTIVIDAD_ID, corrida: Date.now() };
     }
 
     const respuesta = http.post(
