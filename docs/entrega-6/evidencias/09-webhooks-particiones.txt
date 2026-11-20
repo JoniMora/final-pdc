@@ -1,8 +1,0 @@
-﻿aula-1         | [AULA] Webhook 4152: reserva.confirmada v2 aplicado
-aula-1         | [AULA] Webhook 4155: reserva.rechazada v2 aplicado
-notificador-1  | [notificador] webhook-4152: reserva.confirmada entregado a aula:3001 (204)
-aula-1         | [AULA] Webhook 4157: reserva.cancelada v3 aplicado
-aula-1         | [AULA] Webhook 4160: reserva.confirmada v2 aplicado
-notificador-1  | [notificador] webhook-4155: reserva.rechazada entregado a aula:3001 (204)
-notificador-1  | [notificador] webhook-4157: reserva.cancelada entregado a aula:3001 (204)
-notificador-1  | [notificador] webhook-4160: reserva.confirmada entregado a aula:3001 (204)

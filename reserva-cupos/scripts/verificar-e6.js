@@ -8,7 +8,7 @@ const accion = process.argv[2] || 'local';
 const informe = { accion, inicio: new Date().toISOString(), pasos: [], aprobada: false };
 // Las evidencias no llevan rutas absolutas del equipo (ni el usuario local).
 function relativo(texto) {
-    return texto.split(path.resolve(raiz, '..') + path.sep).join('');
+    return texto.split(path.resolve(raiz, '..') + path.sep).join('').split(require('node:os').homedir()).join('~');
 }
 function ejecutar(nombre, programa, args, { timeout = 600000, cwd = raiz, env = process.env } = {}) {
     console.log(`>> ${nombre}`);
@@ -18,7 +18,7 @@ function ejecutar(nombre, programa, args, { timeout = 600000, cwd = raiz, env = 
         const texto = relativo(salida.replace(/[ \t]+$/gm, '').trimEnd() + '\n');
         fs.mkdirSync(path.join(evidencias, 'verificacion'), { recursive: true });
         fs.writeFileSync(path.join(evidencias, 'verificacion', `${nombre}.txt`), texto, 'utf8');
-        const total = /# tests (\d+)/.exec(texto);
+        const total = /(?:#|ℹ) tests (\d+)/.exec(texto);
         informe.pasos.push({ nombre, aprobada: true, ...(total ? { pruebas: Number(total[1]) } : {}) });
         console.log(`OK: ${nombre}${total ? ` (${total[1]} pruebas)` : ''}`);
     } catch (e) {
