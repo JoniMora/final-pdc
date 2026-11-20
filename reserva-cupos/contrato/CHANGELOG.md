@@ -4,6 +4,14 @@ Versionado semántico sobre cada documento. Un cambio compatible sube la versió
 
 ## `openapi.yaml`: API pública
 
+### 1.3.0 · Entrega 6
+
+Compatible con 1.2.0: solo cambian descripciones; oasdiff no informa cambios. Documenta comportamiento que la Entrega 6 agregó detrás de la misma interfaz.
+
+- **Reintentos de webhooks con circuit breaker.** Si la mitad o más de los envíos recientes a un tenant fallan (con al menos 3), el notificador deja de enviarle durante 10 s y después prueba con un solo evento; mientras tanto retiene sus eventos sin gastar intentos. El calendario de reintentos (10 s, 1 min y 5 min) no cambia, y se agrega un tope: a los 400 s del primer fallo de un evento, este queda en la DLQ aunque le queden intentos. Sin ese tope, con el circuito abierto un evento podía tardar horas en llegar a la DLQ.
+- **`503` más amplio.** `NoDisponible` cubre también la caída del almacén del límite de tasa (Redis), no solo la de la base de datos.
+- **Límite de tasa global.** Aclara que el límite de cada tenant vale igual con varias instancias de la API detrás del gateway (antes cada instancia contaba por su cuenta).
+
 ### 1.2.0 · Entrega 5
 
 Compatible con 1.1.0: oasdiff no informa cambios incompatibles ni advertencias. Un cliente de 1.1.0 sigue funcionando sin cambios, porque su clave conserva los cuatro permisos y el límite de tasa por defecto (50/s, ráfaga 100) supera el uso normal.
@@ -30,6 +38,14 @@ Compatible con 1.0.0 para los clientes que siguen el contrato, con dos excepcion
 Primera versión: actividades, admisión de reservas con `Idempotency-Key`, consulta, listado paginado por cursor y feed de cambios.
 
 ## `asyncapi.yaml`: mensajería interna
+
+### 1.1.0 · Entrega 6
+
+Compatible con 1.0.0: los ejemplos de cada versión validan contra los esquemas de la otra (`compatibilidad-mensajes.sh`).
+
+- **Particiones.** `reservas.comandos.{particion}` pasa de una cola a N (`COMANDOS_PARTICIONES`, hasta 32) enlazadas con el mismo peso al exchange de hash consistente. Cada worker consume una sola partición como consumidor exclusivo. Al bajar N, el relay desenlaza las colas sobrantes y reenvía sus comandos al exchange antes de publicar.
+- **Nueva cabecera opcional `x-primer-fallo`** en las entregas de webhook reprogramadas: el instante del primer fallo, desde el que cuenta el plazo de 400 s hasta la DLQ. Un consumidor de 1.0.0 la ignora.
+- **Esperas:** con el circuito del tenant abierto, una entrega vuelve a `webhooks.espera.10s` sin gastar un intento.
 
 ### 1.0.0 · Entrega 4
 

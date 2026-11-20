@@ -147,31 +147,28 @@ async function iniciar() {
     await canal.prefetch(PREFETCH);
 
     async function reprogramar(entrega, motivo, { consumirIntento = true } = {}) {
-        const intento = Number(
-            entrega.properties.headers?.["x-intento"] || 0
-        );
-
+        const cabeceras = entrega.properties.headers || {};
+        const intento = Number(cabeceras["x-intento"] || 0);
         const id = entrega.properties.messageId;
-        const plan = planReintento(intento, consumirIntento);
+        const plan = planReintento(intento, {
+            consumir: consumirIntento,
+            primerFallo: Number(cabeceras["x-primer-fallo"])
+        });
 
         if (plan.agotado) {
-            console.error(
-                `[notificador] ${id}: ${motivo}. ` +
-                "Sin más reintentos, a webhooks.dlq"
-            );
+            console.error(`[notificador] ${id}: ${motivo}. ${plan.motivo}, a webhooks.dlq`);
 
             canal.nack(entrega, false, false);
             contar("dlq_reintentos_agotados");
             return;
         }
 
-        const destinoEspera = plan.cola;
-        canal.sendToQueue(destinoEspera, entrega.content, {
+        canal.sendToQueue(plan.cola, entrega.content, {
             persistent: true,
             contentType: "application/json",
             messageId: id,
             type: "entrega",
-            headers: { "x-intento": plan.intento }
+            headers: { "x-intento": plan.intento, "x-primer-fallo": plan.primerFallo }
         });
 
         await canal.waitForConfirms();
@@ -181,7 +178,7 @@ async function iniciar() {
 
         console.error(
             `[notificador] ${id}: ${motivo}. ` +
-            `${consumirIntento ? 'Reintento ' + (intento + 1) : 'Diferido sin intento HTTP'} en ${destinoEspera}`
+            `${consumirIntento ? "Reintento " + (intento + 1) : "Diferido sin intento HTTP"} en ${plan.cola}`
         );
     }
 
@@ -295,7 +292,7 @@ async function iniciar() {
         } catch (error) {
             if (error.code === 'EOPENBREAKER') {
                 contar('diferido_circuito');
-                await reprogramar(entrega, 'circuito abierto o prueba de recuperacion en curso', { consumirIntento: false });
+                await reprogramar(entrega, "circuito abierto o prueba de recuperación en curso", { consumirIntento: false });
                 return;
             }
             if (error instanceof ErrorDestino) {

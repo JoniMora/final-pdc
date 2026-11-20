@@ -2,8 +2,8 @@ openapi: 3.1.0
 
 info:
   title: Servicio multi-tenant de reserva de cupos
-  version: 1.2.0
-  summary: API pública v1 y administración de tenants (Entrega 5)
+  version: 1.3.0
+  summary: API pública v1 y administración de tenants (Entrega 6)
   description: |
     Contrato de la API pública. Cada organización consumidora es un tenant
     que se autentica con su propia clave; el tenant se deriva siempre de la
@@ -36,7 +36,8 @@ info:
     **Límite de tasa.** Cada tenant tiene un límite de solicitudes por
     segundo con una ráfaga máxima (token bucket). Al superarlo, la API
     responde `429` con `Retry-After`; un tenant saturado no consume el cupo
-    de otro.
+    de otro. El límite es global: vale igual con una o varias instancias de
+    la API detrás del gateway.
 
     **Administración.** Las rutas `/admin/v1` son del operador de la
     plataforma, con su propia clave (`claveAdministrador`): alta de tenants,
@@ -732,7 +733,10 @@ components:
           schema:
             $ref: "#/components/schemas/Problema"
     NoDisponible:
-      description: La base de datos no está disponible; reintentar con la misma Idempotency-Key.
+      description: |
+        Una dependencia del servicio (la base de datos o el almacén del límite
+        de tasa) no está disponible. Reintentar después de `Retry-After`; en
+        una solicitud de reserva, con la misma `Idempotency-Key`.
       headers:
         Retry-After:
           $ref: "#/components/headers/RetryAfter"
@@ -1057,8 +1061,13 @@ webhooks:
 
         **Reintentos.** Ante una respuesta distinta de `2xx`, o si la respuesta
         no termina de llegar en 5 segundos, el notificador reintenta a los
-        10 s, 1 min y 5 min. Agotados los intentos, el evento queda en una cola
-        de mensajes fallidos y sigue disponible en el feed.
+        10 s, 1 min y 5 min. Si la mitad o más de los envíos recientes a un
+        tenant fallan (con al menos 3), deja de enviarle durante 10 s
+        (*circuit breaker*) y después prueba con un solo evento; mientras
+        tanto retiene sus eventos sin gastar intentos. Agotados los intentos,
+        o a los 400 s del primer fallo de un evento (el calendario completo
+        más un margen), el evento queda en una cola de mensajes fallidos y
+        sigue disponible en el feed.
       x-vector-de-prueba:
         secreto: 5c0f8e2a9b7d4e61c3a85f0b2d9e7a14f6c2b8d05e3a9f71c4b6e2d8a0f5c3b9
         t: 1794052805
