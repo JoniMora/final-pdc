@@ -406,6 +406,16 @@ async function escenarioTenant({ ok, dato }) {
     const caida = cronometro();
     dato("Aula y aula-db detenidas (el servidor completo del tenant)");
 
+    try {
+        return await tenantCaido({ ok, dato, clave, dlqAntes, caida });
+    } finally {
+        // También si falla: el escenario siguiente necesita a Aula.
+        await iniciar("aula-db").catch(() => {});
+        await iniciar("aula").catch(() => {});
+    }
+}
+
+async function tenantCaido({ ok, dato, clave, dlqAntes, caida }) {
     const resultado = await rafaga({ clave, capacidad: 5, solicitudes: 20, concurrencia: 10 });
     const conteo = await verificarInvariantes({ clave, actividadId: resultado.actividadId, capacidad: 5, solicitudes: 20 });
     dato(`Reservas del tenant Aula por otro canal mientras su servidor está caído: ${resumenInvariantes(conteo)}`);
@@ -424,8 +434,8 @@ async function escenarioTenant({ ok, dato }) {
             descripcion: "que los 20 webhooks agoten los reintentos o el plazo de 400 s"
         });
         dato(`webhooks.dlq: ${dlqAntes} → ${colas()["webhooks.dlq"]} mensajes tras ${segundos(caida())}`);
-        // Con el circuito del tenant abierto, la mayoría no llega a gastar sus
-        // intentos: vence el plazo de 400 s desde su primer fallo.
+        // Con el circuito del tenant abriéndose y cerrándose, unas entregas
+        // agotan sus intentos y otras vencen el plazo de 400 s.
         ok("Agotados los reintentos (10 s, 1 min, 5 min) o el plazo de 400 s con el circuito abierto, los 20 webhooks quedan en webhooks.dlq");
     }
 
