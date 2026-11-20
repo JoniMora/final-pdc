@@ -5,6 +5,7 @@ const amqp = require("amqplib");
 const { crearValidadorDeMensajes } = require("../../../compartido/src/contrato");
 const { conexionRabbit } = require("../../../compartido/src/tls");
 const { crearMetricas } = require("../../../compartido/src/metricas");
+const { crearSalud, atenderSalud } = require("../../../compartido/src/salud");
 
 const { crearPool, esErrorDeInfraestructura } = require("./db");
 const { reservar } = require("./reservar");
@@ -17,6 +18,11 @@ const PAUSA_INFRAESTRUCTURA_MS = 5000;
 const pool = crearPool();
 const validar = crearValidadorDeMensajes();
 const metricas = crearMetricas("worker");
+
+// RabbitMQ: si se pierde la conexión el proceso termina y Docker lo
+// reinicia; mientras tanto /health lo informa.
+let rabbitConectado = false;
+const salud = crearSalud({ servicio: "worker", pool, rabbitmq: () => rabbitConectado });
 
 function salir(error) {
     console.error("[WORKER]", error.message);
@@ -81,10 +87,12 @@ async function iniciar() {
     conexion.on("error", salir);
 
     conexion.on("close", () => {
+        rabbitConectado = false;
         salir(new Error("Se perdió la conexión con RabbitMQ"));
     });
 
     const canal = await conexion.createChannel();
+    rabbitConectado = true;
 
     canal.on("error", salir);
 
@@ -171,6 +179,8 @@ const servidorMetricas = https.createServer({
     key: fs.readFileSync(process.env.TLS_KEY),
     minVersion: "TLSv1.2"
 }, async (req, res) => {
+    if (await atenderSalud(req, res, salud)) return;
+
     if (req.method !== "GET" || req.url !== "/metrics") {
         res.writeHead(404);
         res.end();

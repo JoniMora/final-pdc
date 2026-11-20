@@ -306,6 +306,8 @@ node scripts/sistema.js detener
 node scripts/sistema.js levantar
 ```
 
+`docker compose ps` muestra `healthy` en cada servicio. El worker, el relay y el notificador exponen `/health` en su puerto interno de métricas (9464), con el mismo formato que el de la API: informa MySQL y RabbitMQ sin bloquearse (`docker compose exec worker node -e "fetch('https://localhost:9464/health').then(r => r.text()).then(console.log)"`). Sin MySQL siguen vivos y lo informan; sin RabbitMQ, el relay reconecta solo y el worker y el notificador se reinician.
+
 `docker compose down` elimina contenedores y redes y conserva los volúmenes. `docker compose down -v` también elimina los datos.
 
 ## Problemas frecuentes
