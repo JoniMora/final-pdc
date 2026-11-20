@@ -146,7 +146,9 @@ app.get("/health", (req, res) => {
 // Comprueba las conexiones sin detener la página si alguna falla. /health
 // es operativo y no forma parte del contrato.
 app.get("/estado", async (req, res) => {
-    const [base, servicio] = await Promise.allSettled([
+    // (Antes el resultado se llamaba `base` y tapaba la función base() del
+    // interruptor: la ruta fallaba siempre y respondía 400.)
+    const [postgresql, servicio] = await Promise.allSettled([
         base(() => pool.query("SELECT 1 FROM materias LIMIT 1")),
 
         fetch(`${API_URL}/health`, {
@@ -163,7 +165,7 @@ app.get("/estado", async (req, res) => {
     res.json({
         aula: "ok",
         contrato: `openapi.yaml ${api.contrato.version}`,
-        postgresql: base.status === "fulfilled" ? "conectado" : "no disponible",
+        postgresql: postgresql.status === "fulfilled" ? "conectado" : "no disponible",
         recuperacion: recuperacion.estado.modo,
         api: servicio.status === "fulfilled" ? `conectada (instancia ${servicio.value.instancia})` : "no disponible"
     });
@@ -358,9 +360,15 @@ app.post("/inscripciones/:reservaId/cancelacion", async (req, res) => {
 });
 
 app.use((error, req, res, next) => {
-    res.status(error.type === "entity.too.large" ? 413 : 400).json({
-        error: "JSON invalido o demasiado grande"
-    });
+    if (error.type === "entity.too.large" || error.type === "entity.parse.failed") {
+        return res.status(error.type === "entity.too.large" ? 413 : 400).json({
+            error: "JSON invalido o demasiado grande"
+        });
+    }
+
+    // Cualquier otro error es de Aula: se registra y no se disfraza de 400.
+    console.error("[AULA] Error inesperado:", error);
+    res.status(500).json({ error: "Error interno de Aula" });
 });
 
 // Aula atiende por HTTPS al navegador y al notificador (webhooks).

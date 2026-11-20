@@ -15,6 +15,7 @@ import { Counter } from "k6/metrics";
 const API_URL = __ENV.API_URL || "https://traefik";
 
 const respuestas429 = new Counter("respuestas_429");
+const reintentosTransporte = new Counter("reintentos_transporte");
 const vecinoRechazado = new Counter("vecino_rechazado");
 
 export const options = {
@@ -38,14 +39,30 @@ export const options = {
         // El saturado tiene que recibir 429 y el vecino ninguno.
         respuestas_429: ["count>0"],
         vecino_rechazado: ["count==0"],
+        // Un 502/503/504 aislado del gateway se reintenta como haría un
+        // cliente correcto, pero se cuenta: más de 5 en ~10.000 solicitudes
+        // ya no es aislado y la prueba falla.
+        reintentos_transporte: ["count<=5"],
         checks: ["rate==1"]
     }
 };
 
+// GET idempotente: ante un error de transporte del gateway (502, 503, 504 o
+// sin respuesta) se reintenta hasta dos veces. En el CI apareció un 502
+// aislado de Traefik, más o menos uno cada 10.000 solicitudes a 1.000 por
+// segundo; no se reprodujo en local y su causa no quedó registrada. Lo que
+// esta prueba mide es el aislamiento del límite entre tenants.
 function feed(clave) {
-    return http.get(`${API_URL}/v1/cambios?limite=1`, {
-        headers: { Authorization: `Bearer ${clave}` }
-    });
+    let respuesta;
+    for (let intento = 0; intento < 3; intento++) {
+        respuesta = http.get(`${API_URL}/v1/cambios?limite=1`, {
+            headers: { Authorization: `Bearer ${clave}` }
+        });
+        if (![0, 502, 503, 504].includes(respuesta.status)) break;
+        reintentosTransporte.add(1);
+        console.warn(`reintento por HTTP ${respuesta.status} ${respuesta.error || ""}`);
+    }
+    return respuesta;
 }
 
 export function saturado() {

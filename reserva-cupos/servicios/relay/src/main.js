@@ -13,6 +13,7 @@ const {
     comandoDesdeCambio,
     entregaDesdeCambio
 } = require("./mensajes");
+const { crearSalud, atenderSalud } = require("../../../compartido/src/salud");
 const { configurarParticiones } = require("../../../compartido/src/particiones");
 
 // Único proceso que secuencia el feed y publica el outbox.
@@ -63,6 +64,9 @@ const pool = mysql.createPool({
 });
 
 let canal = null;
+
+// El relay reconecta a RabbitMQ sin detenerse: /health informa el corte.
+const salud = crearSalud({ servicio: "relay", pool, rabbitmq: () => canal !== null });
 
 // Reconecta al broker sin detener el secuenciador.
 async function conectarBroker() {
@@ -347,6 +351,8 @@ const servidorMetricas = https.createServer({
     key: fs.readFileSync(process.env.TLS_KEY),
     minVersion: "TLSv1.2"
 }, async (req, res) => {
+    if (await atenderSalud(req, res, salud)) return;
+
     if (req.method !== "GET" || req.url !== "/metrics") {
         res.writeHead(404);
         res.end();

@@ -6,6 +6,7 @@ const amqp = require("amqplib");
 const { crearValidadorDeMensajes } = require("../../../compartido/src/contrato");
 const { opcionesMysql, conexionRabbit } = require("../../../compartido/src/tls");
 const { crearMetricas, crearMetricasCircuitos } = require("../../../compartido/src/metricas");
+const { crearSalud, atenderSalud } = require("../../../compartido/src/salud");
 const { crearCircuitos, ErrorHttp } = require("./circuitos");
 const { planReintento } = require('./reintento');
 
@@ -51,6 +52,11 @@ const pool = mysql.createPool({
     connectionLimit: 2,
     connectTimeout: 3000
 });
+
+// RabbitMQ: si se pierde la conexión el proceso termina y Docker lo
+// reinicia; mientras tanto /health lo informa.
+let rabbitConectado = false;
+const salud = crearSalud({ servicio: "notificador", pool, rabbitmq: () => rabbitConectado });
 
 function salir(error) {
     console.error("[notificador]", error.message);
@@ -132,11 +138,13 @@ async function iniciar() {
     conexion.on("error", salir);
 
     conexion.on("close", () => {
+        rabbitConectado = false;
         salir(new Error("Se perdió la conexión con RabbitMQ"));
     });
 
     // Confirma la reprogramación antes de descartar el original.
     const canal = await conexion.createConfirmChannel();
+    rabbitConectado = true;
 
     canal.on("error", salir);
 
@@ -341,6 +349,8 @@ const servidorMetricas = https.createServer({
     key: fs.readFileSync(process.env.TLS_KEY),
     minVersion: "TLSv1.2"
 }, async (req, res) => {
+    if (await atenderSalud(req, res, salud)) return;
+
     if (req.method !== "GET" || req.url !== "/metrics") {
         res.writeHead(404);
         res.end();

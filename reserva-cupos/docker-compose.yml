@@ -203,7 +203,11 @@ services:
       traefik.http.services.api.loadbalancer.serverstransport: api-tls@file
       traefik.http.services.api.loadbalancer.healthcheck.path: /health
       traefik.http.services.api.loadbalancer.healthcheck.interval: 5s
-      traefik.http.services.api.loadbalancer.healthcheck.timeout: 3s
+      # Traefik saca la instancia con un solo chequeo fallido. Con 3 s, una
+      # API sola y ocupada por una ráfaga de 500 quedaba afuera y Traefik
+      # respondía 503 (visto en el ensayo de la demo). Una instancia caída
+      # se detecta igual al instante: la conexión se rechaza.
+      traefik.http.services.api.loadbalancer.healthcheck.timeout: 10s
 
     volumes:
       - *ca
@@ -272,6 +276,15 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+
+    # /health en el servidor interno de métricas (issue #10): el proceso
+    # atiende e informa MySQL y RabbitMQ. Verifica la CA local.
+    healthcheck:
+      test: [CMD, node, -e, "fetch('https://localhost:9464/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
 
     restart: unless-stopped
 
@@ -525,6 +538,15 @@ services:
       rabbitmq:
         condition: service_healthy
 
+    # /health en el servidor interno de métricas (issue #10): el proceso
+    # atiende e informa MySQL y RabbitMQ. Verifica la CA local.
+    healthcheck:
+      test: [CMD, node, -e, "fetch('https://localhost:9464/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
     restart: unless-stopped
 
   notificador:
@@ -573,6 +595,15 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+
+    # /health en el servidor interno de métricas (issue #10): el proceso
+    # atiende e informa MySQL y RabbitMQ. Verifica la CA local.
+    healthcheck:
+      test: [CMD, node, -e, "fetch('https://localhost:9464/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
 
     restart: unless-stopped
 

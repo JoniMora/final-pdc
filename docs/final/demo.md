@@ -10,13 +10,14 @@ Todos los comandos parten de la raíz del repositorio, en la terminal de Intelli
 
 ## 1. Preparación previa
 
-Abrir Docker Desktop. Ejecutar, por separado:
+Abrir Docker Desktop. Desde la raíz del repositorio:
 
 ```powershell
-node reserva-cupos/scripts/sistema.js preparar
-node reserva-cupos/scripts/sistema.js levantar
-node reserva-cupos/scripts/sistema.js estado
+node reserva-cupos/scripts/sistema.js demo
 ```
+
+Deja todo listo y comprobado (API, Aula, réplica, particiones, Prometheus) y crea
+el tenant de la demo. Si algo no responde, se detiene y dice qué.
 
 Abrir https://localhost:3001. Los usuarios y contraseñas de esta instalación están
  en `reserva-cupos/seguridad/local/accesos-locales.txt`; no mostrar ese archivo en
@@ -72,19 +73,35 @@ node reserva-cupos/pruebas/final/recorrido.js
 Todas esas rutas están dentro de `reserva-cupos`. Seguir el mapa de la guía de
  defensa; no leer archivos completos durante la exposición.
 
-## 5. Seguridad y caída de PostgreSQL
+## 5. Escenario +1 en vivo
 
-Ejecutar antes de la exposición, o durante ella si hay tiempo suficiente:
+Para hacerlo a mano, con Aula en pantalla, k6 y Grafana: [ensayo paso a paso](ensayo-paso-a-paso.md).
+Lo que sigue es la versión automatizada, útil para comprobar el entorno antes.
+
+Es la demostración que promete el plan (Entrega 0): una materia de 10 cupos, 500
+alumnos inscribiéndose a la vez y la base de Aula que se cae en plena ráfaga.
 
 ```powershell
-node reserva-cupos/scripts/sistema.js seguridad
+node reserva-cupos/pruebas/final/escenario-mas-uno.js --pausas
 ```
 
-Explicar las comprobaciones: sin sesión 401, permiso insuficiente 403, CSRF,
-reservas ajenas, cifrado verificado y recuperación. La prueba detiene PostgreSQL,
-reserva utilizando el servicio y luego lo inicia y reconcilia. No detiene MySQL.
-La sesión sigue funcionando porque está en memoria; los usuarios provienen del
-archivo local de identidades. La recuperación utiliza el feed y un cursor propio.
+Con `--pausas` espera Enter entre pasos para explicar cada uno:
+
+1. **Todo sano:** la API ve MySQL y Aula está en modo normal.
+2. **El administrador abre la materia** (mostrarla en Aula, https://localhost:3001).
+3. **500 inscripciones a la vez; a las 150 se detiene aula-db.** Decir: "Aula no
+   se cae: el catálogo sale del feed de la API y las inscripciones van directo a
+   la API, que nunca dependió de la base de Aula".
+4. **El servicio decidió:** 10 confirmadas, 490 rechazadas, 0 duplicadas, 0 cupos
+   negativos. Decir: "la garantía la da el UPDATE condicional en MySQL".
+5. **Vuelve aula-db:** Aula lee `/v1/cambios` desde su punto de control y su base
+   queda igual al servicio. Decir: "el webhook es el camino rápido; el feed es la
+   garantía".
+
+Tarda unos dos minutos sin pausas. Cada corrida deja su registro en
+`docs/final/ensayos/`. Para mostrar también el resto de la seguridad (401, 403,
+CSRF, cifrado), correr antes `node reserva-cupos/scripts/sistema.js seguridad` y
+mostrar su salida.
 
 ## 6. Carga y escalado
 
@@ -110,3 +127,28 @@ son el único host, failover manual, sesiones en memoria y CA de desarrollo”.
 
 Si algo falla, mostrar el error real y la evidencia anterior con su fecha.
 No presentar una ejecución anterior como si acabara de ocurrir.
+
+## Checklist de ensayo
+
+Antes de cada ensayo y el día de la defensa:
+
+- [ ] Docker Desktop abierto y con al menos 6 GB de memoria.
+- [ ] `node reserva-cupos/scripts/sistema.js demo` terminó con "Listo para la demo".
+- [ ] El navegador confía en `reserva-cupos/seguridad/local/ca.crt` (sin advertencias en https://localhost:3001).
+- [ ] Ventana normal con el administrador y ventana privada con un alumno, ya logueados.
+- [ ] Grafana abierto en https://localhost:3002 con el dashboard "Reserva de cupos".
+- [ ] El escenario +1 corrió completo al menos una vez ese día (`escenario-mas-uno.js`).
+- [ ] Terminal con letra grande; `accesos-locales.txt` cerrado y fuera de la pantalla.
+- [ ] El video de respaldo a mano.
+
+Cada ensayo completo (los dos integrantes, de punta a punta, con tiempo) se anota en
+la página "Ensayos de la demo" de la Wiki.
+
+## Plan B
+
+Si en vivo falla algo que no se resuelve en un minuto:
+
+1. Mostrar el video de respaldo del escenario +1.
+2. Mostrar el último registro de `docs/final/ensayos/` y los informes de la
+   [Entrega 6](../entrega-6/evidencias/README.md), con su fecha.
+3. Explicar con el código abierto qué debía pasar en el paso que falló.
