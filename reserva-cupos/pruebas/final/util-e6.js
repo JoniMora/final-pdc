@@ -30,8 +30,10 @@ async function sql(consulta) {
 }
 async function desdeApi(url, opciones = {}) {
     const script = `fetch(process.argv[1],JSON.parse(process.argv[2])).then(async r=>{const t=await r.text();if(!r.ok)throw Error('HTTP '+r.status);console.log(t);}).catch(e=>{console.error(e.message);process.exitCode=1;});`;
-    return (await docker(['exec', '-T', 'api', 'node', '-e', script, url, JSON.stringify(opciones)],
-        { timeout: 15000 })).stdout.trim();
+    // Por id: después de escalar, la instancia que queda puede no ser la 1
+    // (`docker compose exec api` apunta siempre a la de índice 1).
+    const [id] = await ids('api');
+    return (await directo(['exec', id, 'node', '-e', script, url, JSON.stringify(opciones)], 15000)).stdout.trim();
 }
 async function metricas(servicio, id) {
     const script = "fetch('https://localhost:9464/metrics').then(r=>{if(!r.ok)throw Error('HTTP '+r.status);return r.text();}).then(console.log).catch(e=>{console.error(e.message);process.exitCode=1;});";

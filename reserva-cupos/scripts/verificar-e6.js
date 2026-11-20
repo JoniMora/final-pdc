@@ -6,19 +6,23 @@ const raiz = path.resolve(__dirname, '..');
 const evidencias = path.resolve(raiz, '../docs/entrega-6/evidencias');
 const accion = process.argv[2] || 'local';
 const informe = { accion, inicio: new Date().toISOString(), pasos: [], aprobada: false };
+// Las evidencias no llevan rutas absolutas del equipo (ni el usuario local).
+function relativo(texto) {
+    return texto.split(path.resolve(raiz, '..') + path.sep).join('');
+}
 function ejecutar(nombre, programa, args, { timeout = 600000, cwd = raiz, env = process.env } = {}) {
     console.log(`>> ${nombre}`);
     try {
         const salida = execFileSync(programa, args, { cwd, env, encoding: 'utf8', timeout,
             maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
-        const texto = salida.replace(/[ \t]+$/gm, '').trimEnd() + '\n';
+        const texto = relativo(salida.replace(/[ \t]+$/gm, '').trimEnd() + '\n');
         fs.mkdirSync(path.join(evidencias, 'verificacion'), { recursive: true });
         fs.writeFileSync(path.join(evidencias, 'verificacion', `${nombre}.txt`), texto, 'utf8');
         const total = /# tests (\d+)/.exec(texto);
         informe.pasos.push({ nombre, aprobada: true, ...(total ? { pruebas: Number(total[1]) } : {}) });
         console.log(`OK: ${nombre}${total ? ` (${total[1]} pruebas)` : ''}`);
     } catch (e) {
-        const texto = String(e.stdout || '') + '\n' + String(e.stderr || e.message);
+        const texto = relativo(String(e.stdout || '') + '\n' + String(e.stderr || e.message));
         fs.mkdirSync(path.join(evidencias, 'verificacion'), { recursive: true });
         fs.writeFileSync(path.join(evidencias, 'verificacion', `${nombre}.txt`),
             texto.replace(/(?:rc_(?:admin_)?[a-f0-9]{64}|[a-f0-9]{64})/gi, '[SECRETO OCULTO]'), 'utf8');
@@ -52,6 +56,7 @@ function levantar() {
     ejecutar('levantar-cuatro-particiones', 'docker', ['compose', '-f', 'docker-compose.yml', '-f',
         'docker-compose.particiones.yml', 'up', '-d', '--build', '--wait', '--wait-timeout', '300']);
     nodo('replica', 'scripts/sistema.js', ['replica']);
+    nodo('grafana', 'scripts/sistema.js', ['grafana']);
 }
 function circuito() { nodo('circuito', 'pruebas/final/circuito.js', [], { timeout: 420000 }); }
 function redis() { nodo('redis', 'pruebas/final/redis.js', [], { timeout: 600000 }); }
