@@ -643,6 +643,10 @@ services:
       GF_SERVER_CERT_KEY: /tls/grafana.key
       GF_SECURITY_COOKIE_SECURE: "true"
       GF_USERS_ALLOW_SIGN_UP: "false"
+      # Contraseña generada por `sistema.js preparar` (no la de fábrica).
+      # Grafana la aplica al crear el admin en un volumen nuevo.
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana-admin
 
     ports:
       - "127.0.0.1:3002:3000"
@@ -665,6 +669,10 @@ services:
       - type: bind
         source: ./seguridad/local/grafana.key
         target: /tls/grafana.key
+        read_only: true
+      - type: bind
+        source: ./seguridad/local/grafana-admin.txt
+        target: /run/secrets/grafana-admin
         read_only: true
 
     networks:

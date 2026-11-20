@@ -1,5 +1,6 @@
 // Recarga la provision y verifica los paneles usando la API oficial de Grafana.
-// Credenciales solo en variables temporales: nunca se guardan ni se imprimen.
+// Las credenciales se leen de seguridad/local/ o de variables temporales:
+// nunca se guardan ni se imprimen.
 const fs = require("node:fs");
 const path = require("node:path");
 const https = require("node:https");
@@ -46,10 +47,15 @@ function pedir(metodo, ruta, usuario, password) {
 }
 
 async function main() {
-    const usuario = process.env.PDC_GRAFANA_USUARIO;
-    const password = process.env.PDC_GRAFANA_PASSWORD;
-    if (!usuario || !password) {
-        throw new Error("Faltan credenciales temporales PDC_GRAFANA_USUARIO y PDC_GRAFANA_PASSWORD");
+    // Por defecto, el admin generado por `sistema.js preparar`.
+    const usuario = process.env.PDC_GRAFANA_USUARIO || "admin";
+    let password = process.env.PDC_GRAFANA_PASSWORD;
+    if (!password) {
+        try {
+            password = fs.readFileSync(path.join(raiz, "seguridad/local/grafana-admin.txt"), "utf8").trim();
+        } catch {
+            throw new Error("Falta seguridad/local/grafana-admin.txt: ejecutar `node scripts/sistema.js preparar`");
+        }
     }
     const respuesta = await pedir("POST", "/api/admin/provisioning/dashboards/reload", usuario, password);
     console.log("Recarga de provision:", respuesta.message || "OK");
