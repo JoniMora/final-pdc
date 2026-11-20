@@ -1,0 +1,20 @@
+Ensayo del escenario +1: materia de 10 cupos con la base de Aula caída
+Ejecución: 2026-11-20T18:51:46.923Z
+
+=== 1. Todo sano
+  · API: MySQL conectado · Aula: modo normal
+OK: El servicio y Aula responden; Aula opera en modo normal con su propia base (aula-db)
+=== 2. El administrador abre una materia de 10 cupos
+  · "Escenario +1 · 03:51:47" (actividad 01a1fa4c-eaab-7d8c-a04b-67cca29f98a8) · verla en https://localhost:3001
+=== 3. 500 alumnos se inscriben a la vez; a las 150 admisiones se cae aula-db
+  · 500 admitidas en 14.8 s · latencia de admisión p50 2.82 s, p95 4.37 s, máx 5.26 s · reintentos 0 (errores vistos: ninguno)
+OK: Con aula-db caída, Aula respondió en modo contingencia (X-Aula-Modo: contingencia) y las 500 inscripciones fueron admitidas
+=== 4. El servicio decidió: 10 confirmadas, el resto rechazadas
+  · Servicio: 10 confirmadas, 490 rechazadas, 0 pendientes, 0 duplicadas, cupos_disponibles = 0
+OK: 10 confirmadas, 490 rechazadas, 0 duplicadas, 0 cupos negativos
+=== 5. Vuelve aula-db y Aula se reconcilia desde el feed
+  · aula-db estuvo detenida 12.2 s
+  · aula-db: confirmada 10, rechazada 490 · 6.6 s después de volver
+OK: La base de Aula coincide con el servicio: el escenario +1 cumple el criterio del plan
+
+Resultado: APROBADA
