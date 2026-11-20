@@ -3,6 +3,7 @@
 // necesita Node.js 22, Docker y OpenSSL (en Windows, el que trae Git).
 //
 // Uso, desde reserva-cupos:
+//   node scripts/sistema.js demo [--particiones 4]   todo lo siguiente en un comando, listo para la demo
 //   node scripts/sistema.js preparar     certificados, identidades, clave del operador y de Grafana
 //   node scripts/sistema.js levantar     compose up + réplica configurada y cifrada + admin de Grafana
 //   node scripts/sistema.js estado       contenedores y replicación
@@ -140,10 +141,108 @@ async function tenant(args) {
     console.log(creado.clave_api);
 }
 
+// --- Un comando para la demo (issue #52) -----------------------------------
+//
+// Desde volúmenes vacíos o sobre una instalación existente: genera lo que
+// falte en seguridad/local/, levanta todo (con 1 o 4 particiones de
+// comandos), configura la réplica y Grafana, crea el tenant de la demo y
+// comprueba que cada parte responda. No borra volúmenes.
+
+function opcion(args, nombre, porDefecto) {
+    const i = args.indexOf(nombre);
+    return i >= 0 ? args[i + 1] : porDefecto;
+}
+
+async function comprobarListo(particiones) {
+    const { pedir } = require("../pruebas/comun");
+    const esperarQue = async (descripcion, condicion, plazoMs = 90000) => {
+        const inicio = Date.now();
+        for (;;) {
+            const resultado = await condicion().catch(() => null);
+            if (resultado) return console.log(`OK: ${descripcion}${resultado === true ? "" : ` (${resultado})`}`);
+            if (Date.now() - inicio > plazoMs) throw new Error(`No se cumplió: ${descripcion}`);
+            await esperar(2000);
+        }
+    };
+
+    await esperarQue("la API responde por Traefik y ve MySQL", async () => {
+        const r = await pedir("https://localhost:3000/health", { timeoutMs: 5000 });
+        return r.status === 200 && r.datos.mysql === "conectado";
+    });
+    await esperarQue("Aula responde", async () => (await pedir("https://localhost:3001/health", { timeoutMs: 5000 })).status === 200);
+    await esperarQue("replicación semisincrónica activa", async () => {
+        const fila = compose(["exec", "-T", "mysql-primary", "sh", "-c",
+            'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -N -B -e "SHOW GLOBAL STATUS LIKE \'Rpl_semi_sync_source_status\'" 2>/dev/null'],
+        { capturar: true }).trim();
+        return fila.endsWith("ON");
+    });
+    await esperarQue(`${particiones} partición(es) de comandos enlazada(s)`, async () => {
+        const enlaces = compose(["exec", "-T", "rabbitmq", "rabbitmqctl", "-q", "list_bindings", "source_name", "destination_name"],
+            { capturar: true }).split("\n").filter(l => l.startsWith("reservas.comandos\t"));
+        return enlaces.length === particiones;
+    });
+    await esperarQue("Prometheus recolecta todos sus destinos", async () => {
+        const r = await pedir("https://localhost:9090/api/v1/targets?state=active", { timeoutMs: 5000 });
+        const destinos = r.datos.data.activeTargets;
+        return destinos.length > 0 && destinos.every(d => d.health === "up") ? `${destinos.length} destinos` : null;
+    }, 120000);
+}
+
+// Tenant con límite alto para la demo de carga. La clave queda en
+// seguridad/local/tenant-demo.key (fuera de Git); si ya existe y sigue
+// autenticando (los volúmenes son los mismos), se reutiliza.
+async function tenantDemo() {
+    const { api, crearTenant } = require("../pruebas/comun");
+    const archivo = path.join(RAIZ, "seguridad/local/tenant-demo.key");
+
+    if (fs.existsSync(archivo)) {
+        const clave = fs.readFileSync(archivo, "utf8").trim();
+        if ((await api(clave)("/v1/cambios?limite=1")).status === 200) {
+            return console.log("OK: tenant de la demo (ya existía)");
+        }
+    }
+
+    const creado = await crearTenant("Demostración", { limite: { por_segundo: 1000, rafaga: 1000 } });
+    fs.writeFileSync(archivo, creado.clave_api + "\n", { mode: 0o600 });
+    console.log("OK: tenant de la demo creado");
+}
+
+async function demo(args) {
+    const particiones = Number(opcion(args, "--particiones", "1"));
+    if (![1, 4].includes(particiones)) throw new Error("--particiones admite 1 o 4");
+
+    nodo("scripts/preparar-seguridad.js");
+    exigirTopologiaOriginal();
+
+    // Con una partición se retiran los workers de las particiones 1 a 3 que
+    // hayan quedado de una corrida con cuatro (--remove-orphans).
+    const archivos = particiones === 4 ? ["-f", "docker-compose.yml", "-f", "docker-compose.particiones.yml"] : [];
+    compose([...archivos, "up", "--build", "-d", "--remove-orphans", "--wait", "--wait-timeout", "300"]);
+    await configurarReplica();
+    sincronizarGrafana();
+    await comprobarListo(particiones);
+    await tenantDemo();
+
+    console.log([
+        "",
+        "Listo para la demo:",
+        "  API (por Traefik)  https://localhost:3000",
+        "  Aula               https://localhost:3001",
+        "  Traefik            https://localhost:8080/dashboard/",
+        "  RabbitMQ           https://localhost:15672",
+        "  Prometheus         https://localhost:9090",
+        "  Grafana            https://localhost:3002",
+        "Credenciales: seguridad/local/accesos-locales.txt · clave del tenant de la demo: seguridad/local/tenant-demo.key",
+        "Confiar en seguridad/local/ca.crt en el navegador para evitar advertencias."
+    ].join("\n"));
+}
+
 async function main() {
     const [accion = "estado", ...args] = process.argv.slice(2);
 
     switch (accion) {
+        case "demo":
+            return demo(args);
         case "preparar":
             return nodo("scripts/preparar-seguridad.js");
         case "levantar":
@@ -167,7 +266,7 @@ async function main() {
         case "detener":
             return compose(["stop"]);
         default:
-            throw new Error("Acciones: preparar, levantar, estado, tenant, seguridad, fallos, detener");
+            throw new Error("Acciones: demo, preparar, levantar, estado, tenant, seguridad, fallos, detener");
     }
 }
 

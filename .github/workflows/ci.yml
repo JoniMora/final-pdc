@@ -194,11 +194,11 @@ jobs:
         with:
           node-version: 22
 
-      - name: Certificados, identidades y clave del operador
-        run: node scripts/sistema.js preparar
-
-      - name: Levantar el sistema (réplica incluida)
-        run: node scripts/sistema.js levantar
+      # El comando único de la demo (issue #52), desde volúmenes vacíos:
+      # certificados, entorno, réplica, Grafana, tenant de la demo y
+      # comprobaciones.
+      - name: Levantar todo con un comando (sistema.js demo)
+        run: node scripts/sistema.js demo
 
       - name: Suites de seguridad (API, Aula y cifrado)
         run: node scripts/sistema.js seguridad

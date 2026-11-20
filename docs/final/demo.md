@@ -10,13 +10,14 @@ Todos los comandos parten de la raíz del repositorio, en la terminal de Intelli
 
 ## 1. Preparación previa
 
-Abrir Docker Desktop. Ejecutar, por separado:
+Abrir Docker Desktop. Desde `reserva-cupos`:
 
 ```powershell
-node reserva-cupos/scripts/sistema.js preparar
-node reserva-cupos/scripts/sistema.js levantar
-node reserva-cupos/scripts/sistema.js estado
+node scripts/sistema.js demo
 ```
+
+Deja todo listo y comprobado (API, Aula, réplica, particiones, Prometheus) y crea
+el tenant de la demo. Si algo no responde, se detiene y dice qué.
 
 Abrir https://localhost:3001. Los usuarios y contraseñas de esta instalación están
  en `reserva-cupos/seguridad/local/accesos-locales.txt`; no mostrar ese archivo en

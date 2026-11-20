@@ -84,6 +84,15 @@ git checkout v6-escalabilidad
 cd reserva-cupos
 ```
 
+### Todo con un comando
+
+```shell
+node scripts/sistema.js demo                    # una partición de comandos
+node scripts/sistema.js demo --particiones 4    # cuatro, como las pruebas de la Entrega 6
+```
+
+Desde volúmenes vacíos o sobre una instalación existente: genera lo que falte en `seguridad/local/`, construye y levanta todo, configura la réplica y la contraseña de Grafana, crea un tenant para la demo (su clave queda en `seguridad/local/tenant-demo.key`) y comprueba que la API, Aula, la replicación semisincrónica, las particiones y Prometheus respondan. No borra volúmenes. Es lo que corre el CI en cada PR. Los pasos por separado se describen a continuación.
+
 ### Volúmenes nuevos
 
 La Entrega 6 no cambia los scripts iniciales de las bases: una instalación de la Entrega 5 conserva sus volúmenes (Redis, Prometheus y Grafana crean los suyos). La Entrega 5 sí los cambió (permisos y límite por tenant, usuario `admin_app`, webhook de Aula por HTTPS, punto de control del feed), así que una instalación de la Entrega 4 o anterior debe eliminarlos:
