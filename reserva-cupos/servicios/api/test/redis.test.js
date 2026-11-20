@@ -114,3 +114,59 @@ test('autenticacion usa cache sin cambiar el aislamiento por tenant', async () =
     }
     assert.equal(consultas, 1);
 });
+
+// --- Reconexión del cliente (crearRedis) -------------------------------------
+
+const { EventEmitter } = require('node:events');
+const { crearRedis } = require('../src/redis');
+
+function clienteFalso({ incrFallidos = 0 } = {}) {
+    const cliente = new EventEmitter();
+    cliente.isReady = false;
+    cliente.incrs = 0;
+    cliente.connect = async () => {};
+    cliente.destroy = () => {};
+    cliente.withCommandOptions = () => ({
+        async incr() {
+            cliente.incrs++;
+            if (cliente.incrs <= incrFallidos) throw new Error('LOADING Redis is loading the dataset in memory');
+            return cliente.incrs;
+        },
+        async eval() { return 'ok'; }
+    });
+    return cliente;
+}
+
+function redisCon(cliente) {
+    return crearRedis({ REDIS_URL: 'rediss://redis:6379', TLS_CA: __filename }, { crearCliente: () => cliente });
+}
+
+const listoEn = cliente => { cliente.isReady = true; cliente.emit('ready'); return new Promise(r => setImmediate(r)); };
+
+test('sin conexion lista, cada uso falla con REDIS_UNAVAILABLE', async () => {
+    const redis = redisCon(clienteFalso());
+    await assert.rejects(redis.eval('script', {}), e => e.code === 'REDIS_UNAVAILABLE');
+});
+
+test('si Redis sigue cargando su AOF al reconectar, la API se recupera sola en el uso siguiente', async () => {
+    const cliente = clienteFalso({ incrFallidos: 1 });
+    const redis = redisCon(cliente);
+    await listoEn(cliente); // el INCR del evento ready responde LOADING
+    assert.equal(cliente.incrs, 1);
+    // Antes quedaba en 503 para siempre; ahora reintenta la preparación.
+    assert.equal(await redis.eval('script', {}), 'ok');
+    assert.equal(cliente.incrs, 2);
+    assert.equal(await redis.eval('script', {}), 'ok');
+    assert.equal(cliente.incrs, 2, 'una vez preparado no vuelve a incrementar');
+});
+
+test('cada reconexion vuelve a invalidar la cache de permisos antes de atender', async () => {
+    const cliente = clienteFalso();
+    const redis = redisCon(cliente);
+    await listoEn(cliente);
+    assert.equal(await redis.eval('script', {}), 'ok');
+    cliente.emit('reconnecting');
+    await listoEn(cliente);
+    assert.equal(await redis.eval('script', {}), 'ok');
+    assert.equal(cliente.incrs, 2);
+});
