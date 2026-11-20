@@ -1,0 +1,17 @@
+✔ media y desvio muestral se calculan sobre corridas independientes (1.182253ms)
+✔ no inventa dispersion con una sola muestra o valores invalidos (0.393542ms)
+(node:81408) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file://reserva-cupos/pruebas/carga/resumen.js is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to ~/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ reporte HTML escapa nombres y valores provenientes del resultado (1.278954ms)
+✔ exportacion de k6 excluye setup_data y variables con credenciales (11.383888ms)
+✔ resumen requiere un resultado real, no acepta salida incompleta (1.345206ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 120.259425

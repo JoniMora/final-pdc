@@ -11,11 +11,21 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
 import exec from "k6/execution";
+import { Counter, Trend } from "k6/metrics";
+import { salidaResumen } from './resumen.js';
+export const handleSummary = salidaResumen;
 
+const admisionesPorEstado = new Counter("admisiones_por_estado");
+const duracionAdmision = new Trend("admision_duracion_ms", true);
 const API_URL = __ENV.API_URL || "https://traefik";
 const API_KEY = __ENV.API_KEY;
 const SOLICITUDES = Number(__ENV.SOLICITUDES || 500);
 const CAPACIDAD = Number(__ENV.CAPACIDAD || 10);
+const REINTENTOS = Number(__ENV.REINTENTOS || 0);
+const reintentos = new Counter('admision_reintentos');
+const esperaDecisiones = new Trend('espera_decisiones_ms', true);
+// Plazo funcional de drenaje; no representa un objetivo de latencia.
+const PLAZO_DECISIONES_MS = 180000;
 
 export const options = {
     scenarios: {
@@ -24,14 +34,14 @@ export const options = {
             executor: "per-vu-iterations",
             vus: SOLICITUDES,
             iterations: 1,
-            maxDuration: "60s"
+            maxDuration: REINTENTOS ? "180s" : "60s"
         }
     },
     thresholds: {
         checks: ["rate==1"]
     },
-    setupTimeout: "30s",
-    teardownTimeout: "150s",
+    setupTimeout: "60s",
+    teardownTimeout: "210s",
     summaryTrendStats: ["min", "med", "avg", "p(95)", "max"]
 };
 
@@ -76,14 +86,39 @@ export default function (datos) {
 
     // Clave de idempotencia y participante únicos por solicitud: así
     // todas llegan a competir por el cupo y ninguna la frena un índice único.
-    const respuesta = http.post(
-        `${API_URL}/v1/actividades/${datos.actividadId}/reservas`,
-        JSON.stringify({ participante: `alumno-${n}` }),
-        opciones({ "Idempotency-Key": `rafaga-${datos.corrida}-${n}` })
-    );
+    let respuesta;
+    if (__ENV.FALLOS && n === 0) console.log(`PDC_CARGA_INICIADA:${datos.actividadId}`);
+    for (let intento = 0; ; intento++) {
+        respuesta = http.post(
+            `${API_URL}/v1/actividades/${datos.actividadId}/reservas`,
+            JSON.stringify({ participante: `alumno-${n}` }),
+            { ...opciones({ "Idempotency-Key": `rafaga-${datos.corrida}-${n}` }), timeout: '60s' }
+        );
+        // Como un cliente correcto: ante un error de red, 429 o cualquier 5xx,
+        // reintenta con la misma Idempotency-Key (la admisión es idempotente).
+        // Incluye el 500: si una API muere a mitad de una respuesta, Traefik
+        // puede devolver su propio 500 en lugar de 502 o 504.
+        const transitorio = respuesta.status === 0 || respuesta.status === 429 || respuesta.status >= 500;
+        if (!transitorio || intento >= REINTENTOS) break;
+        reintentos.add(1);
+        sleep(Math.min(2, 0.25 * (intento + 1)));
+    }
+    admisionesPorEstado.add(1, {
+        estado: String(respuesta.status)
+    });
 
+    duracionAdmision.add(respuesta.timings.duration);
+
+    if (respuesta.status !== 202 && !(REINTENTOS > 0 && respuesta.status === 200)) {
+        console.warn(
+            `Admisión fallida: participante=alumno-${n}, ` +
+            `HTTP=${respuesta.status}, ` +
+            `duracion_ms=${respuesta.timings.duration.toFixed(1)}, ` +
+            `error=${respuesta.error || "ninguno"}`
+        );
+    }
     check(respuesta, {
-        "admisión responde 202": r => r.status === 202,
+        "admisión responde 202": r => r.status === 202 || (REINTENTOS > 0 && r.status === 200),
         "admisión devuelve Location": r => Boolean(r.headers["Location"])
     });
 }
@@ -93,14 +128,42 @@ function contar(datos, estado) {
     let cursor = null;
 
     do {
-        const pagina = http.get(
+        const url =
             `${API_URL}/v1/actividades/${datos.actividadId}/reservas` +
-            `?estado=${estado}&limite=100${cursor ? `&cursor=${cursor}` : ""}`,
-            opciones()
-        );
+            `?estado=${estado}&limite=100` +
+            (cursor ? `&cursor=${encodeURIComponent(cursor)}` : "");
 
-        total += pagina.json("datos").length;
-        cursor = pagina.json("siguiente_cursor");
+        const pagina = http.get(url, opciones());
+
+        if (pagina.status !== 200) {
+            const detalle = String(pagina.body || "")
+                .split(API_KEY).join("[CLAVE OCULTA]")
+                .slice(0, 800);
+
+            throw new Error(
+                `Falló el listado de reservas: HTTP ${pagina.status}, ` +
+                `estado solicitado=${estado}. Respuesta: ${detalle}`
+            );
+        }
+
+        let contenido;
+
+        try {
+            contenido = pagina.json();
+        } catch {
+            throw new Error(
+                "El listado respondió HTTP 200 pero no devolvió JSON válido"
+            );
+        }
+
+        if (!Array.isArray(contenido.datos)) {
+            throw new Error(
+                "El listado respondió HTTP 200 sin un arreglo datos"
+            );
+        }
+
+        total += contenido.datos.length;
+        cursor = contenido.siguiente_cursor;
     } while (cursor);
 
     return total;
@@ -111,18 +174,19 @@ export function teardown(datos) {
     const inicio = Date.now();
     let pendientes = contar(datos, "pendiente");
 
-    while (pendientes > 0 && Date.now() - inicio < 120000) {
-        sleep(0.5);
+    while (pendientes > 0 && Date.now() - inicio < PLAZO_DECISIONES_MS) {
+        sleep(1);
         pendientes = contar(datos, "pendiente");
     }
 
     const segundos = ((Date.now() - inicio) / 1000).toFixed(1);
+    esperaDecisiones.add(Date.now() - inicio);
     const confirmadas = contar(datos, "confirmada");
     const rechazadas = contar(datos, "rechazada");
     const actividad = http.get(`${API_URL}/v1/actividades/${datos.actividadId}`, opciones()).json();
 
     console.log(
-        `Resultado (sin pendientes tras ${segundos} s de espera): ` +
+        `Resultado (tras ${segundos} s de espera; plazo ${PLAZO_DECISIONES_MS / 1000} s): ` +
         `confirmadas=${confirmadas} rechazadas=${rechazadas} pendientes=${pendientes} ` +
         `cupos_disponibles=${actividad.cupos_disponibles}`
     );

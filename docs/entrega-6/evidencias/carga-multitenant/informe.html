@@ -1,0 +1,78 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><title>E6: multitenant</title>
+<style>body{font:16px system-ui;max-width:1100px;margin:32px auto;padding:0 20px;color:#172033}table{border-collapse:collapse;width:100%}td,th{padding:8px;border:1px solid #ddd;text-align:left}pre{white-space:pre-wrap}svg{width:100%;border:1px solid #ddd}h1{font-size:28px}</style>
+<h1>E6: multitenant</h1><p>Generado con los resultados reales de k6. Las tasas generales de k6 incluyen setup y teardown; usar los histogramas de admision para su latencia.</p>
+<h2>Admisiones HTTP 202 por segundo</h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 350" role="img" aria-label="Serie temporal y fallos"><path d="M50 40V290H920" fill="none" stroke="#333"/><polyline fill="none" stroke="#2463eb" stroke-width="2" points="50,290 262.5,260.6035278588856 475,75.8257029718811 687.5,50 900,50.02879884804605"/><text x="50" y="325">2026-11-20T04:46:20.314Z</text><text x="650" y="325">2026-11-20T04:46:40.314Z</text></svg><h2>p95 de admision en segundos</h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 350" role="img" aria-label="Serie temporal y fallos"><path d="M50 40V290H920" fill="none" stroke="#333"/><polyline fill="none" stroke="#2463eb" stroke-width="2" points="50,197.4974358974359 333.3333333333333,50.1424943988051 616.6666666666666,50 900,50.00000000000006"/><text x="50" y="325">2026-11-20T04:46:25.314Z</text><text x="650" y="325">2026-11-20T04:46:40.314Z</text></svg><h2>Mensajes por cola</h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 350" role="img" aria-label="Serie temporal y fallos"><path d="M50 40V290H920" fill="none" stroke="#333"/><polyline fill="none" stroke="#2463eb" stroke-width="2" points="50,290 220,290 390,290 560,83.98230088495575 730,50 900,290"/><polyline fill="none" stroke="#079669" stroke-width="2" points="50,290 220,290 390,290 560,290 730,290 900,290"/><polyline fill="none" stroke="#9333ea" stroke-width="2" points="50,290 220,290 390,290 560,222.0353982300885 730,290 900,290"/><polyline fill="none" stroke="#c2410c" stroke-width="2" points="50,290 220,290 390,290 560,236.90265486725664 730,290 900,290"/><polyline fill="none" stroke="#2463eb" stroke-width="2" points="50,290 220,290 390,290 560,290 730,290 900,290"/><polyline fill="none" stroke="#079669" stroke-width="2" points="50,290 220,290 390,290 560,290 730,290 900,290"/><polyline fill="none" stroke="#9333ea" stroke-width="2" points="50,290 220,290 390,290 560,290 730,290 900,290"/><polyline fill="none" stroke="#c2410c" stroke-width="2" points="50,290 220,290 390,290 560,290 730,290 900,290"/><polyline fill="none" stroke="#2463eb" stroke-width="2" points="50,290 220,290 390,290 560,290 730,290 900,290"/><polyline fill="none" stroke="#079669" stroke-width="2" points="50,290 220,290 390,290 560,290 730,290 900,290"/><text x="50" y="325">2026-11-20T04:46:20.314Z</text><text x="650" y="325">2026-11-20T04:46:45.314Z</text></svg><h2>p95 de demora de webhook en segundos</h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 350" role="img" aria-label="Serie temporal y fallos"><path d="M50 40V290H920" fill="none" stroke="#333"/><polyline fill="none" stroke="#2463eb" stroke-width="2" points="50,69.60878243512977 262.5,50 475,65.15347387416946 687.5,68.40702157329176 900,68.40702157329176"/><text x="50" y="325">2026-11-20T04:46:25.314Z</text><text x="650" y="325">2026-11-20T04:46:45.314Z</text></svg><table><thead><tr><th>Metrica</th><th>Valores</th></tr></thead><tbody><tr><td>admisiones_estado</td><td><pre>{
+  &quot;count&quot;: 400,
+  &quot;rate&quot;: 26.93120536706778
+}</pre></td></tr><tr><td>http_req_connecting</td><td><pre>{
+  &quot;max&quot;: 114.983123,
+  &quot;avg&quot;: 9.764142771186442,
+  &quot;p(95)&quot;: 78.81397675
+}</pre></td></tr><tr><td>reservas_admitidas</td><td><pre>{
+  &quot;count&quot;: 400,
+  &quot;rate&quot;: 26.93120536706778
+}</pre></td></tr><tr><td>data_received</td><td><pre>{
+  &quot;count&quot;: 311617,
+  &quot;rate&quot;: 20980.553557173902
+}</pre></td></tr><tr><td>http_req_sending</td><td><pre>{
+  &quot;avg&quot;: 0.6498485338983049,
+  &quot;p(95)&quot;: 1.508733249999998,
+  &quot;max&quot;: 55.514299
+}</pre></td></tr><tr><td>http_req_waiting</td><td><pre>{
+  &quot;avg&quot;: 1105.7239977775428,
+  &quot;p(95)&quot;: 1920.66528105,
+  &quot;max&quot;: 2318.723509
+}</pre></td></tr><tr><td>vus</td><td><pre>{
+  &quot;value&quot;: 0,
+  &quot;min&quot;: 0,
+  &quot;max&quot;: 80
+}</pre></td></tr><tr><td>http_req_receiving</td><td><pre>{
+  &quot;avg&quot;: 22.110016552966083,
+  &quot;p(95)&quot;: 90.86624009999996,
+  &quot;max&quot;: 459.994056
+}</pre></td></tr><tr><td>http_req_failed</td><td><pre>{
+  &quot;rate&quot;: 0,
+  &quot;passes&quot;: 0,
+  &quot;fails&quot;: 472
+}</pre></td></tr><tr><td>http_reqs</td><td><pre>{
+  &quot;count&quot;: 472,
+  &quot;rate&quot;: 31.77882233313998
+}</pre></td></tr><tr><td>vus_max</td><td><pre>{
+  &quot;value&quot;: 80,
+  &quot;min&quot;: 80,
+  &quot;max&quot;: 80
+}</pre></td></tr><tr><td>iterations</td><td><pre>{
+  &quot;count&quot;: 400,
+  &quot;rate&quot;: 26.93120536706778
+}</pre></td></tr><tr><td>http_req_duration{expected_response:true}</td><td><pre>{
+  &quot;p(95)&quot;: 1924.9325241,
+  &quot;max&quot;: 2327.628465,
+  &quot;avg&quot;: 1128.4838628644077
+}</pre></td></tr><tr><td>iteration_duration</td><td><pre>{
+  &quot;avg&quot;: 1364.4528404350003,
+  &quot;p(95)&quot;: 2135.23692225,
+  &quot;max&quot;: 2327.95423
+}</pre></td></tr><tr><td>checks</td><td><pre>{
+  &quot;fails&quot;: 0,
+  &quot;rate&quot;: 1,
+  &quot;passes&quot;: 408
+}</pre></td></tr><tr><td>http_req_blocked</td><td><pre>{
+  &quot;avg&quot;: 30.374319381355935,
+  &quot;p(95)&quot;: 205.63127525,
+  &quot;max&quot;: 489.548253
+}</pre></td></tr><tr><td>data_sent</td><td><pre>{
+  &quot;count&quot;: 119476,
+  &quot;rate&quot;: 8044.081731089475
+}</pre></td></tr><tr><td>http_req_duration</td><td><pre>{
+  &quot;avg&quot;: 1128.4838628644077,
+  &quot;p(95)&quot;: 1924.9325241,
+  &quot;max&quot;: 2327.628465
+}</pre></td></tr><tr><td>admision_ms</td><td><pre>{
+  &quot;max&quot;: 2327.628465,
+  &quot;avg&quot;: 1328.4216517650004,
+  &quot;p(95)&quot;: 1941.681172699999
+}</pre></td></tr><tr><td>http_req_tls_handshaking</td><td><pre>{
+  &quot;p(95)&quot;: 124.05823314999998,
+  &quot;max&quot;: 360.277359,
+  &quot;avg&quot;: 20.128013059322033
+}</pre></td></tr></tbody></table></html>

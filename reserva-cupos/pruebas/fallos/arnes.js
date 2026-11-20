@@ -140,6 +140,10 @@ async function rafaga({ clave, capacidad = 10, solicitudes = 200, concurrencia =
 
             if (durante && !accion && registro.admitidas.length >= durante.tras) {
                 accion = Promise.resolve().then(durante.accion);
+                // Si la acción falla antes de que termine la ráfaga, el error
+                // se informa al final (await accion), no como un rechazo sin
+                // manejar que corta el proceso sin dejar la evidencia.
+                accion.catch(() => {});
             }
         }
     }

@@ -1,0 +1,31 @@
+✔ cerrado -> abierto -> semiabierto -> cerrado; abierto no hace HTTP (70.821336ms)
+✔ un receptor caido no abre el circuito de otro tenant (1.863929ms)
+✔ una prueba semiabierta fallida vuelve a abrir (42.204238ms)
+✔ semiabierto permite solo una prueba concurrente (42.005385ms)
+✔ receptor HTTP real falla, circuito protege y se recupera (87.696358ms)
+ℹ {"transiciones":["cerrado","abierto","semiabierto","cerrado"],"solicitudesHTTPReales":4,"transporte":"HTTP loopback solo de prueba, sin Docker"}
+✔ las direcciones privadas, de loopback y link-local se reconocen como internas (9.413668ms)
+✔ se rechazan URLs con otro protocolo, credenciales o IP interna literal (1.412704ms)
+✔ con exigirHttps, una URL en texto plano se rechaza aunque el host esté permitido (0.249921ms)
+✔ una IPv4 interna escrita como IPv6 también se rechaza (1.912526ms)
+✔ un nombre que resuelve a una IP interna se rechaza al conectar, salvo que esté permitido (0.525005ms)
+✔ el webhook firmado cumple el contrato y el receptor lo acepta (30.650844ms)
+✔ una firma vieja o con otro secreto se rechaza (7.795396ms)
+✔ la firma tiene el formato que define el contrato (0.401239ms)
+✔ el emisor reproduce el vector de prueba del contrato (0.21007ms)
+✔ una respuesta que no termina de llegar a tiempo cuenta como falla (304.976821ms)
+✔ los intentos HTTP siguen el calendario del contrato: 10 s, 1 min, 5 min y DLQ (1.873022ms)
+✔ el circuito abierto difiere sin consumir intentos mientras no venza el plazo (0.696345ms)
+✔ vencido el plazo desde el primer fallo, el mensaje va a la DLQ aunque queden intentos (0.402324ms)
+✔ un mensaje diferido indefinidamente llega a la DLQ en el plazo, no en horas (0.445831ms)
+✔ un reintento nunca espera mas alla del plazo: usa la espera mas larga que termine antes (0.4453ms)
+✔ con el circuito abriendose y cerrandose, ninguna entrega pasa el plazo por mas de 10 s (2.606569ms)
+✔ una cabecera de primer fallo ausente, futura o inválida empieza a contar ahora (0.607435ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 780.064587

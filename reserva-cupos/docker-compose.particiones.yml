@@ -1,0 +1,33 @@
+services:
+  relay:
+    environment:
+      COMANDOS_PARTICIONES: "4"
+
+  worker:
+    environment:
+      COMANDOS_PARTICIONES: "4"
+      WORKER_PARTICION: "0"
+
+  worker-p1:
+    extends:
+      file: docker-compose.yml
+      service: worker
+    environment:
+      COMANDOS_PARTICIONES: "4"
+      WORKER_PARTICION: "1"
+
+  worker-p2:
+    extends:
+      file: docker-compose.yml
+      service: worker
+    environment:
+      COMANDOS_PARTICIONES: "4"
+      WORKER_PARTICION: "2"
+
+  worker-p3:
+    extends:
+      file: docker-compose.yml
+      service: worker
+    environment:
+      COMANDOS_PARTICIONES: "4"
+      WORKER_PARTICION: "3"

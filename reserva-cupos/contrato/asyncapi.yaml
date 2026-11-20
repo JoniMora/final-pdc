@@ -2,7 +2,7 @@ asyncapi: 3.0.0
 
 info:
   title: Mensajería interna del servicio de reserva de cupos
-  version: 1.0.0
+  version: 1.1.0
   description: |
     Contrato de los mensajes que viajan por RabbitMQ entre los componentes
     internos del servicio. Es el complemento de `openapi.yaml`: allí está la
@@ -82,13 +82,16 @@ channels:
     address: reservas.comandos.{particion}
     title: Partición de comandos
     description: |
-      Cola durable de una partición. Hoy existe la partición `0`; el
-      particionado en N colas se mide en la Entrega 6. Si un comando no se
-      puede procesar, se deriva a `reservas.dlq`.
+      Cola durable de una partición. Hay N particiones, de `0` a `N-1`
+      (`COMANDOS_PARTICIONES`: 1 por defecto, 4 con
+      `docker-compose.particiones.yml`, hasta 32), enlazadas con el mismo
+      peso al exchange. Al bajar N, el relay desenlaza las colas sobrantes y
+      reenvía sus comandos pendientes al exchange antes de publicar. Si un
+      comando no se puede procesar, se deriva a `reservas.dlq`.
     parameters:
       particion:
-        description: Número de partición.
-        examples: ["0"]
+        description: Número de partición, de 0 a N-1.
+        examples: ["0", "3"]
     messages:
       reservar:
         $ref: "#/components/messages/ComandoReservar"
@@ -147,7 +150,9 @@ channels:
     description: |
       Colas con TTL. Al vencer, el mensaje vuelve a `webhooks.entregas` por
       *dead-lettering*. El notificador elige la espera según el intento:
-      10 s, 1 min y 5 min.
+      10 s, 1 min y 5 min. Con el circuito del tenant abierto, la entrega
+      vuelve a la espera de 10 s sin gastar un intento; a los 400 s del
+      primer fallo (`x-primer-fallo`) pasa a `webhooks.dlq`.
     parameters:
       espera:
         enum: ["10s", "1m", "5m"]
@@ -180,6 +185,9 @@ operations:
       $ref: "#/channels/particionComandos"
     title: El worker procesa un comando
     description: |
+      Cada worker consume una sola partición (`WORKER_PARTICION`) como
+      consumidor exclusivo: un segundo worker sobre la misma cola es
+      rechazado, así los comandos de una actividad se procesan en orden.
       Consumo con `prefetch(1)` y `ack` después del `COMMIT`. Reentregar un
       comando ya procesado no cambia nada.
     messages:
@@ -282,6 +290,13 @@ components:
             type: integer
             minimum: 0
             description: Reintentos ya realizados. Lo agrega el notificador al reprogramar.
+          x-primer-fallo:
+            type: integer
+            minimum: 0
+            description: |
+              Instante del primer fallo de la entrega, en milisegundos desde
+              1970 (UTC). Lo agrega el notificador al reprogramar; desde ahí
+              cuenta el plazo de 400 s hasta la DLQ.
       payload:
         $ref: "#/components/schemas/EntregaWebhook"
       bindings:
@@ -310,6 +325,7 @@ components:
           summary: Entrega reprogramada por el notificador después de un primer intento fallido.
           headers:
             x-intento: 1
+            x-primer-fallo: 1794052991000
           payload:
             cambio_id: 1078
             tenant_id: 01a1542d-7ee2-7d8b-b3b3-40474b8dec7e

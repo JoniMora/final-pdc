@@ -1,0 +1,20 @@
+{
+  "accion": "carga",
+  "inicio": "2026-11-20T04:45:18.486Z",
+  "pasos": [
+    {
+      "nombre": "carga-caliente",
+      "aprobada": true
+    },
+    {
+      "nombre": "carga-multitenant",
+      "aprobada": true
+    },
+    {
+      "nombre": "carga-rampa",
+      "aprobada": true
+    }
+  ],
+  "aprobada": true,
+  "fin": "2026-11-20T04:48:12.195Z"
+}

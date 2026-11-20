@@ -14,6 +14,25 @@ x-ca: &ca
   read_only: true
 
 services:
+  redis:
+    image: redis:8.2-alpine
+    command: [redis-server, /usr/local/etc/redis/redis.conf]
+    environment:
+      REDISCLI_AUTH: redis_local_2026
+    volumes:
+      - redis-data:/data
+      - ./Infraestructura/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - *ca
+      - { type: bind, source: ./seguridad/local/redis.crt, target: /tls/redis.crt, read_only: true }
+      - { type: bind, source: ./seguridad/local/redis.key, target: /tls/redis.key, read_only: true }
+    networks: [interna]
+    healthcheck:
+      test: [CMD, redis-cli, --tls, --cacert, /tls/ca.crt, -h, redis, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
   rabbitmq:
     build:
       context: ./Infraestructura/rabbitmq
@@ -81,11 +100,21 @@ services:
     image: traefik:v3.6
 
     command:
+      # Compose interpola el nivel; Traefik recibe toda su configuración por CLI.
+      - --log.level=${TRAEFIK_LOG_LEVEL:-ERROR}
       - --providers.docker=true
+      - --accesslog=true
+      - --accesslog.format=json
+      - --accesslog.filters.statuscodes=500-599
+      - --accesslog.fields.headers.defaultmode=drop
       - --providers.docker.endpoint=tcp://socket-proxy:2375
       - --providers.docker.exposedByDefault=false
       - --providers.docker.network=reserva-cupos-infra_publica
       - --providers.file.filename=/etc/traefik/tls.yml
+      - --entryPoints.metrics.address=:9464
+      - --metrics.prometheus=true
+      - --metrics.prometheus.manualRouting=true
+      - --metrics.prometheus.addRoutersLabels=true
       - --entryPoints.websecure.address=:443
       - --entryPoints.traefik.address=:8080
       - --entryPoints.ping.address=:8082
@@ -109,6 +138,7 @@ services:
     networks:
       - publica
       - docker
+      - interna
 
     depends_on:
       - socket-proxy
@@ -152,6 +182,8 @@ services:
       DB_ADMIN_PASSWORD: admin_local_2026
       # Hash de la clave del operador; la clave no llega al contenedor.
       ADMIN_CLAVE_SHA256_ARCHIVO: /seguridad/admin.sha256
+      REDIS_URL: rediss://redis:6379
+      REDIS_PASSWORD: redis_local_2026
       # Límite de tasa por defecto de cada tenant (token bucket).
       LIMITE_POR_SEGUNDO: "50"
       LIMITE_RAFAGA: "100"
@@ -186,6 +218,8 @@ services:
     depends_on:
       mysql-primary:
         condition: service_healthy
+      redis:
+        condition: service_healthy
 
     healthcheck:
       test:
@@ -215,9 +249,20 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: demo
       RABBITMQ_PASSWORD: demo_local_2026
+      TLS_CERT: /tls/worker.crt
+      TLS_KEY: /tls/worker.key
+      NODE_EXTRA_CA_CERTS: /tls/ca.crt
 
     volumes:
       - *ca
+      - type: bind
+        source: ./seguridad/local/worker.crt
+        target: /tls/worker.crt
+        read_only: true
+      - type: bind
+        source: ./seguridad/local/worker.key
+        target: /tls/worker.key
+        read_only: true
 
     networks:
       - interna
@@ -251,8 +296,14 @@ services:
     volumes:
       - mysql-primary-data:/var/lib/mysql
       - *ca
-      - { type: bind, source: ./seguridad/local/mysql-primary.crt, target: /tls/mysql-primary.crt, read_only: true }
-      - { type: bind, source: ./seguridad/local/mysql-primary.key, target: /tls/mysql-primary.key, read_only: true }
+      - type: bind
+        source: ./seguridad/local/mysql-primary.crt
+        target: /tls/mysql-primary.crt
+        read_only: true
+      - type: bind
+        source: ./seguridad/local/mysql-primary.key
+        target: /tls/mysql-primary.key
+        read_only: true
 
     networks:
       - interna
@@ -443,6 +494,9 @@ services:
 
     environment:
       TLS_CA: /tls/ca.crt
+      TLS_CERT: /tls/relay.crt
+      TLS_KEY: /tls/relay.key
+      NODE_EXTRA_CA_CERTS: /tls/ca.crt
       DB_HOST: mysql-primary
       DB_NAME: reservas
       DB_USER: relay_app
@@ -453,6 +507,14 @@ services:
 
     volumes:
       - *ca
+      - type: bind
+        source: ./seguridad/local/relay.crt
+        target: /tls/relay.crt
+        read_only: true
+      - type: bind
+        source: ./seguridad/local/relay.key
+        target: /tls/relay.key
+        read_only: true
 
     networks:
       - interna
@@ -488,9 +550,19 @@ services:
       # lista. En el entorno local, el receptor de Aula.
       NOTIFICADOR_HOSTS_PERMITIDOS: aula
       WEBHOOK_TIMEOUT_MS: "5000"
+      TLS_CERT: /tls/notificador.crt
+      TLS_KEY: /tls/notificador.key
 
     volumes:
       - *ca
+      - type: bind
+        source: ./seguridad/local/notificador.crt
+        target: /tls/notificador.crt
+        read_only: true
+      - type: bind
+        source: ./seguridad/local/notificador.key
+        target: /tls/notificador.key
+        read_only: true
 
     networks:
       - interna
@@ -523,6 +595,95 @@ services:
     networks:
       - publica
 
+  prometheus:
+    image: prom/prometheus:v3.5.0
+
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.config.file=/etc/prometheus/web.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+
+    ports:
+      - "127.0.0.1:9090:9090"
+
+    volumes:
+      - prometheus-data:/prometheus
+      - *ca
+      - type: bind
+        source: ./Infraestructura/prometheus/prometheus.yml
+        target: /etc/prometheus/prometheus.yml
+        read_only: true
+      - type: bind
+        source: ./Infraestructura/prometheus/web.yml
+        target: /etc/prometheus/web.yml
+        read_only: true
+      - type: bind
+        source: ./seguridad/local/prometheus.crt
+        target: /tls/prometheus.crt
+        read_only: true
+      - type: bind
+        source: ./seguridad/local/prometheus.key
+        target: /tls/prometheus.key
+        read_only: true
+
+    networks:
+      - interna
+
+    restart: unless-stopped
+  grafana:
+    image: grafana/grafana:13.3.1
+
+    environment:
+      SSL_CERT_FILE: /tls/ca.crt
+      GF_SERVER_PROTOCOL: https
+      GF_SERVER_HTTP_PORT: "3000"
+      GF_SERVER_ROOT_URL: https://localhost:3002
+      GF_SERVER_CERT_FILE: /tls/grafana.crt
+      GF_SERVER_CERT_KEY: /tls/grafana.key
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # Contraseña generada por `sistema.js preparar` (no la de fábrica).
+      # Grafana la aplica al crear el admin en un volumen nuevo.
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana-admin
+
+    ports:
+      - "127.0.0.1:3002:3000"
+
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - *ca
+      - type: bind
+        source: ./Infraestructura/grafana/provisioning
+        target: /etc/grafana/provisioning
+        read_only: true
+      - type: bind
+        source: ./Infraestructura/grafana/dashboards
+        target: /var/lib/grafana/dashboards
+        read_only: true
+      - type: bind
+        source: ./seguridad/local/grafana.crt
+        target: /tls/grafana.crt
+        read_only: true
+      - type: bind
+        source: ./seguridad/local/grafana.key
+        target: /tls/grafana.key
+        read_only: true
+      - type: bind
+        source: ./seguridad/local/grafana-admin.txt
+        target: /run/secrets/grafana-admin
+        read_only: true
+
+    networks:
+      - interna
+
+    depends_on:
+      prometheus:
+        condition: service_started
+
+    restart: unless-stopped
+
 networks:
   publica:
   interna:
@@ -532,7 +693,10 @@ networks:
     internal: true
 
 volumes:
+  redis-data:
   rabbitmq-data:
   mysql-primary-data:
   mysql-replica-data:
   aula-db-data:
+  prometheus-data:
+  grafana-data:

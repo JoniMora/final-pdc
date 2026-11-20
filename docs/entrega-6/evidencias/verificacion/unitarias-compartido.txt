@@ -1,0 +1,28 @@
+✔ cada ejemplo de asyncapi.yaml cumple el esquema de su mensaje (180.442144ms)
+✔ los ejemplos cubren cada mensaje y cada una de sus propiedades (6.911723ms)
+✔ el contrato es compatible consigo mismo (133.984222ms)
+✔ un campo obligatorio nuevo rompe a los mensajes que siguen en las colas (124.058796ms)
+✔ un campo opcional nuevo rompe a los consumidores que todavía no se actualizaron (118.689519ms)
+✔ quitar un mensaje es incompatible y agregar uno solo se informa (322.256489ms)
+✔ un comando reservar válido cumple el contrato de mensajería (202.577019ms)
+✔ un comando sin reserva_id o con campos de más se rechaza (87.592071ms)
+✔ la entrega de webhook reutiliza el evento definido en openapi.yaml (42.624325ms)
+✔ las rutas se arman desde las plantillas del contrato (48.411329ms)
+✔ una respuesta que no cumple el esquema documentado se detecta (41.156759ms)
+✔ el evento de webhook se valida como esquema del contrato (42.840626ms)
+✔ la firma del webhook trae un vector de prueba en el contrato (86.475658ms)
+✔ sin configuración conserva una partición (1.226814ms)
+✔ cuatro particiones generan cuatro colas distintas (0.890356ms)
+✔ rechaza cantidades inválidas (0.472238ms)
+✔ rechaza workers fuera de las particiones configuradas (0.24688ms)
+✔ con la CA, MySQL exige TLS y verifica la identidad del servidor (1.636044ms)
+✔ con la CA, RabbitMQ usa AMQPS en el 5671 y verifica el nombre del broker (0.346757ms)
+✔ sin la CA (pruebas fuera de Docker) la conexión es en texto plano (0.213285ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1287.392124

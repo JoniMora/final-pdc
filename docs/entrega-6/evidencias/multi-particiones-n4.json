@@ -1,0 +1,22 @@
+{
+  "particiones": 4,
+  "fecha": "2026-11-20T04:43:33.917Z",
+  "actividades": 8,
+  "porActividad": 40,
+  "capacidad": 10,
+  "total": 320,
+  "conexionesHttpMaximas": 64,
+  "comprobaciones": [
+    "Topologia estable y un consumidor por particion, sin comandos anteriores",
+    "320 admisiones con HTTP 202 y Location",
+    "Cada actividad termina con 10 confirmadas, 30 rechazadas y cero cupos disponibles",
+    "Orden de decisiones coincide con el registro de comandos dentro de cada actividad"
+  ],
+  "aprobada": true,
+  "codigoPrueba": "dd7a71c941f52dfc45d2ae5deb4551acf14992d6bc6338a8388a631be5df8a26",
+  "admisionMs": 4935.034584,
+  "p95AdmisionClienteMs": 4756.515311,
+  "tiempoTotalMs": 9701.628054,
+  "decisionesPorSegundo": 32.984154640732015,
+  "comparacionPendiente": "Repetir N=1 y N=4 con el mismo codigo y en el mismo entorno; no comparar con evidencia historica o de otro runner CI"
+}

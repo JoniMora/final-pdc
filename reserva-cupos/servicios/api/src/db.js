@@ -37,6 +37,7 @@ function poolAdministracion() {
 
 // Errores de infraestructura: la base no está disponible.
 const CODIGOS_INFRAESTRUCTURA = new Set([
+    "REDIS_UNAVAILABLE",
     "ECONNREFUSED",
     "ECONNRESET",
     "ETIMEDOUT",

@@ -1,0 +1,36 @@
+﹣ crear una materia usa crearActividad según el contrato (0.881365ms) # PRISM_URL no definida: requiere el mock de Prism
+﹣ consultar una materia y sus inscriptos (0.160506ms) # PRISM_URL no definida: requiere el mock de Prism
+﹣ inscribirse con Idempotency-Key y consultar el resultado (0.104069ms) # PRISM_URL no definida: requiere el mock de Prism
+﹣ cancelar una inscripción (0.166394ms) # PRISM_URL no definida: requiere el mock de Prism
+﹣ el mock rechaza una solicitud fuera de contrato antes de que llegue a una API real (0.116238ms) # PRISM_URL no definida: requiere el mock de Prism
+✔ tras un fallo de la base, no se reintenta hasta que pasa la espera (1.719163ms)
+✔ la sonda de reconciliación cierra el interruptor cuando la base vuelve (0.256789ms)
+[AULA] Reconciliación pendiente: PostgreSQL detenido
+✔ el feed admite saltos de secuencia y confirma datos y punto de control juntos (1.823602ms)
+✔ si falla la aplicación, se revierte y el punto de control no avanza (0.602042ms)
+✔ si otro proceso ya movió el punto de control, la página no se aplica (0.299714ms)
+✔ un feed fuera de orden o un punto de control inválido se rechazan (0.266193ms)
+✔ sin PostgreSQL queda en modo degradado y el catálogo se arma desde la API (8.657356ms)
+✔ pedidos simultáneos del catálogo comparten una sola lectura del feed (21.045358ms)
+✔ backend real de Aula: login, roles, CSRF y propiedad de las reservas (1409.165889ms)
+✔ contraseñas: sal aleatoria, verificación y rechazo de una incorrecta (280.022957ms)
+✔ sesiones, CSRF, roles, logout y vencimiento se comprueban en el servidor (484.353265ms)
+✔ desactivar a una persona corta su sesión abierta (110.242302ms)
+✔ autorización de reserva: un alumno solo ve la suya; el administrador, todas (0.240753ms)
+✔ diez contraseñas incorrectas bloquean la IP con 429; los logins correctos no cuentan (1407.265685ms)
+✔ HSTS no se envía en localhost (afectaría a otros servicios locales) (0.381453ms)
+[AULA] PostgreSQL, conexión perdida: Connection terminated unexpectedly
+✔ confirma la transacción y devuelve la conexión al pool (7.708022ms)
+✔ si aula-db cae con la conexión tomada, falla la operación y no el proceso (14.255204ms)
+✔ un evento firmado según el contrato se acepta y cumple el esquema (14.458719ms)
+✔ se rechazan la firma de otro secreto, el cuerpo alterado y la reinyección (0.550055ms)
+✔ el receptor acepta el vector de prueba del contrato (0.42475ms)
+✔ sin un secreto de 32 bytes no se acepta ninguna firma (0.626691ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 5
+ℹ todo 0
+ℹ duration_ms 3060.197346

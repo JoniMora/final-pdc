@@ -1,0 +1,65 @@
+{
+  "inicio": "2026-11-20T04:42:34.438Z",
+  "aprobada": true,
+  "curva": [
+    {
+      "instancias": 1,
+      "solicitudes": 200,
+      "endpoint": "GET /v1/cambios?limite=1",
+      "conexionesHttpMaximas": 64,
+      "tiempoMs": 2594.943676000001,
+      "throughput": 77.07296379869477,
+      "p95ClienteMs": 2481.5591449999974,
+      "instanciasObservadas": [
+        "797c54e5b6a3"
+      ],
+      "consultasAutenticacionMysql": 1
+    },
+    {
+      "instancias": 2,
+      "solicitudes": 200,
+      "endpoint": "GET /v1/cambios?limite=1",
+      "conexionesHttpMaximas": 64,
+      "tiempoMs": 963.5232409999953,
+      "throughput": 207.571536927775,
+      "p95ClienteMs": 903.8008560000017,
+      "instanciasObservadas": [
+        "797c54e5b6a3",
+        "05766233290f"
+      ],
+      "consultasAutenticacionMysql": 0
+    },
+    {
+      "instancias": 4,
+      "solicitudes": 200,
+      "endpoint": "GET /v1/cambios?limite=1",
+      "conexionesHttpMaximas": 64,
+      "tiempoMs": 1266.597520000003,
+      "throughput": 157.9033567032403,
+      "p95ClienteMs": 1228.6398780000018,
+      "instanciasObservadas": [
+        "9ec252e3f335",
+        "797c54e5b6a3",
+        "05766233290f",
+        "0ec6a481209a"
+      ],
+      "consultasAutenticacionMysql": 0
+    }
+  ],
+  "comprobaciones": [
+    "N=1: 200 lecturas; 1 consultas de autenticacion a MySQL",
+    "N=2: 200 lecturas; 0 consultas de autenticacion a MySQL",
+    "N=4: 200 lecturas; 0 consultas de autenticacion a MySQL",
+    "El balde es global: no se multiplica por cuatro y responde Retry-After",
+    "La clave rotada deja de autenticar y los permisos nuevos se aplican en todas las APIs"
+  ],
+  "limite": {
+    "instancias": 4,
+    "tasa": 1,
+    "rafaga": 5,
+    "enviadas": 40,
+    "admitidas": 5,
+    "rechazadas": 35,
+    "duracionMs": 243.32983400000376
+  }
+}

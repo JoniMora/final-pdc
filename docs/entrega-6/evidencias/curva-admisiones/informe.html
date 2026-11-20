@@ -1,0 +1,45 @@
+<!doctype html><meta charset="utf-8"><title>Curva de admisiones E6</title><style>body{font:16px system-ui;max-width:1000px;margin:30px auto}svg{width:100%}</style><h1>Admisiones de reservas con 1, 2 y 4 APIs</h1><p>Tres corridas por configuracion; 100 POST por corrida, 64 conexiones maximas, cuatro workers constantes. Media y desvio muestral. Sin reintentos.</p><p>El tiempo del cliente incluye espera por conexion. El p95 de cada corrida no mezcla consultas de drenaje. La barra muestra media de esos p95, no el percentil de todas las corridas juntas.</p><h2>Admisiones/s: media +/- desvio</h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 280" role="img" aria-label="Admisiones/s: media +/- desvio">
+        <path d="M50 20V220H680" fill="none" stroke="black"/>
+        <rect x="105" y="94.50561598126703" width="70" height="125.49438401873297" fill="#2463eb"/>
+            <path d="M140 52.928318609079525V136.08291335345453 M128 52.928318609079525h24" stroke="black"/>
+            <text x="80" y="20">64.63 +/- 21.41</text>
+            <text x="120" y="250">1 API</text><rect x="305" y="88.06889238078185" width="70" height="131.93110761921815" fill="#2463eb"/>
+            <path d="M340 40V136.1377847615637 M328 40h24" stroke="black"/>
+            <text x="280" y="20">67.95 +/- 24.76</text>
+            <text x="320" y="250">2 API</text><rect x="505" y="109.0134335374493" width="70" height="110.9865664625507" fill="#2463eb"/>
+            <path d="M540 79.31291438650558V138.71395268839302 M528 79.31291438650558h24" stroke="black"/>
+            <text x="480" y="20">57.16 +/- 15.30</text>
+            <text x="520" y="250">4 API</text></svg><h2>p95 del cliente en ms: media +/- desvio</h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 280" role="img" aria-label="p95 del cliente en ms: media +/- desvio">
+        <path d="M50 20V220H680" fill="none" stroke="black"/>
+        <rect x="105" y="96.95531822504476" width="70" height="123.04468177495524" fill="#2463eb"/>
+            <path d="M140 50.74184791339772V143.1687885366918 M128 50.74184791339772h24" stroke="black"/>
+            <text x="80" y="20">1623.56 +/- 609.78</text>
+            <text x="120" y="250">1 API</text><rect x="305" y="96.11287567410676" width="70" height="123.88712432589324" fill="#2463eb"/>
+            <path d="M340 40V152.22575134821352 M328 40h24" stroke="black"/>
+            <text x="280" y="20">1634.68 +/- 740.40</text>
+            <text x="320" y="250">2 API</text><rect x="505" y="84.57331472406204" width="70" height="135.42668527593796" fill="#2463eb"/>
+            <path d="M540 41.84233878913443V127.30429065898969 M528 41.84233878913443h24" stroke="black"/>
+            <text x="480" y="20">1786.94 +/- 563.83</text>
+            <text x="520" y="250">4 API</text></svg><h2>Commits (lotes) para 100 admisiones: media +/- desvio</h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 280" role="img" aria-label="Commits (lotes) para 100 admisiones: media +/- desvio">
+        <path d="M50 20V220H680" fill="none" stroke="black"/>
+        <rect x="105" y="162.15803034642045" width="70" height="57.841969653579554" fill="#2463eb"/>
+            <path d="M140 144.8054394503466V179.51062124249432 M128 144.8054394503466h24" stroke="black"/>
+            <text x="80" y="20">10.00 +/- 3.00</text>
+            <text x="120" y="250">1 API</text><rect x="305" y="139.02124248498865" width="70" height="80.97875751501135" fill="#2463eb"/>
+            <path d="M340 129.00271946000294V149.03976550997436 M328 129.00271946000294h24" stroke="black"/>
+            <text x="280" y="20">14.00 +/- 1.73</text>
+            <text x="320" y="250">2 API</text><rect x="505" y="61.89861628021592" width="70" height="158.10138371978408" fill="#2463eb"/>
+            <path d="M540 40V83.79723256043187 M528 40h24" stroke="black"/>
+            <text x="480" y="20">27.33 +/- 3.79</text>
+            <text x="520" y="250">4 API</text></svg><h2>Admisiones por commit: media +/- desvio</h2><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 280" role="img" aria-label="Admisiones por commit: media +/- desvio">
+        <path d="M50 20V220H680" fill="none" stroke="black"/>
+        <rect x="105" y="83.00152560475485" width="70" height="136.99847439524515" fill="#2463eb"/>
+            <path d="M140 40V126.00305120950966 M128 40h24" stroke="black"/>
+            <text x="80" y="20">10.66 +/- 3.35</text>
+            <text x="120" y="250">1 API</text><rect x="305" y="127.314176472289" width="70" height="92.685823527711" fill="#2463eb"/>
+            <path d="M340 116.6117394395318V138.01661350504622 M328 116.6117394395318h24" stroke="black"/>
+            <text x="280" y="20">7.21 +/- 0.83</text>
+            <text x="320" y="250">2 API</text><rect x="505" y="172.3198884655315" width="70" height="47.680111534468494" fill="#2463eb"/>
+            <path d="M540 165.18013677182154V179.45964015924147 M528 165.18013677182154h24" stroke="black"/>
+            <text x="480" y="20">3.71 +/- 0.56</text>
+            <text x="520" y="250">4 API</text></svg><p>Cada API agrupa sus admisiones en lotes de hasta 50 por commit, y cada commit espera la confirmacion semisincrona de la replica. El agrupamiento es por proceso: con la misma carga repartida entre mas instancias, cada una forma lotes mas chicos y el primario paga mas commits durables. Por eso agregar APIs no aumenta las admisiones por segundo: el cuello de botella es el commit del primario, no la CPU de la API.</p><p>La prueba caliente de 500 solicitudes se conserva por separado. Esta curva usa 100 por corrida; no debe presentarse como nueve rafagas de 500. Las APIs comparten primario, disco y Redis; no se exige ni se presupone mejora lineal.</p>

@@ -1,0 +1,43 @@
+{
+  "accion": "local",
+  "inicio": "2026-11-20T05:21:44.159Z",
+  "pasos": [
+    {
+      "nombre": "unitarias-compartido",
+      "aprobada": true,
+      "pruebas": 20
+    },
+    {
+      "nombre": "unitarias-servicios-api",
+      "aprobada": true,
+      "pruebas": 31
+    },
+    {
+      "nombre": "unitarias-servicios-worker",
+      "aprobada": true,
+      "pruebas": 6
+    },
+    {
+      "nombre": "unitarias-servicios-relay",
+      "aprobada": true,
+      "pruebas": 7
+    },
+    {
+      "nombre": "unitarias-servicios-notificador",
+      "aprobada": true,
+      "pruebas": 22
+    },
+    {
+      "nombre": "unitarias-clientes-aula",
+      "aprobada": true,
+      "pruebas": 26
+    },
+    {
+      "nombre": "unitarias-reportes",
+      "aprobada": true,
+      "pruebas": 5
+    }
+  ],
+  "aprobada": true,
+  "fin": "2026-11-20T05:21:51.643Z"
+}

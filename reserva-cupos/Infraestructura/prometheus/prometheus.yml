@@ -1,0 +1,73 @@
+global:
+  scrape_interval: 5s
+  scrape_timeout: 3s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: api
+    scheme: https
+    metrics_path: /metrics
+    tls_config:
+      ca_file: /tls/ca.crt
+      server_name: api
+    dns_sd_configs:
+      - names: [api]
+        type: A
+        port: 9464
+        refresh_interval: 5s
+
+  - job_name: worker
+    scheme: https
+    metrics_path: /metrics
+    tls_config:
+      ca_file: /tls/ca.crt
+      server_name: worker
+    dns_sd_configs:
+      - names: [worker, worker-p1, worker-p2, worker-p3]
+        type: A
+        port: 9464
+        refresh_interval: 5s
+
+  - job_name: relay
+    scheme: https
+    metrics_path: /metrics
+    tls_config:
+      ca_file: /tls/ca.crt
+      server_name: relay
+    dns_sd_configs:
+      - names: [relay]
+        type: A
+        port: 9464
+        refresh_interval: 5s
+
+  - job_name: notificador
+    scheme: https
+    metrics_path: /metrics
+    tls_config:
+      ca_file: /tls/ca.crt
+      server_name: notificador
+    dns_sd_configs:
+      - names: [notificador]
+        type: A
+        port: 9464
+        refresh_interval: 5s
+
+  - job_name: rabbitmq
+    scheme: https
+    metrics_path: /metrics/per-object
+    tls_config:
+      ca_file: /tls/ca.crt
+      server_name: rabbitmq
+    static_configs:
+      - targets:
+          - rabbitmq:15691
+
+  - job_name: traefik
+    scheme: https
+    metrics_path: /metrics
+    tls_config:
+      ca_file: /tls/ca.crt
+      server_name: traefik
+    static_configs:
+      - targets:
+          - traefik:9464

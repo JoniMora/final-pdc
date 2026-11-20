@@ -1,0 +1,2 @@
+Nada que generar: reserva-cupos/seguridad/local ya estaba completo.
+Credenciales de desarrollo: reserva-cupos/seguridad/local/accesos-locales.txt

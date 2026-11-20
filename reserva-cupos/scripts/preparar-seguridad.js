@@ -8,7 +8,9 @@
 //   - las identidades de Aula (usuarios.json, solo hashes) y sus
 //     contraseñas aleatorias (accesos-locales.txt);
 //   - la clave del operador de la plataforma (admin.key) y su hash
-//     (admin.sha256, lo único que recibe la API).
+//     (admin.sha256, lo único que recibe la API);
+//   - la contraseña del administrador de Grafana (grafana-admin.txt), para
+//     que no quede la de fábrica (admin/admin).
 //
 // Es repetible: no reemplaza nada que ya exista. Para regenerar todo,
 // borrar seguridad/local/ y volver a ejecutarlo.
@@ -29,8 +31,15 @@ const DIAS = "365";
 // mysql-primary: al promoverla (pruebas/fallos/failover.js) recibe ese
 // alias de red y los clientes verifican la identidad contra ese nombre.
 const CERTIFICADOS = {
+    redis: ["redis", "localhost"],
+    "receptor-pruebas": ["receptor-pruebas", "localhost"],
+    prometheus: ["prometheus", "localhost"],
+    grafana: ["grafana", "localhost"],
     traefik: ["traefik", "localhost"],
     api: ["api", "localhost"],
+    worker: ["worker", "localhost"],
+    relay: ["relay", "localhost"],
+    notificador: ["notificador", "localhost"],
     aula: ["aula", "localhost"],
     "mysql-primary": ["mysql-primary", "localhost"],
     "mysql-replica": ["mysql-replica", "mysql-primary", "localhost"],
@@ -146,6 +155,25 @@ async function crearIdentidades() {
     return true;
 }
 
+// Grafana la lee de un archivo (GF_SECURITY_ADMIN_PASSWORD__FILE) y la usa
+// al crear el usuario admin en un volumen nuevo. Va aparte de las
+// identidades para que una instalación anterior la reciba sin regenerar
+// todo lo demás.
+function crearCredencialGrafana() {
+    if (existe("grafana-admin.txt")) return false;
+
+    const password = randomBytes(18).toString("base64url");
+
+    fs.writeFileSync(path.join(DIRECTORIO, "grafana-admin.txt"), password);
+    fs.appendFileSync(
+        path.join(DIRECTORIO, "accesos-locales.txt"),
+        `Grafana (https://localhost:3002): admin / ${password}\n`,
+        { mode: 0o600 }
+    );
+
+    return true;
+}
+
 async function main() {
     fs.mkdirSync(DIRECTORIO, { recursive: true });
 
@@ -159,10 +187,11 @@ async function main() {
     }
 
     if (await crearIdentidades()) creados.push("usuarios de Aula y clave del operador");
+    if (crearCredencialGrafana()) creados.push("contraseña de Grafana");
 
     // Los contenedores corren con usuarios sin privilegios (node, mysql,
-    // rabbitmq) y necesitan leer los certificados y claves que se les
-    // montan. La clave de la CA y las credenciales en texto no se montan
+    // rabbitmq, grafana) y necesitan leer los certificados y claves que se
+    // les montan. La clave de la CA y las credenciales en texto no se montan
     // en ningún contenedor y quedan solo para el dueño.
     for (const nombre of fs.readdirSync(DIRECTORIO)) {
         const privado = ["ca.key", "admin.key", "accesos-locales.txt"].includes(nombre);

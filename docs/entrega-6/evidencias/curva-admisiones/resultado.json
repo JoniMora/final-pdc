@@ -1,0 +1,251 @@
+{
+  "inicio": "2026-11-20T04:48:12.307Z",
+  "aprobada": true,
+  "parametros": {
+    "solicitudesPorCorrida": 100,
+    "capacidad": 10,
+    "repeticiones": 3,
+    "conexionesMaximas": 64,
+    "particiones": 4,
+    "timeoutClienteMs": 60000
+  },
+  "corridas": [
+    {
+      "apis": 1,
+      "repeticion": 1,
+      "actividad": "01a1f748-a2cd-7406-89a1-8c05bc12edc4",
+      "solicitudes": 100,
+      "duracionMs": 2485.446759,
+      "errores": [],
+      "instanciasObservadas": [
+        "9ec252e3f335"
+      ],
+      "admisionesPorSegundo": 40.234215292639874,
+      "p95ClienteMs": 2324.565298,
+      "lotes": 13,
+      "admisionesEnLotes": 100,
+      "tamanoMedioLote": 7.6923076923076925,
+      "estados": "confirmada\t10\nrechazada\t90"
+    },
+    {
+      "apis": 2,
+      "repeticion": 1,
+      "actividad": "01a1f748-f0ba-73eb-9e65-21c04bf4bcef",
+      "solicitudes": 100,
+      "duracionMs": 1306.0136349999993,
+      "errores": [],
+      "instanciasObservadas": [
+        "9ec252e3f335",
+        "50968895bd80"
+      ],
+      "admisionesPorSegundo": 76.56887900714761,
+      "p95ClienteMs": 1296.009607,
+      "lotes": 13,
+      "admisionesEnLotes": 100,
+      "tamanoMedioLote": 7.6923076923076925,
+      "estados": "confirmada\t10\nrechazada\t90"
+    },
+    {
+      "apis": 4,
+      "repeticion": 1,
+      "actividad": "01a1f749-4bd7-762f-a83e-7a9316c5c9ad",
+      "solicitudes": 100,
+      "duracionMs": 1613.318803000002,
+      "errores": [],
+      "instanciasObservadas": [
+        "50968895bd80",
+        "9ec252e3f335",
+        "3aeb91dbaeac",
+        "01fcd8cf1900"
+      ],
+      "admisionesPorSegundo": 61.98402932764919,
+      "p95ClienteMs": 1595.935411999999,
+      "lotes": 23,
+      "admisionesEnLotes": 100,
+      "tamanoMedioLote": 4.3478260869565215,
+      "estados": "confirmada\t10\nrechazada\t90"
+    },
+    {
+      "apis": 4,
+      "repeticion": 2,
+      "actividad": "01a1f749-7a3b-7db8-b6a3-d51e98897365",
+      "solicitudes": 100,
+      "duracionMs": 1439.6829199999993,
+      "errores": [],
+      "instanciasObservadas": [
+        "9ec252e3f335",
+        "3aeb91dbaeac",
+        "50968895bd80",
+        "01fcd8cf1900"
+      ],
+      "admisionesPorSegundo": 69.45973909310534,
+      "p95ClienteMs": 1343.423963000001,
+      "lotes": 30,
+      "admisionesEnLotes": 100,
+      "tamanoMedioLote": 3.3333333333333335,
+      "estados": "confirmada\t10\nrechazada\t90"
+    },
+    {
+      "apis": 1,
+      "repeticion": 2,
+      "actividad": "01a1f749-a874-7a21-a612-1d54c8e82e0b",
+      "solicitudes": 100,
+      "duracionMs": 1363.3985229999962,
+      "errores": [],
+      "instanciasObservadas": [
+        "3aeb91dbaeac"
+      ],
+      "admisionesPorSegundo": 73.34612610549254,
+      "p95ClienteMs": 1330.330633999998,
+      "lotes": 7,
+      "admisionesEnLotes": 100,
+      "tamanoMedioLote": 14.285714285714286,
+      "estados": "confirmada\t10\nrechazada\t90"
+    },
+    {
+      "apis": 2,
+      "repeticion": 2,
+      "actividad": "01a1f749-f17f-71d7-920f-88cdae7469e7",
+      "solicitudes": 100,
+      "duracionMs": 1146.3236380000017,
+      "errores": [],
+      "instanciasObservadas": [
+        "3aeb91dbaeac",
+        "1b807b1c950e"
+      ],
+      "admisionesPorSegundo": 87.23539904879799,
+      "p95ClienteMs": 1124.1772760000022,
+      "lotes": 13,
+      "admisionesEnLotes": 100,
+      "tamanoMedioLote": 7.6923076923076925,
+      "estados": "confirmada\t10\nrechazada\t90"
+    },
+    {
+      "apis": 2,
+      "repeticion": 3,
+      "actividad": "01a1f74a-17b7-7b41-a358-a81da3178d1b",
+      "solicitudes": 100,
+      "duracionMs": 2498.0695220000052,
+      "errores": [],
+      "instanciasObservadas": [
+        "3aeb91dbaeac",
+        "1b807b1c950e"
+      ],
+      "admisionesPorSegundo": 40.03091151760179,
+      "p95ClienteMs": 2483.846936999995,
+      "lotes": 16,
+      "admisionesEnLotes": 100,
+      "tamanoMedioLote": 6.25,
+      "estados": "confirmada\t10\nrechazada\t90"
+    },
+    {
+      "apis": 4,
+      "repeticion": 3,
+      "actividad": "01a1f74a-7fd8-70c9-b5f3-01c6d97e58e1",
+      "solicitudes": 100,
+      "duracionMs": 2498.0111730000062,
+      "errores": [],
+      "instanciasObservadas": [
+        "3aeb91dbaeac",
+        "1b807b1c950e",
+        "fe21823b9117",
+        "4d729e42542a"
+      ],
+      "admisionesPorSegundo": 40.03184656692476,
+      "p95ClienteMs": 2421.464426000006,
+      "lotes": 29,
+      "admisionesEnLotes": 100,
+      "tamanoMedioLote": 3.4482758620689653,
+      "estados": "confirmada\t10\nrechazada\t90"
+    },
+    {
+      "apis": 1,
+      "repeticion": 3,
+      "actividad": "01a1f74a-b2df-78da-9d03-2d5e69d91740",
+      "solicitudes": 100,
+      "duracionMs": 1245.174469999998,
+      "errores": [],
+      "instanciasObservadas": [
+        "4d729e42542a"
+      ],
+      "admisionesPorSegundo": 80.31003077022625,
+      "p95ClienteMs": 1215.7900580000132,
+      "lotes": 10,
+      "admisionesEnLotes": 100,
+      "tamanoMedioLote": 10,
+      "estados": "confirmada\t10\nrechazada\t90"
+    }
+  ],
+  "resumen": [
+    {
+      "apis": 1,
+      "throughput": {
+        "muestras": 3,
+        "media": 64.63012405611956,
+        "desvio": 21.412479196531482
+      },
+      "p95": {
+        "muestras": 3,
+        "media": 1623.5619966666702,
+        "desvio": 609.782016172806
+      },
+      "commits": {
+        "muestras": 3,
+        "media": 10,
+        "desvio": 3
+      },
+      "lote": {
+        "muestras": 3,
+        "media": 10.659340659340659,
+        "desvio": 3.3457884280523804
+      }
+    },
+    {
+      "apis": 2,
+      "throughput": {
+        "muestras": 3,
+        "media": 67.94506319118246,
+        "desvio": 24.755677332512686
+      },
+      "p95": {
+        "muestras": 3,
+        "media": 1634.677939999999,
+        "desvio": 740.4036578743431
+      },
+      "commits": {
+        "muestras": 3,
+        "media": 14,
+        "desvio": 1.7320508075688772
+      },
+      "lote": {
+        "muestras": 3,
+        "media": 7.211538461538463,
+        "desvio": 0.8327167344081142
+      }
+    },
+    {
+      "apis": 4,
+      "throughput": {
+        "muestras": 3,
+        "media": 57.15853832922644,
+        "desvio": 15.295889551281514
+      },
+      "p95": {
+        "muestras": 3,
+        "media": 1786.941267000002,
+        "desvio": 563.8308589014332
+      },
+      "commits": {
+        "muestras": 3,
+        "media": 27.333333333333332,
+        "desvio": 3.7859388972001824
+      },
+      "lote": {
+        "muestras": 3,
+        "media": 3.7098117607862733,
+        "desvio": 0.5555174673463402
+      }
+    }
+  ],
+  "fin": "2026-11-20T04:50:38.426Z"
+}

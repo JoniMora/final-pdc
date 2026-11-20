@@ -1,0 +1,69 @@
+
+2026-11-20T04:43:49.312Z
+usuario	estado	conexiones
+relay_app	NULL	1
+worker_app	NULL	4
+notificador_app	NULL	2
+api_app	NULL	11
+admin_app	NULL	1
+Variable_name	Value
+Rpl_semi_sync_source_clients	1
+Rpl_semi_sync_source_net_avg_wait_time	0
+Rpl_semi_sync_source_net_wait_time	0
+Rpl_semi_sync_source_net_waits	458
+Rpl_semi_sync_source_no_times	0
+Rpl_semi_sync_source_no_tx	0
+Rpl_semi_sync_source_status	ON
+Rpl_semi_sync_source_timefunc_failures	0
+Rpl_semi_sync_source_tx_avg_wait_time	32259
+Rpl_semi_sync_source_tx_wait_time	12322973
+Rpl_semi_sync_source_tx_waits	382
+Rpl_semi_sync_source_wait_pos_backtraverse	0
+Rpl_semi_sync_source_wait_sessions	0
+Rpl_semi_sync_source_yes_tx	385
+
+2026-11-20T04:43:51.683Z
+usuario	estado	conexiones
+relay_app	NULL	1
+worker_app	NULL	4
+notificador_app	NULL	2
+api_app	NULL	11
+admin_app	NULL	1
+Variable_name	Value
+Rpl_semi_sync_source_clients	1
+Rpl_semi_sync_source_net_avg_wait_time	0
+Rpl_semi_sync_source_net_wait_time	0
+Rpl_semi_sync_source_net_waits	468
+Rpl_semi_sync_source_no_times	0
+Rpl_semi_sync_source_no_tx	0
+Rpl_semi_sync_source_status	ON
+Rpl_semi_sync_source_timefunc_failures	0
+Rpl_semi_sync_source_tx_avg_wait_time	31754
+Rpl_semi_sync_source_tx_wait_time	12447647
+Rpl_semi_sync_source_tx_waits	392
+Rpl_semi_sync_source_wait_pos_backtraverse	0
+Rpl_semi_sync_source_wait_sessions	0
+Rpl_semi_sync_source_yes_tx	395
+
+2026-11-20T04:43:54.108Z
+usuario	estado	conexiones
+relay_app	NULL	1
+worker_app	NULL	4
+notificador_app	NULL	2
+api_app	NULL	11
+admin_app	NULL	1
+Variable_name	Value
+Rpl_semi_sync_source_clients	1
+Rpl_semi_sync_source_net_avg_wait_time	0
+Rpl_semi_sync_source_net_wait_time	0
+Rpl_semi_sync_source_net_waits	470
+Rpl_semi_sync_source_no_times	0
+Rpl_semi_sync_source_no_tx	0
+Rpl_semi_sync_source_status	ON
+Rpl_semi_sync_source_timefunc_failures	0
+Rpl_semi_sync_source_tx_avg_wait_time	31631
+Rpl_semi_sync_source_tx_wait_time	12462878
+Rpl_semi_sync_source_tx_waits	394
+Rpl_semi_sync_source_wait_pos_backtraverse	0
+Rpl_semi_sync_source_wait_sessions	0
+Rpl_semi_sync_source_yes_tx	397

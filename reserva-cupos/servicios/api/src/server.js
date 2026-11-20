@@ -8,8 +8,12 @@ const yaml = require("js-yaml");
 const OpenApiValidator = require("express-openapi-validator");
 const { pool, esErrorDeInfraestructura } = require("./db");
 const { Problema, enviarProblema, problemas } = require("./problemas");
-const { rutas } = require("./rutas");
+const { rutas, alObservarLoteAdmision } = require("./rutas");
+const { crearMetricas, crearMetricaLoteAdmision } = require("../../../compartido/src/metricas");
 const { rutasAdmin } = require("./admin");
+const { crearRedis } = require('./redis');
+const { crearLimitadorRedis } = require('./limite-redis');
+const { crearCacheAutenticacion } = require('./cache-autenticacion');
 const {
     crearAutenticacion,
     crearExigirPermisos,
@@ -32,12 +36,24 @@ const CONTRATO = path.join(
 const VALIDAR_RESPUESTAS = process.env.VALIDAR_RESPUESTAS === "true";
 const contrato = yaml.load(fs.readFileSync(CONTRATO, "utf8"));
 
+const metricas = crearMetricas("api");
+
+// Cuántas admisiones comparte cada commit (ver compartido/src/metricas.js).
+const loteAdmision = crearMetricaLoteAdmision(metricas.registro);
+alObservarLoteAdmision(tamano => loteAdmision.observe(tamano));
+
+const redis = crearRedis();
+const cache = redis ? crearCacheAutenticacion(redis, {
+    observar: resultado => metricas.eventos.inc({ tipo: 'auth_cache', resultado })
+}) : null;
 // Límite de tasa por defecto de cada tenant; el operador puede fijar otro
 // por tenant con PATCH /admin/v1/tenants/{id}.
-const limitar = crearLimitador({
+const opcionesLimite = {
     porSegundo: Number(process.env.LIMITE_POR_SEGUNDO || 50),
-    rafaga: Number(process.env.LIMITE_RAFAGA || 100)
-});
+    rafaga: Number(process.env.LIMITE_RAFAGA || 100),
+    observar: resultado => metricas.eventos.inc({ tipo: 'limite_distribuido', resultado })
+};
+const limitar = redis ? crearLimitadorRedis(redis, opcionesLimite) : crearLimitador(opcionesLimite);
 
 const hashAdministrador = leerHashAdministrador(process.env.ADMIN_CLAVE_SHA256_ARCHIVO);
 
@@ -46,6 +62,31 @@ if (!hashAdministrador) {
 }
 
 const app = express();
+app.locals.cacheAutenticacion = cache;
+app.use((req, res, next) => { res.set('X-Instancia', INSTANCIA); next(); });
+
+app.use((req, res, next) => {
+    const inicio = process.hrtime.bigint();
+
+    res.once("finish", () => {
+        const segundos = Number(
+            process.hrtime.bigint() - inicio
+        ) / 1e9;
+
+        const etiquetas = {
+            metodo: req.method,
+            ruta: typeof req.route?.path === "string"
+                ? `${req.baseUrl || ""}${req.route.path}`
+                : "sin_ruta",
+            estado: String(res.statusCode)
+        };
+
+        metricas.solicitudes.inc(etiquetas);
+        metricas.duracion.observe(etiquetas, segundos);
+    });
+
+    next();
+});
 
 app.disable("x-powered-by");
 
@@ -56,24 +97,48 @@ app.use(express.json({ limit: "24kb" }));
 // instancia permite ver a qué réplica llegó cada solicitud detrás del
 // gateway.
 //
-// Responde en 1 s como máximo aunque el pool de MySQL esté ocupado (por
-// ejemplo, todas las conexiones esperando la confirmación semisíncrona
-// cuando cae la réplica). Si tardara más que el health check de Traefik
-// (3 s), Traefik sacaría de servicio a una instancia que está funcionando.
-app.get("/health", async (req, res) => {
-    const mysql = await Promise.race([
-        pool.query({ sql: "SELECT 1", timeout: 1000 }).then(() => "conectado", () => "no disponible"),
-        new Promise(resolve => setTimeout(resolve, 1000, "ocupado"))
-    ]);
+// La consulta usa un pool propio de una conexión, así no espera detrás de
+// las reservas. Los chequeos simultáneos (Docker, Traefik, Prometheus)
+// comparten la misma consulta en curso: con una sola conexión y sin cola,
+// el segundo informaría "no disponible" aunque la base respondiera.
+const { opcionesMysql } = require("../../../compartido/src/tls");
+const poolSalud = require("mysql2/promise").createPool({
+    host: process.env.DB_HOST,
+    ...opcionesMysql(),
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    connectionLimit: 1,
+    waitForConnections: false,
+    connectTimeout: 1000
+});
 
-    res.json({ servicio: "api", instancia: INSTANCIA, estado: "ok", mysql });
+let saludEnCurso = null;
+
+function estadoMysql() {
+    saludEnCurso ??= poolSalud.query({ sql: "SELECT 1", timeout: 500 })
+        .then(() => "conectado", () => "no disponible")
+        .finally(() => { saludEnCurso = null; });
+
+    return saludEnCurso;
+}
+
+app.get("/health", async (req, res) => {
+    res.json({
+        servicio: "api",
+        instancia: INSTANCIA,
+        estado: "ok",
+        mysql: await estadoMysql()
+    });
 });
 
 // El tenant se autentica antes de validar: una solicitud sin clave
 // responde 401 aunque además sea inválida. Después se descuenta del límite
 // de tasa del tenant, también antes de validar: una ráfaga de solicitudes
 // inválidas consume el cupo igual que una de válidas.
-app.use("/v1", crearAutenticacion(pool, limitar), limitar);
+app.use("/v1", crearAutenticacion(pool, limitar, { cache,
+    observarConsulta: () => metricas.eventos.inc({ tipo: 'auth_mysql', resultado: 'consulta' })
+}), limitar);
 app.use("/admin", crearAutenticacionAdministrador(pool, hashAdministrador));
 
 app.use(OpenApiValidator.middleware({
@@ -140,7 +205,7 @@ app.use((error, req, res, next) => {
     // La base no responde: lo admitido ya está guardado y el cliente
     // puede reintentar con la misma Idempotency-Key.
     if (esErrorDeInfraestructura(error)) {
-        console.error("[API] MySQL no disponible:", error.code || error.message);
+        console.error("[API] Infraestructura no disponible:", error.code || error.message);
         return enviarProblema(res, problemas.noDisponible());
     }
 
@@ -163,11 +228,56 @@ const servidor = process.env.TLS_CERT
     }, app)
     : http.createServer(app);
 
+// Traefik retira conexiones ociosas a los 60 s, antes de que Node las cierre.
+// Evita reutilizar un socket que el backend esta cerrando por keep-alive.
+servidor.keepAliveTimeout = 65000;
+servidor.headersTimeout = 66000;
+
 servidor.listen(PORT, "0.0.0.0", () => {
     console.log(`[API] Escuchando en puerto ${PORT} · contrato ${CONTRATO}`);
 });
 
 servidor.on("error", error => {
     console.error("[API]", error.message);
+    process.exit(1);
+});
+// Puerto de observabilidad dentro del contenedor.
+// No se publica en el host ni se agrega al contrato de negocio.
+const atenderMetricas = async (req, res) => {
+    if (req.method !== "GET" || req.url !== "/metrics") {
+        res.writeHead(404);
+        res.end();
+        return;
+    }
+
+    try {
+        const contenido = await metricas.registro.metrics();
+
+        res.writeHead(200, {
+            "Content-Type": metricas.registro.contentType
+        });
+
+        res.end(contenido);
+    } catch (error) {
+        console.error("[API] Error al exportar métricas:", error.message);
+        res.writeHead(500);
+        res.end();
+    }
+};
+
+const servidorMetricas = process.env.TLS_CERT
+    ? https.createServer({
+        cert: fs.readFileSync(process.env.TLS_CERT),
+        key: fs.readFileSync(process.env.TLS_KEY),
+        minVersion: "TLSv1.2"
+    }, atenderMetricas)
+    : http.createServer(atenderMetricas);
+
+servidorMetricas.listen(9464, "0.0.0.0", () => {
+    console.log("[API] Métricas disponibles en puerto interno 9464");
+});
+
+servidorMetricas.on("error", error => {
+    console.error("[API] Servidor de métricas:", error.message);
     process.exit(1);
 });

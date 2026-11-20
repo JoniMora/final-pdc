@@ -86,8 +86,11 @@ async function prueba({ ok }) {
         // control del feed: la reconciliación tiene que reconstruirla.
         psql(`DELETE FROM materias WHERE actividad_id = '${id}';
               UPDATE punto_control SET ultima_secuencia_feed = 0 WHERE id = 1;`);
-        assert.equal((await admin("/reconciliacion", { metodo: "POST" })).datos.modo, "normal");
-        assert.equal(psql(`SELECT count(*) FROM materias WHERE actividad_id = '${id}';`).trim(), "1");
+        await esperarHasta(async () => {
+            const resultado = await admin("/reconciliacion", { metodo: "POST" });
+            return resultado.status === 200 && resultado.datos?.modo === "normal"
+                && psql(`SELECT count(*) FROM materias WHERE actividad_id = '${id}';`).trim() === "1";
+        }, { descripcion: "la materia reconstruida por el feed" });
         ok("La reconciliación por feed reconstruye la materia borrada de aula-db");
 
         docker(["stop", "aula-db"]);
@@ -111,12 +114,13 @@ async function prueba({ ok }) {
         docker(["start", "aula-db"]);
         aulaDbDetenida = false;
 
-        await esperarHasta(async () => (await admin("/reconciliacion", { metodo: "POST" })).datos?.modo === "normal",
-            { descripcion: "la reconciliación después de la caída" });
-        assert.equal(
-            psql(`SELECT estado FROM inscripciones WHERE reserva_id = '${durante.datos.id}';`).trim(),
-            "confirmada"
-        );
+        // Modo normal no implica que el relay ya haya secuenciado el cambio.
+        // Esperar el efecto persistido evita la carrera entre confirmación y feed.
+        await esperarHasta(async () => {
+            const resultado = await admin("/reconciliacion", { metodo: "POST" });
+            return resultado.status === 200 && resultado.datos?.modo === "normal"
+                && psql(`SELECT estado FROM inscripciones WHERE reserva_id = '${durante.datos.id}';`).trim() === "confirmada";
+        }, { descripcion: "la inscripción recuperada en PostgreSQL" });
         ok("Al volver aula-db, la reconciliación agrega la inscripción hecha durante la caída");
 
         assert.equal((await uno("/auth/logout", { metodo: "POST" })).status, 200);

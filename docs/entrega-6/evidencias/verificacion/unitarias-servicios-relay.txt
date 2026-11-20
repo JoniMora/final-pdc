@@ -1,0 +1,15 @@
+✔ los pedidos del outbox se convierten en comandos que cumplen el contrato (10.214585ms)
+✔ las decisiones del worker se convierten en entregas de webhook válidas (13.886024ms)
+✔ un cambio que no es una decisión sobre una reserva no cumple el contrato de webhook (0.465125ms)
+✔ sin cambios no emite UPDATE ni COMMIT (2.469012ms)
+✔ secuencia solo IDs confirmados del lote, incluso con huecos (0.725804ms)
+✔ un commit fallido no se informa como lote secuenciado (0.985871ms)
+✔ si el lote cambia se revierte, sin confirmar una secuencia parcial (1.548381ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 377.176213

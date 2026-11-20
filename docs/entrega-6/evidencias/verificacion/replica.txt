@@ -1,0 +1,2 @@
+Réplica: ya estaba configurada.
+Réplica: conectada al primario por TLS y aplicando.

@@ -1,0 +1,4 @@
+actividad_id	estado	cantidad
+01a1f744-9994-7587-9fe0-2e61ab44e206	confirmada	2
+id	capacidad	cupos_disponibles
+01a1f744-9994-7587-9fe0-2e61ab44e206	10	8

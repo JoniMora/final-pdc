@@ -1,0 +1,45 @@
+{
+  "inicio": "2026-11-20T04:42:03.704Z",
+  "aprobada": true,
+  "eventos": [
+    {
+      "tipo": "detener_aula",
+      "instante": "2026-11-20T04:42:08.418Z"
+    },
+    {
+      "tipo": "circuito_abierto",
+      "instante": "2026-11-20T04:42:11.904Z"
+    },
+    {
+      "tipo": "recuperar_aula",
+      "instante": "2026-11-20T04:42:13.916Z"
+    }
+  ],
+  "tenant": "01a1542d-7ee2-7d8b-b3b3-40474b8dec7e",
+  "actividad": "01a1f742-fb6e-7717-9ca7-86fed211d2d1",
+  "transiciones": [
+    {
+      "tenant": "01a1542d-7ee2-7d8b-b3b3-40474b8dec7e",
+      "estado": "cerrado",
+      "instante": "2026-11-20T04:42:10.549Z"
+    },
+    {
+      "tenant": "01a1542d-7ee2-7d8b-b3b3-40474b8dec7e",
+      "estado": "abierto",
+      "instante": "2026-11-20T04:42:10.668Z"
+    },
+    {
+      "tenant": "01a1542d-7ee2-7d8b-b3b3-40474b8dec7e",
+      "estado": "semiabierto",
+      "instante": "2026-11-20T04:42:20.669Z"
+    },
+    {
+      "tenant": "01a1542d-7ee2-7d8b-b3b3-40474b8dec7e",
+      "estado": "cerrado",
+      "instante": "2026-11-20T04:42:20.730Z"
+    }
+  ],
+  "entregasVerificadas": 11,
+  "confirmadas": 11,
+  "fin": "2026-11-20T04:42:34.245Z"
+}

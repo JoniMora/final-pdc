@@ -1,0 +1,12 @@
+{
+  "accion": "fallos",
+  "inicio": "2026-11-20T04:50:38.551Z",
+  "pasos": [
+    {
+      "nombre": "fallos",
+      "aprobada": true
+    }
+  ],
+  "aprobada": true,
+  "fin": "2026-11-20T04:52:18.712Z"
+}

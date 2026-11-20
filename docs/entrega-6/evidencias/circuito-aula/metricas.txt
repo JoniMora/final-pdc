@@ -1,0 +1,75 @@
+# HELP pdc_http_solicitudes_total Cantidad de solicitudes HTTP terminadas
+# TYPE pdc_http_solicitudes_total counter
+pdc_http_solicitudes_total{metodo="POST",ruta="webhook",estado="error",servicio="notificador"} 8
+pdc_http_solicitudes_total{metodo="POST",ruta="webhook",estado="204",servicio="notificador"} 11
+
+# HELP pdc_http_duracion_segundos Tiempo de respuesta HTTP en segundos
+# TYPE pdc_http_duracion_segundos histogram
+pdc_http_duracion_segundos_bucket{le="0.005",servicio="notificador",metodo="POST",ruta="webhook",estado="error"} 0
+pdc_http_duracion_segundos_bucket{le="0.01",servicio="notificador",metodo="POST",ruta="webhook",estado="error"} 0
+pdc_http_duracion_segundos_bucket{le="0.025",servicio="notificador",metodo="POST",ruta="webhook",estado="error"} 0
+pdc_http_duracion_segundos_bucket{le="0.05",servicio="notificador",metodo="POST",ruta="webhook",estado="error"} 0
+pdc_http_duracion_segundos_bucket{le="0.1",servicio="notificador",metodo="POST",ruta="webhook",estado="error"} 5
+pdc_http_duracion_segundos_bucket{le="0.25",servicio="notificador",metodo="POST",ruta="webhook",estado="error"} 8
+pdc_http_duracion_segundos_bucket{le="0.5",servicio="notificador",metodo="POST",ruta="webhook",estado="error"} 8
+pdc_http_duracion_segundos_bucket{le="1",servicio="notificador",metodo="POST",ruta="webhook",estado="error"} 8
+pdc_http_duracion_segundos_bucket{le="2.5",servicio="notificador",metodo="POST",ruta="webhook",estado="error"} 8
+pdc_http_duracion_segundos_bucket{le="5",servicio="notificador",metodo="POST",ruta="webhook",estado="error"} 8
+pdc_http_duracion_segundos_bucket{le="10",servicio="notificador",metodo="POST",ruta="webhook",estado="error"} 8
+pdc_http_duracion_segundos_bucket{le="30",servicio="notificador",metodo="POST",ruta="webhook",estado="error"} 8
+pdc_http_duracion_segundos_bucket{le="60",servicio="notificador",metodo="POST",ruta="webhook",estado="error"} 8
+pdc_http_duracion_segundos_bucket{le="120",servicio="notificador",metodo="POST",ruta="webhook",estado="error"} 8
+pdc_http_duracion_segundos_bucket{le="+Inf",servicio="notificador",metodo="POST",ruta="webhook",estado="error"} 8
+pdc_http_duracion_segundos_sum{servicio="notificador",metodo="POST",ruta="webhook",estado="error"} 0.7755096419999999
+pdc_http_duracion_segundos_count{servicio="notificador",metodo="POST",ruta="webhook",estado="error"} 8
+pdc_http_duracion_segundos_bucket{le="0.005",servicio="notificador",metodo="POST",ruta="webhook",estado="204"} 0
+pdc_http_duracion_segundos_bucket{le="0.01",servicio="notificador",metodo="POST",ruta="webhook",estado="204"} 0
+pdc_http_duracion_segundos_bucket{le="0.025",servicio="notificador",metodo="POST",ruta="webhook",estado="204"} 4
+pdc_http_duracion_segundos_bucket{le="0.05",servicio="notificador",metodo="POST",ruta="webhook",estado="204"} 8
+pdc_http_duracion_segundos_bucket{le="0.1",servicio="notificador",metodo="POST",ruta="webhook",estado="204"} 11
+pdc_http_duracion_segundos_bucket{le="0.25",servicio="notificador",metodo="POST",ruta="webhook",estado="204"} 11
+pdc_http_duracion_segundos_bucket{le="0.5",servicio="notificador",metodo="POST",ruta="webhook",estado="204"} 11
+pdc_http_duracion_segundos_bucket{le="1",servicio="notificador",metodo="POST",ruta="webhook",estado="204"} 11
+pdc_http_duracion_segundos_bucket{le="2.5",servicio="notificador",metodo="POST",ruta="webhook",estado="204"} 11
+pdc_http_duracion_segundos_bucket{le="5",servicio="notificador",metodo="POST",ruta="webhook",estado="204"} 11
+pdc_http_duracion_segundos_bucket{le="10",servicio="notificador",metodo="POST",ruta="webhook",estado="204"} 11
+pdc_http_duracion_segundos_bucket{le="30",servicio="notificador",metodo="POST",ruta="webhook",estado="204"} 11
+pdc_http_duracion_segundos_bucket{le="60",servicio="notificador",metodo="POST",ruta="webhook",estado="204"} 11
+pdc_http_duracion_segundos_bucket{le="120",servicio="notificador",metodo="POST",ruta="webhook",estado="204"} 11
+pdc_http_duracion_segundos_bucket{le="+Inf",servicio="notificador",metodo="POST",ruta="webhook",estado="204"} 11
+pdc_http_duracion_segundos_sum{servicio="notificador",metodo="POST",ruta="webhook",estado="204"} 0.43309593699999993
+pdc_http_duracion_segundos_count{servicio="notificador",metodo="POST",ruta="webhook",estado="204"} 11
+
+# HELP pdc_eventos_total Cantidad de eventos de negocio procesados
+# TYPE pdc_eventos_total counter
+pdc_eventos_total{tipo="webhook",resultado="error_envio",servicio="notificador"} 8
+pdc_eventos_total{tipo="webhook",resultado="reintento_programado",servicio="notificador"} 18
+pdc_eventos_total{tipo="webhook",resultado="diferido_circuito",servicio="notificador"} 10
+pdc_eventos_total{tipo="webhook",resultado="entregado",servicio="notificador"} 11
+
+# HELP pdc_webhook_circuito_estado Estado por tenant: 0 cerrado, 1 abierto, 2 semiabierto
+# TYPE pdc_webhook_circuito_estado gauge
+pdc_webhook_circuito_estado{tenant="01a1542d-7ee2-7d8b-b3b3-40474b8dec7e",servicio="notificador"} 0
+
+# HELP pdc_webhook_circuito_transiciones_total Transiciones del circuito por tenant y estado
+# TYPE pdc_webhook_circuito_transiciones_total counter
+pdc_webhook_circuito_transiciones_total{tenant="01a1542d-7ee2-7d8b-b3b3-40474b8dec7e",estado="cerrado",servicio="notificador"} 2
+pdc_webhook_circuito_transiciones_total{tenant="01a1542d-7ee2-7d8b-b3b3-40474b8dec7e",estado="abierto",servicio="notificador"} 1
+pdc_webhook_circuito_transiciones_total{tenant="01a1542d-7ee2-7d8b-b3b3-40474b8dec7e",estado="semiabierto",servicio="notificador"} 1
+
+# HELP pdc_webhook_demora_segundos Demora desde ocurrido_en hasta entrega HTTP exitosa
+# TYPE pdc_webhook_demora_segundos histogram
+pdc_webhook_demora_segundos_bucket{le="0.1",servicio="notificador"} 0
+pdc_webhook_demora_segundos_bucket{le="0.5",servicio="notificador"} 0
+pdc_webhook_demora_segundos_bucket{le="1",servicio="notificador"} 0
+pdc_webhook_demora_segundos_bucket{le="2",servicio="notificador"} 0
+pdc_webhook_demora_segundos_bucket{le="5",servicio="notificador"} 0
+pdc_webhook_demora_segundos_bucket{le="10",servicio="notificador"} 0
+pdc_webhook_demora_segundos_bucket{le="30",servicio="notificador"} 11
+pdc_webhook_demora_segundos_bucket{le="60",servicio="notificador"} 11
+pdc_webhook_demora_segundos_bucket{le="120",servicio="notificador"} 11
+pdc_webhook_demora_segundos_bucket{le="300",servicio="notificador"} 11
+pdc_webhook_demora_segundos_bucket{le="600",servicio="notificador"} 11
+pdc_webhook_demora_segundos_bucket{le="+Inf",servicio="notificador"} 11
+pdc_webhook_demora_segundos_sum{servicio="notificador"} 186.995
+pdc_webhook_demora_segundos_count{servicio="notificador"} 11

@@ -1,5 +1,6 @@
+const { crearAdmisor, insertarAdmisiones } = require("./admisiones");
 const express = require("express");
-const { pool, enTransaccion } = require("./db");
+const { pool, enTransaccion, esErrorDeInfraestructura } = require("./db");
 const { problemas } = require("./problemas");
 const {
     uuidv7,
@@ -23,6 +24,14 @@ const CLAVE_IDEMPOTENCIA = /^[\x21-\x7e]{1,128}$/;
 const PEDIDO_CANCELACION = "reserva.cancelacion_solicitada";
 
 const rutas = express.Router();
+// Tamaño de cada lote de admisiones (lo registra server.js en Prometheus).
+let observarLoteAdmision = () => {};
+
+const admitirReserva = crearAdmisor(enTransaccion, {
+    escribirLote: insertarAdmisiones,
+    esErrorDeInfraestructura,
+    observarLote: tamano => observarLoteAdmision(tamano)
+});
 
 function entero(valor, porDefecto, minimo, maximo, nombre) {
     if (valor === undefined) return porDefecto;
@@ -190,7 +199,7 @@ rutas.post("/actividades/:id/reservas", async (req, res) => {
     };
 
     try {
-        await enTransaccion(async conexion => {
+        await admitirReserva(async conexion => {
             await conexion.query(
                 `INSERT INTO reservas
                      (id, tenant_id, actividad_id, participante_id,
@@ -202,7 +211,7 @@ rutas.post("/actividades/:id/reservas", async (req, res) => {
             await registrarCambio(conexion, req.tenantId, "reserva", reserva, "reserva.solicitada", {
                 comando: true
             });
-        });
+        }, { reserva, tenantId: req.tenantId, clave, hash });
     } catch (error) {
         if (error.code === "ER_DUP_ENTRY") {
             // Dos solicitudes simultáneas con la misma clave: el índice
@@ -376,4 +385,8 @@ rutas.get("/cambios", async (req, res) => {
     });
 });
 
-module.exports = { rutas };
+function alObservarLoteAdmision(observador) {
+    observarLoteAdmision = observador;
+}
+
+module.exports = { rutas, alObservarLoteAdmision };

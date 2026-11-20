@@ -1,0 +1,6 @@
+Rafaga con reintentos de la MISMA clave; se detendra una API y el worker de la actividad...
+2026-11-20T04:51:15.118Z detener_api
+2026-11-20T04:51:40.664Z detener_worker-p1
+2026-11-20T04:51:46.753Z recuperar_worker-p1
+2026-11-20T04:51:47.385Z recuperar_api
+OK: 10 confirmadas, 490 rechazadas, cero duplicadas y cupos no negativos.

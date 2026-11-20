@@ -1,0 +1,7 @@
+Corrida: 2026-11-20T04-43-47-531Z
+Particiones previstas: 4
+Prueba: duplicados.js
+Tenant: 01a1f744-8ed2-7060-9dc5-6782abda0578
+Muestras: 3
+Codigo k6: 0
+El estado de la base es una instantanea; k6 conserva sus criterios originales.

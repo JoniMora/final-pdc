@@ -3,8 +3,8 @@
 // necesita Node.js 22, Docker y OpenSSL (en Windows, el que trae Git).
 //
 // Uso, desde reserva-cupos:
-//   node scripts/sistema.js preparar     certificados, identidades y clave del operador
-//   node scripts/sistema.js levantar     compose up + réplica configurada y cifrada
+//   node scripts/sistema.js preparar     certificados, identidades, clave del operador y de Grafana
+//   node scripts/sistema.js levantar     compose up + réplica configurada y cifrada + admin de Grafana
 //   node scripts/sistema.js estado       contenedores y replicación
 //   node scripts/sistema.js tenant <nombre> [--limite <por_segundo>/<rafaga>] [--scopes a,b]
 //   node scripts/sistema.js seguridad    pruebas de acceso, cifrado y Aula (evidencias)
@@ -15,6 +15,7 @@
 // de MySQL y PostgreSQL: quien viene de la Entrega 4 tiene que empezar con
 // volúmenes nuevos (docker compose down -v).
 
+const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 
@@ -85,11 +86,25 @@ function exigirTopologiaOriginal() {
     }
 }
 
+// Grafana toma la contraseña generada solo al crear el admin en un volumen
+// nuevo. En un volumen anterior (con admin/admin de fábrica) se fija acá,
+// así que siempre coincide con seguridad/local/grafana-admin.txt.
+function sincronizarGrafana() {
+    const password = fs.readFileSync(path.join(RAIZ, "seguridad/local/grafana-admin.txt"), "utf8").trim();
+
+    compose(["exec", "-T", "grafana", "grafana", "cli", "admin", "reset-admin-password", "--password-from-stdin"],
+        { capturar: true, input: password });
+    console.log("Grafana: contraseña del admin tomada de seguridad/local/grafana-admin.txt.");
+}
+
 async function levantar() {
     exigirTopologiaOriginal();
     compose(["up", "--build", "-d", "--wait", "--wait-timeout", "300"]);
     await configurarReplica();
-    console.log("Entorno listo: API https://localhost:3000 · Aula https://localhost:3001 · panel https://localhost:8080/dashboard/");
+    sincronizarGrafana();
+    console.log("Entorno listo: API https://localhost:3000 · Aula https://localhost:3001 · " +
+        "panel de Traefik https://localhost:8080/dashboard/ · Prometheus https://localhost:9090 · " +
+        "Grafana https://localhost:3002 (credenciales en seguridad/local/accesos-locales.txt)");
 }
 
 function estado() {
@@ -133,6 +148,12 @@ async function main() {
             return nodo("scripts/preparar-seguridad.js");
         case "levantar":
             return levantar();
+        case "replica":
+            return configurarReplica();
+        case "comprobar-topologia":
+            return exigirTopologiaOriginal();
+        case "grafana":
+            return sincronizarGrafana();
         case "estado":
             return estado();
         case "tenant":

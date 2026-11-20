@@ -1,0 +1,14 @@
+✔ un comando válido se ejecuta y se confirma (4.51461ms)
+✔ un mensaje fuera de contrato va a la DLQ sin ejecutarse (0.4269ms)
+✔ un error de infraestructura reencola sin consumir reintentos (0.315814ms)
+✔ una reserva inexistente va a la DLQ sin reintentos (0.261213ms)
+✔ agotados los reintentos, un reservar deja la reserva fallida (0.385104ms)
+✔ agotados los reintentos, un cancelar va a la DLQ y no se marca fallida (2.853823ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 241.049918

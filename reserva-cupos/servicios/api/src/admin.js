@@ -13,6 +13,10 @@ const TODOS_LOS_PERMISOS = ["actividades:escribir", "reservas:escribir", "lectur
 const COLUMNAS = "id, nombre, activo, scopes, webhook_url, limite_por_segundo, limite_rafaga, creado_en";
 
 const rutasAdmin = express.Router();
+function cambiarAutenticacion(req, fn) {
+    const cache = req.app.locals.cacheAutenticacion;
+    return cache ? cache.mutar(fn) : fn();
+}
 
 // 256 bits aleatorios. La base guarda solo el hash: la clave se muestra
 // una única vez, en la respuesta que la genera.
@@ -113,10 +117,10 @@ rutasAdmin.patch("/tenants/:id", async (req, res) => {
         }
     }
 
-    const [resultado] = await poolAdministracion().query(
+    const [resultado] = await cambiarAutenticacion(req, () => poolAdministracion().query(
         `UPDATE tenants SET ${cambios.join(", ")} WHERE id = ?`,
         [...valores, req.params.id]
-    );
+    ));
 
     if (resultado.affectedRows === 0) throw problemas.noEncontrado();
 
@@ -141,10 +145,10 @@ rutasAdmin.patch("/tenants/:id", async (req, res) => {
 rutasAdmin.post("/tenants/:id/rotacion", async (req, res) => {
     const { clave, hash } = nuevaClave();
 
-    const [resultado] = await poolAdministracion().query(
+    const [resultado] = await cambiarAutenticacion(req, () => poolAdministracion().query(
         "UPDATE tenants SET api_key_hash = ? WHERE id = ?",
         [hash, req.params.id]
-    );
+    ));
 
     if (resultado.affectedRows === 0) throw problemas.noEncontrado();
 

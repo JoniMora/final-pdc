@@ -1,0 +1,12 @@
+Matriz de fallos · Servidor completo del tenant caído (Aula y aula-db)
+Ejecución: 2026-11-20T05:07:12.676Z
+
+  · Aula y aula-db detenidas (el servidor completo del tenant)
+  · Reservas del tenant Aula por otro canal mientras su servidor está caído: 5 confirmadas, 15 rechazadas, 0 pendientes, 0 duplicadas, cupos_disponibles = 0
+OK: El servicio sigue decidiendo las reservas del tenant aunque su servidor no responda
+  · webhooks.dlq: 20 → 40 mensajes tras 409.2 s
+OK: Agotados los reintentos (10 s, 1 min, 5 min) o el plazo de 400 s con el circuito abierto, los 20 webhooks quedan en webhooks.dlq
+  · Aula reconstruyó las 20 inscripciones desde el feed 17.9 s después de volver
+OK: Al volver, Aula se reconstruye desde /v1/cambios: la DLQ no implica pérdida
+
+Resultado: APROBADA

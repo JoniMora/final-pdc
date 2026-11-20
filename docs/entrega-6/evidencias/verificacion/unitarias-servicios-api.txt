@@ -1,0 +1,39 @@
+✔ cada operación de /v1 declara exactamente un permiso en el contrato (1.403076ms)
+✔ una clave sin el permiso que pide la operación recibe 403 (17.01965ms)
+✔ el límite de tasa responde 429 con Retry-After y se recupera con el tiempo (14.172106ms)
+✔ un tenant saturado no consume el cupo de otro (1.523382ms)
+✔ con el balde agotado, la clave recibe 429 sin consultar la base (13.097381ms)
+✔ el límite propio del tenant reemplaza al de la plataforma (0.463157ms)
+✔ /admin: sin clave 401, clave de tenant 403, clave del operador pasa (2.51464ms)
+✔ sin hash del operador configurado, /admin no acepta ninguna clave (7.106903ms)
+✔ 50 admisiones comparten un commit y todas quedan persistidas (28.50745ms)
+✔ ninguna admision se resuelve antes de confirmar el lote (25.841225ms)
+✔ una duplicada revierte el lote y no pierde solicitudes validas (1.11545ms)
+✔ si falla el commit nunca se informa una escritura no persistida (3.196306ms)
+✔ un lote incompleto termina sin esperar mas solicitudes (6.40254ms)
+✔ varios lotes conservan todas las admisiones sin transacciones superpuestas (18.327737ms)
+✔ un lote SQL usa solo dos consultas y conserva tenant, idempotencia y outbox (2.299333ms)
+✔ si falla la escritura masiva revierte y recupera cada admision individual (0.728876ms)
+✔ con la base caida el lote se rechaza en un solo intento, sin repetir cada admision (1.312602ms)
+✔ si la base cae durante la recuperacion individual, el resto falla sin mas intentos (0.928101ms)
+✔ informa el tamano de cada lote (11.577271ms)
+✔ cada ruta de la API está en el contrato y viceversa (4.148872ms)
+✔ uuidv7 genera UUID versión 7 ordenados por tiempo (5.936673ms)
+✔ jsonCanonico no depende del orden de las claves (28.074795ms)
+✔ metadata acepta objetos de hasta 16 KB y rechaza el resto (5.753987ms)
+✔ cache-aside comparte resultado y reduce lecturas MySQL (2.079868ms)
+✔ una rafaga fria del mismo hash comparte la consulta en vuelo (11.010267ms)
+✔ cambio de permisos invalida cache de todas las instancias (2.146185ms)
+✔ lectura anterior a rotacion no repuebla la generacion nueva (3.224178ms)
+✔ durante una mutacion se autentica contra MySQL sin usar ni poblar la cache (0.515049ms)
+✔ limite usa tenant como clave global y respeta Retry-After (0.735804ms)
+✔ si Redis falla no hay fallback a un limite por instancia (0.258905ms)
+✔ autenticacion usa cache sin cambiar el aislamiento por tenant (0.928342ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1033.560139

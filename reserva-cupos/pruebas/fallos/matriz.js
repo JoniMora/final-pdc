@@ -1,4 +1,5 @@
-// Matriz de fallos (Entrega 5, issues E5-12, E5-13 y E5-14). Cada escenario
+// Matriz de fallos (Entrega 5, issues E5-12, E5-13 y E5-14; Redis, de la
+// Entrega 6). Cada escenario
 // detiene un componente con carga en curso, mide el efecto y el tiempo de
 // recuperación y verifica las garantías por la API pública. Cada uno deja
 // su evidencia en docs/entrega-5/evidencias/fallos/<escenario>.txt y la
@@ -9,7 +10,9 @@
 //   node pruebas/fallos/matriz.js                 todos, en el orden de abajo
 //   node pruebas/fallos/matriz.js worker          uno o varios por nombre
 //   node pruebas/fallos/matriz.js --sin-dlq ...   el escenario "tenant" no espera
-//                                                 los ~6 min hasta la DLQ
+//                                                 los ~7 min hasta la DLQ
+//   node pruebas/fallos/matriz.js --e6 ...        evidencias en docs/entrega-6/
+//                                                 (las de E5 quedan como están)
 //
 // "mysql-primary" va al final: deja la réplica promovida como primario y
 // sin réplica. Para volver a la topología inicial: docker compose down -v y
@@ -27,8 +30,12 @@ const {
     listar, verificarInvariantes, resumenInvariantes
 } = require("./arnes");
 
-const DIRECTORIO = path.resolve(RAIZ, "../docs/entrega-5/evidencias/fallos");
 const SIN_DLQ = process.argv.includes("--sin-dlq");
+const E6 = process.argv.includes("--e6");
+
+// Las rutas de Evidencia son relativas a docs/entrega-5/evidencias.
+const CARPETA = E6 ? "../../entrega-6/evidencias/matriz" : "fallos";
+const DIRECTORIO = path.resolve(RAIZ, "../docs/entrega-5/evidencias", CARPETA);
 
 let tenantDeCarga = null;
 
@@ -182,6 +189,83 @@ async function escenarioApi({ ok, dato }) {
     };
 }
 
+// --- Redis (Entrega 6) -------------------------------------------------------
+
+// Redis guarda el límite de tasa global y la caché de autenticación. Si no
+// responde, la API rechaza /v1 con 503: no sigue con un límite por instancia
+// (que multiplicaría el cupo de cada tenant por la cantidad de APIs) ni sin
+// límite. Lo ya admitido sigue su curso por el outbox.
+async function escenarioRedis({ ok, dato }) {
+    const clave = await claveDeCarga();
+    const cliente = api(clave);
+    const PAUSA_MS = 15000;
+    let durante = null;
+    let recuperacion = null;
+
+    const resultado = await rafaga({
+        clave,
+        capacidad: 10,
+        solicitudes: 200,
+        concurrencia: 40,
+        durante: {
+            tras: 40,
+            accion: async () => {
+                await detener("redis");
+                const caida = cronometro();
+
+                // La API sigue viva, pero no atiende /v1 sin Redis.
+                const [lectura, salud] = await Promise.all([
+                    esperarHasta(async () => {
+                        const respuesta = await cliente("/v1/cambios?limite=1", { timeoutMs: 5000 }).catch(() => null);
+                        return respuesta?.status === 503 ? respuesta : null;
+                    }, { plazoMs: 10000, intervaloMs: 200, descripcion: "503 de /v1 sin Redis" }),
+                    pedir("https://localhost:3000/health", { timeoutMs: 5000 })
+                ]);
+                durante = { lectura, salud, primer503: caida() };
+
+                await esperar(PAUSA_MS);
+                await iniciar("redis");
+                await esperarSaludable("redis", 60000);
+                const reloj = cronometro();
+
+                await esperarHasta(async () => {
+                    const respuesta = await cliente("/v1/cambios?limite=1", { timeoutMs: 5000 }).catch(() => null);
+                    return respuesta?.status === 200;
+                }, { plazoMs: 60000, intervaloMs: 200, descripcion: "que /v1 vuelva a responder con Redis" });
+
+                recuperacion = { total: caida(), desdeRedis: reloj() };
+            }
+        }
+    });
+
+    dato(`Ráfaga de 200 solicitudes; Redis detenido tras 40 admisiones durante ${PAUSA_MS / 1000} s`);
+    assert.equal(durante.lectura.status, 503);
+    assert.equal(durante.lectura.datos?.type?.endsWith("no-disponible"), true);
+    assert.ok(durante.lectura.encabezados["retry-after"], "el 503 trae Retry-After");
+    assert.equal(durante.salud.status, 200);
+    dato(`Sin Redis: GET /v1/cambios → ${durante.lectura.status} (${durante.lectura.datos.type}, ` +
+        `Retry-After ${durante.lectura.encabezados["retry-after"]}) a los ${segundos(durante.primer503)}; ` +
+        `/health → ${durante.salud.status}`);
+    ok("Sin Redis la API responde 503 con Retry-After: no autentica sin la caché ni limita por instancia");
+
+    dato(resumenRafaga(resultado));
+    assert.ok((resultado.errores[503] || 0) > 0, "los clientes vieron 503 durante la caída");
+
+    const conteo = await verificarInvariantes({ clave, actividadId: resultado.actividadId, capacidad: 10, solicitudes: 200 });
+    dato(`Invariantes: ${resumenInvariantes(conteo)}`);
+    ok("Los clientes reintentaron con la misma Idempotency-Key: 10 confirmadas, ninguna duplicada ni perdida");
+
+    dato(`Redis en marcha ${segundos(recuperacion.total - recuperacion.desdeRedis)} después de detenerlo; ` +
+        `/v1 volvió a responder ${segundos(recuperacion.desdeRedis)} después de que Redis quedó sano`);
+    ok("Al volver Redis, la API reconecta sola e invalida la caché de permisos (nueva generación)");
+
+    return {
+        efecto: `/v1 responde 503 con Retry-After (${resultado.errores[503]} reintentos del cliente); /health sigue en 200`,
+        garantia: "Sin límite por instancia ni caché vieja; 10 confirmadas, 0 duplicadas",
+        recuperacion: `${segundos(recuperacion.desdeRedis)} desde que Redis vuelve`
+    };
+}
+
 // --- Bases y tenant (E5-14) ---------------------------------------------------
 
 function estadoSemisincrono() {
@@ -322,6 +406,16 @@ async function escenarioTenant({ ok, dato }) {
     const caida = cronometro();
     dato("Aula y aula-db detenidas (el servidor completo del tenant)");
 
+    try {
+        return await tenantCaido({ ok, dato, clave, dlqAntes, caida });
+    } finally {
+        // También si falla: el escenario siguiente necesita a Aula.
+        await iniciar("aula-db").catch(() => {});
+        await iniciar("aula").catch(() => {});
+    }
+}
+
+async function tenantCaido({ ok, dato, clave, dlqAntes, caida }) {
     const resultado = await rafaga({ clave, capacidad: 5, solicitudes: 20, concurrencia: 10 });
     const conteo = await verificarInvariantes({ clave, actividadId: resultado.actividadId, capacidad: 5, solicitudes: 20 });
     dato(`Reservas del tenant Aula por otro canal mientras su servidor está caído: ${resumenInvariantes(conteo)}`);
@@ -337,10 +431,12 @@ async function escenarioTenant({ ok, dato }) {
         await esperarHasta(() => (colas()["webhooks.dlq"] || 0) >= dlqAntes + 20, {
             plazoMs: 480000,
             intervaloMs: 5000,
-            descripcion: "que los 20 webhooks agoten los reintentos (10 s, 1 min, 5 min)"
+            descripcion: "que los 20 webhooks agoten los reintentos o el plazo de 400 s"
         });
         dato(`webhooks.dlq: ${dlqAntes} → ${colas()["webhooks.dlq"]} mensajes tras ${segundos(caida())}`);
-        ok("Agotados los reintentos (10 s, 1 min, 5 min), los 20 webhooks quedan en webhooks.dlq");
+        // Con el circuito del tenant abriéndose y cerrándose, unas entregas
+        // agotan sus intentos y otras vencen el plazo de 400 s.
+        ok("Agotados los reintentos (10 s, 1 min, 5 min) o el plazo de 400 s con el circuito abierto, los 20 webhooks quedan en webhooks.dlq");
     }
 
     const reloj = cronometro();
@@ -508,6 +604,7 @@ const ESCENARIOS = {
     }),
     notificador: escenarioNotificador,
     api: escenarioApi,
+    redis: escenarioRedis,
     "mysql-replica": escenarioReplica,
     "aula-db": escenarioAulaDb,
     tenant: escenarioTenant,
@@ -520,6 +617,7 @@ const TITULOS = {
     rabbitmq: "RabbitMQ detenido con una ráfaga en curso",
     notificador: "Notificador detenido: webhooks pendientes",
     api: "Una instancia de la API cae (SIGKILL) con dos instancias",
+    redis: "Redis detenido con una ráfaga en curso (límite global y caché de autenticación)",
     "mysql-replica": "Réplica de MySQL detenida: degradación a asíncrona",
     "aula-db": "Escenario +1: aula-db cae con 500 alumnos inscribiéndose",
     tenant: "Servidor completo del tenant caído (Aula y aula-db)",
@@ -538,7 +636,9 @@ async function main() {
 
     for (const nombre of nombres) {
         console.log(`\n=== ${TITULOS[nombre]} ===`);
-        const evidencia = new Evidencia(`fallos/${nombre}.txt`, `Matriz de fallos · ${TITULOS[nombre]}`);
+        // Redis es de la Entrega 6: su evidencia siempre va con las de esa entrega.
+        const carpeta = nombre === "redis" ? "../../entrega-6/evidencias/matriz" : CARPETA;
+        const evidencia = new Evidencia(`${carpeta}/${nombre}.txt`, `Matriz de fallos · ${TITULOS[nombre]}`);
 
         try {
             await esperarEntornoSano();

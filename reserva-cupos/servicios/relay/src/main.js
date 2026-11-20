@@ -1,27 +1,37 @@
+const { secuenciarConfirmados } = require("./secuenciar");
+const fs = require("node:fs");
+const https = require("node:https");
 const mysql = require("mysql2/promise");
 const amqp = require("amqplib");
+
 const { crearValidadorDeMensajes } = require("../../../compartido/src/contrato");
 const { opcionesMysql, conexionRabbit } = require("../../../compartido/src/tls");
-const { COMANDOS, ESQUEMAS, comandoDesdeCambio, entregaDesdeCambio } = require("./mensajes");
+const { crearMetricas } = require("../../../compartido/src/metricas");
+const {
+    COMANDOS,
+    ESQUEMAS,
+    comandoDesdeCambio,
+    entregaDesdeCambio
+} = require("./mensajes");
+const { configurarParticiones } = require("../../../compartido/src/particiones");
 
-// Único proceso que lee el outbox (tabla cambios) y publica.
-// Cumple tres funciones: secuenciador del feed, publicador (comandos y
-// entregas de webhook) y barredor de reservas pendientes. Cada mensaje se
-// valida contra el contrato de mensajería antes de publicarse.
-
+// Único proceso que secuencia el feed y publica el outbox.
 const EXCHANGE = "reservas.comandos";
 const EXCHANGE_WEBHOOKS = "webhooks.eventos";
-const COLAS_COMANDOS = ["reservas.comandos.0"];
+const { colas: COLAS_COMANDOS } = configurarParticiones();
+
 const INTERVALO_MS = Number(process.env.RELAY_INTERVALO_MS || 500);
 const BARRIDO_MS = Number(process.env.RELAY_BARRIDO_MS || 30000);
 const ANTIGUEDAD_BARRIDO_S = 30;
 const LOTE = 200;
 
 const validar = crearValidadorDeMensajes();
-
-// Un mensaje que no cumple el contrato es un error de programación: no se
-// publica, queda sin marcar en el outbox y se informa una sola vez.
+const metricas = crearMetricas("relay");
 const informados = new Set();
+
+function contar(tipo, resultado, cantidad = 1) {
+    metricas.eventos.inc({ tipo, resultado }, cantidad);
+}
 
 function cumpleContrato(esquema, mensaje, cambioId) {
     try {
@@ -30,7 +40,11 @@ function cumpleContrato(esquema, mensaje, cambioId) {
     } catch (error) {
         if (!informados.has(cambioId)) {
             informados.add(cambioId);
-            console.error(`[relay] Cambio ${cambioId} no publicado: ${error.message}`);
+            contar("validacion", "error");
+
+            console.error(
+                `[relay] Cambio ${cambioId} no publicado: ${error.message}`
+            );
         }
 
         return false;
@@ -50,11 +64,12 @@ const pool = mysql.createPool({
 
 let canal = null;
 
-// El broker puede caer sin detener al secuenciador: el canal se
-// reconecta en segundo plano y el publicador espera mientras tanto.
+// Reconecta al broker sin detener el secuenciador.
 async function conectarBroker() {
     try {
-        const conexion = await amqp.connect(...conexionRabbit({ heartbeat: 10 }));
+        const conexion = await amqp.connect(
+            ...conexionRabbit({ heartbeat: 10 })
+        );
 
         conexion.on("error", error => {
             console.error("[relay] RabbitMQ:", error.message);
@@ -62,7 +77,9 @@ async function conectarBroker() {
 
         conexion.on("close", () => {
             canal = null;
-            console.error("[relay] Conexión con RabbitMQ cerrada; reconectando");
+            console.error(
+                "[relay] Conexión con RabbitMQ cerrada; reconectando"
+            );
             setTimeout(conectarBroker, 2000);
         });
 
@@ -80,55 +97,21 @@ async function conectarBroker() {
         canal = nuevo;
         console.log("[relay] Conectado a RabbitMQ");
     } catch (error) {
+        contar("conexion_broker", "error");
         console.error("[relay] RabbitMQ no disponible:", error.message);
         setTimeout(conectarBroker, 2000);
     }
 }
 
-// 1. Secuenciador: asigna números crecientes a los cambios confirmados
-// que todavía no tienen secuencia. Es la única instancia que lo hace y
-// lo hace en una sola transacción por lote, así la secuencia de la tabla
-// no tiene huecos y un lector nunca ve aparecer después una menor (el
-// índice único sobre secuencia rechaza una segunda instancia por error).
-// El feed de un tenant sí muestra saltos: solo incluye sus cambios y omite
-// los pedidos de cancelación, que son comandos.
+// Asigna secuencias a los cambios confirmados.
+// El relay secuenciador sigue siendo de instancia única.
 async function secuenciar() {
-    const conexion = await pool.getConnection();
-
-    try {
-        // READ COMMITTED: bloquea solo las filas que numera, sin bloqueos
-        // de intervalo que frenen los INSERT de la API y del worker.
-        await conexion.query("SET TRANSACTION ISOLATION LEVEL READ COMMITTED");
-        await conexion.beginTransaction();
-
-        const [[{ ultima }]] = await conexion.query(
-            "SELECT COALESCE(MAX(secuencia), 0) AS ultima FROM cambios"
-        );
-
-        const [resultado] = await conexion.query(
-            `UPDATE cambios c
-               JOIN (SELECT id, ROW_NUMBER() OVER (ORDER BY id) AS n
-                       FROM cambios
-                      WHERE secuencia IS NULL
-                      ORDER BY id
-                      LIMIT ?) pendientes ON pendientes.id = c.id
-                SET c.secuencia = ? + pendientes.n`,
-            [LOTE, Number(ultima)]
-        );
-
-        await conexion.commit();
-        return resultado.affectedRows;
-    } catch (error) {
-        await conexion.rollback().catch(() => {});
-        throw error;
-    } finally {
-        conexion.release();
-    }
+    const cantidad = await secuenciarConfirmados(pool, LOTE);
+    contar("cambio", "secuenciado", cantidad);
+    return cantidad;
 }
 
 function publicarComando(comando, messageId) {
-    // La routing key es la actividad: el exchange de hash consistente
-    // envía todos los comandos de una actividad a la misma partición.
     canal.publish(
         EXCHANGE,
         comando.actividad_id,
@@ -142,16 +125,15 @@ function publicarComando(comando, messageId) {
     );
 }
 
-// 2. Publicador: envía los comandos secuenciados y los marca como
-// publicados recién cuando RabbitMQ confirma. Si el proceso cae entre
-// publicar y marcar, los vuelve a publicar: al-menos-una-vez.
+// Publica comandos y los marca después del confirm de RabbitMQ.
 async function publicar() {
     if (!canal) return 0;
 
     const [filas] = await pool.query(
         `SELECT id, tenant_id, entidad_id, tipo, snapshot
            FROM cambios
-          WHERE publicado_comando = FALSE AND secuencia IS NOT NULL
+          WHERE publicado_comando = FALSE
+            AND secuencia IS NOT NULL
           ORDER BY id
           LIMIT ?`,
         [LOTE]
@@ -160,14 +142,26 @@ async function publicar() {
     for (const fila of filas) {
         if (!COMANDOS[fila.tipo] && !informados.has(fila.id)) {
             informados.add(fila.id);
-            console.error(`[relay] Cambio ${fila.id} de tipo ${fila.tipo} sin comando asociado`);
+
+            console.error(
+                `[relay] Cambio ${fila.id} de tipo ${fila.tipo} sin comando asociado`
+            );
         }
     }
 
     const publicables = filas
         .filter(fila => COMANDOS[fila.tipo])
-        .map(fila => ({ fila, comando: comandoDesdeCambio(fila) }))
-        .filter(({ fila, comando }) => cumpleContrato(ESQUEMAS[comando.comando], comando, fila.id));
+        .map(fila => ({
+            fila,
+            comando: comandoDesdeCambio(fila)
+        }))
+        .filter(({ fila, comando }) =>
+            cumpleContrato(
+                ESQUEMAS[comando.comando],
+                comando,
+                fila.id
+            )
+        );
 
     if (publicables.length === 0) return 0;
 
@@ -177,8 +171,10 @@ async function publicar() {
         publicarComando(comando, `cambio-${fila.id}`);
     }
 
-    // Rechaza si RabbitMQ no confirma alguno: quedan sin marcar.
     await enviado.waitForConfirms();
+
+    // Cuenta publicaciones confirmadas, no reservas decididas.
+    contar("comando", "publicado", publicables.length);
 
     await pool.query(
         "UPDATE cambios SET publicado_comando = TRUE WHERE id IN (?)",
@@ -188,25 +184,28 @@ async function publicar() {
     return publicables.length;
 }
 
-// Entregas de webhook: una por cada cambio que lo requiere (las decisiones
-// del worker sobre reservas). El relay no sabe qué tenants tienen URL
-// registrada: eso lo resuelve el notificador. Mismo esquema que los
-// comandos: se marcan recién cuando RabbitMQ confirma.
+// Publica las entregas que consumirá el notificador.
 async function publicarWebhooks() {
     if (!canal) return 0;
 
     const [filas] = await pool.query(
         `SELECT id, tenant_id, tipo, snapshot, secuencia, creado_en
            FROM cambios
-          WHERE publicado_webhook = FALSE AND secuencia IS NOT NULL
+          WHERE publicado_webhook = FALSE
+            AND secuencia IS NOT NULL
           ORDER BY id
           LIMIT ?`,
         [LOTE]
     );
 
     const publicables = filas
-        .map(fila => ({ fila, entrega: entregaDesdeCambio(fila) }))
-        .filter(({ fila, entrega }) => cumpleContrato("EntregaWebhook", entrega, fila.id));
+        .map(fila => ({
+            fila,
+            entrega: entregaDesdeCambio(fila)
+        }))
+        .filter(({ fila, entrega }) =>
+            cumpleContrato("EntregaWebhook", entrega, fila.id)
+        );
 
     if (publicables.length === 0) return 0;
 
@@ -228,6 +227,9 @@ async function publicarWebhooks() {
 
     await enviado.waitForConfirms();
 
+    // Publicado en RabbitMQ no significa entregado al receptor HTTP.
+    contar("webhook", "publicado", publicables.length);
+
     await pool.query(
         "UPDATE cambios SET publicado_webhook = TRUE WHERE id IN (?)",
         [publicables.map(({ fila }) => fila.id)]
@@ -236,14 +238,14 @@ async function publicarWebhooks() {
     return publicables.length;
 }
 
-// 3. Barredor: si las colas de comandos están vacías y quedan reservas
-// pendientes antiguas, su comando se perdió (por ejemplo, junto con el
-// volumen del broker). Se republica; el worker es idempotente.
+// Recupera comandos de reservas pendientes antiguas
+// cuando no hay mensajes esperando en las colas.
 async function barrer() {
     if (!canal) return 0;
 
     for (const cola of COLAS_COMANDOS) {
         const estado = await canal.checkQueue(cola);
+
         if (estado.messageCount > 0) return 0;
     }
 
@@ -260,6 +262,7 @@ async function barrer() {
     if (filas.length === 0) return 0;
 
     const enviado = canal;
+    let enviados = 0;
 
     for (const fila of filas) {
         const comando = {
@@ -269,12 +272,21 @@ async function barrer() {
             actividad_id: fila.actividad_id
         };
 
-        if (cumpleContrato("ComandoReservar", comando, `barrido-${fila.id}`)) {
+        if (
+            cumpleContrato(
+                "ComandoReservar",
+                comando,
+                `barrido-${fila.id}`
+            )
+        ) {
             publicarComando(comando, `barrido-${fila.id}`);
+            enviados++;
         }
     }
 
     await enviado.waitForConfirms();
+
+    contar("comando", "republicado", enviados);
 
     return filas.length;
 }
@@ -288,15 +300,23 @@ async function ciclo() {
         const webhooks = await publicarWebhooks();
 
         if (secuenciados || publicados || webhooks) {
-            console.log(`[relay] Secuenciados: ${secuenciados} · comandos publicados: ${publicados} · webhooks: ${webhooks}`);
+            console.log(
+                `[relay] Secuenciados: ${secuenciados}` +
+                ` · comandos publicados: ${publicados}` +
+                ` · webhooks: ${webhooks}`
+            );
         }
 
-        lleno = secuenciados === LOTE || publicados === LOTE || webhooks === LOTE;
+        lleno = secuenciados === LOTE
+            || publicados === LOTE
+            || webhooks === LOTE;
     } catch (error) {
-        // MySQL o RabbitMQ no disponibles: se reintenta en el próximo ciclo.
-        console.error("[relay] Ciclo fallido:", error.code || error.message);
+        contar("ciclo", "error");
+        console.error(
+            "[relay] Ciclo fallido:",
+            error.code || error.message
+        );
     } finally {
-        // Con un lote completo hay más trabajo: se sigue sin esperar.
         setTimeout(ciclo, lleno ? 0 : INTERVALO_MS);
     }
 }
@@ -306,14 +326,62 @@ async function cicloBarredor() {
         const republicados = await barrer();
 
         if (republicados) {
-            console.log(`[relay] Barredor: ${republicados} comandos republicados`);
+            console.log(
+                `[relay] Barredor: ${republicados} comandos republicados`
+            );
         }
     } catch (error) {
-        console.error("[relay] Barrido fallido:", error.code || error.message);
+        contar("barrido", "error");
+        console.error(
+            "[relay] Barrido fallido:",
+            error.code || error.message
+        );
     } finally {
         setTimeout(cicloBarredor, BARRIDO_MS);
     }
 }
+
+// Servidor de métricas HTTPS en la red interna de Docker.
+const servidorMetricas = https.createServer({
+    cert: fs.readFileSync(process.env.TLS_CERT),
+    key: fs.readFileSync(process.env.TLS_KEY),
+    minVersion: "TLSv1.2"
+}, async (req, res) => {
+    if (req.method !== "GET" || req.url !== "/metrics") {
+        res.writeHead(404);
+        res.end();
+        return;
+    }
+
+    try {
+        const contenido = await metricas.registro.metrics();
+
+        res.writeHead(200, {
+            "Content-Type": metricas.registro.contentType
+        });
+
+        res.end(contenido);
+    } catch (error) {
+        console.error(
+            "[relay] Error al exportar métricas:",
+            error.message
+        );
+
+        res.writeHead(500);
+        res.end();
+    }
+});
+
+servidorMetricas.on("error", error => {
+    console.error("[relay] Servidor de métricas:", error.message);
+    process.exit(1);
+});
+
+servidorMetricas.listen(9464, "0.0.0.0", () => {
+    console.log(
+        "[relay] Métricas disponibles en puerto interno 9464"
+    );
+});
 
 conectarBroker();
 
