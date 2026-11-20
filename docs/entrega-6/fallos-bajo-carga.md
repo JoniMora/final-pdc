@@ -31,6 +31,8 @@
 
 Durante esta prueba, y solo en ella, `docker-compose.fallos-e6.yml` le agrega a Traefik un reintento de transporte (2 intentos, 100 ms) en la ruta `POST /v1/actividades/{id}/reservas`. Es seguro porque esa operación exige `Idempotency-Key`; no se agrega a altas de actividades, tenants ni rotaciones, que no son idempotentes. El entorno normal no reintenta en el gateway.
 
+Si la API muere a mitad de una respuesta, Traefik puede devolver su propio `500` (cuerpo `Internal Server Error`, no un Problem Details de la API) en lugar de `502` o `504`. Pasó en el CI el 20/11/2026: el cliente solo reintentaba `502`, `503` y `504`, una solicitud se perdió y la prueba terminó con 489 rechazadas en vez de 490 (las invariantes se mantuvieron). Desde entonces el cliente reintenta cualquier `5xx` con la misma clave, como corresponde a una operación idempotente.
+
 Sin ese reintento, las solicitudes en curso en la API detenida llegarían al cliente como `502` o `504` y el cliente las reintentaría igual, con la misma clave: el resultado (10 confirmadas, ninguna duplicada) no cambia, pero el cliente vería más errores transitorios. Es lo que mide la [matriz de fallos de la Entrega 5](../entrega-5/evidencias/fallos/api.txt) con una API terminada con SIGKILL, sin ese reintento: 10 confirmadas, 290 rechazadas, cero duplicadas, con 27 reintentos del cliente.
 
 ## Otras fallas medidas

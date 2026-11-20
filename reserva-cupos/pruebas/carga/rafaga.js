@@ -89,14 +89,19 @@ export default function (datos) {
     let respuesta;
     if (__ENV.FALLOS && n === 0) console.log(`PDC_CARGA_INICIADA:${datos.actividadId}`);
     for (let intento = 0; ; intento++) {
-    respuesta = http.post(
-        `${API_URL}/v1/actividades/${datos.actividadId}/reservas`,
-        JSON.stringify({ participante: `alumno-${n}` }),
-        { ...opciones({ "Idempotency-Key": `rafaga-${datos.corrida}-${n}` }), timeout: '60s' }
-    );
-    if (![0, 429, 502, 503, 504].includes(respuesta.status) || intento >= REINTENTOS) break;
-    reintentos.add(1);
-    sleep(Math.min(2, 0.25 * (intento + 1)));
+        respuesta = http.post(
+            `${API_URL}/v1/actividades/${datos.actividadId}/reservas`,
+            JSON.stringify({ participante: `alumno-${n}` }),
+            { ...opciones({ "Idempotency-Key": `rafaga-${datos.corrida}-${n}` }), timeout: '60s' }
+        );
+        // Como un cliente correcto: ante un error de red, 429 o cualquier 5xx,
+        // reintenta con la misma Idempotency-Key (la admisión es idempotente).
+        // Incluye el 500: si una API muere a mitad de una respuesta, Traefik
+        // puede devolver su propio 500 en lugar de 502 o 504.
+        const transitorio = respuesta.status === 0 || respuesta.status === 429 || respuesta.status >= 500;
+        if (!transitorio || intento >= REINTENTOS) break;
+        reintentos.add(1);
+        sleep(Math.min(2, 0.25 * (intento + 1)));
     }
     admisionesPorEstado.add(1, {
         estado: String(respuesta.status)
