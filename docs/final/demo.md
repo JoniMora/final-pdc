@@ -75,6 +75,9 @@ Todas esas rutas están dentro de `reserva-cupos`. Seguir el mapa de la guía de
 
 ## 5. Escenario +1 en vivo
 
+Para hacerlo a mano, con Aula en pantalla, k6 y Grafana: [ensayo paso a paso](ensayo-paso-a-paso.md).
+Lo que sigue es la versión automatizada, útil para comprobar el entorno antes.
+
 Es la demostración que promete el plan (Entrega 0): una materia de 10 cupos, 500
 alumnos inscribiéndose a la vez y la base de Aula que se cae en plena ráfaga.
 
