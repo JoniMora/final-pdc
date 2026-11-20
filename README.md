@@ -8,7 +8,7 @@ Temática 7 — Plataforma de e-learning de alta concurrencia, generalizada a un
 | **Grupo N°** | 15 |
 | **Integrantes** | Jonathan Mora Colodrero · María Constanza Gigli |
 | **Repositorio** | https://github.com/JoniMora/final-pdc |
-| **Estado actual** | Entrega 5 — Seguridad y confiabilidad (`v5-seguridad`), verificada el 14/11/2026 |
+| **Estado actual** | Entrega 6 — Patrones y escalabilidad (`v6-escalabilidad`), verificada el 20/11/2026 |
 
 | Entrega | Contenido | Tag |
 |---|---|---|
@@ -18,6 +18,7 @@ Temática 7 — Plataforma de e-learning de alta concurrencia, generalizada a un
 | 3 | Comunicación: API v1 síncrona, outbox → relay → RabbitMQ → worker asíncrono y caso de concurrencia demostrado | `v3-comunicacion` |
 | 4 | Middleware: contratos OpenAPI y AsyncAPI verificados en CI, descubrimiento de servicios con Traefik, cancelación y webhooks firmados | `v4-middleware` |
 | 5 | Seguridad y confiabilidad: personas y roles en Aula, permisos por clave, administración de tenants, límite de tasa, TLS en todos los saltos, contingencia de Aula, matriz de fallos y failover medido | `v5-seguridad` |
+| 6 | Patrones y escalabilidad: API sin estado con Redis, comandos particionados por actividad, circuit breaker por tenant, admisión por lotes, Prometheus y Grafana, carga y fallos medidos con k6 | `v6-escalabilidad` |
 
 > **Revisión 1 (17/09/2026)** — persistencia primario-réplica con replicación semi-sincrónica: el nodo único de MySQL era un punto único de falla.
 > **Revisión 2 (22/09/2026)** — ampliación de alcance a pedido de la cátedra: API pública multi-tenant para cualquier dominio con cupo y continuidad operativa de los sistemas consumidores ante la caída de su propia base de datos.
@@ -26,24 +27,28 @@ Temática 7 — Plataforma de e-learning de alta concurrencia, generalizada a un
 ---
 
 
-## Entrega 6: preparación sobre la base corregida
+## Entrega 6: implementación actual
 
-Ver [estado de requerimientos y avances](docs/entrega-6/README.md).
-La integración local conserva el trabajo previo sin declarar E6 completa.
-E6 corresponde a patrones y escalabilidad (`v6-escalabilidad`); el cierre final
-es posterior (`v7-final`). No se publicaron estas versiones.
+La aplicación está en [`reserva-cupos`](reserva-cupos/README.md). Sobre la Entrega 5, esta entrega hace que el servicio escale horizontalmente y lo mide:
 
-## Entrega 5: implementación actual
+- **Patrones distribuidos con evidencia medida** — *circuit breaker* por tenant en el notificador, *cache-aside* de la autenticación, *token bucket* distribuido en Redis, *competing consumers* con colas particionadas por actividad (hash consistente) y admisión por lotes sobre el *transactional outbox*, junto con los de entregas anteriores.
+- **Escalado horizontal** — la API no guarda estado: el límite de tasa y la caché de permisos viven en Redis, así que 1, 2 o 4 instancias detrás de Traefik respetan el mismo límite. Los comandos se reparten en N particiones con un worker exclusivo cada una, sin perder el orden por actividad.
+- **Carga documentada** — k6 con escenarios caliente, multitenant y rampa, informes HTML con las series de Prometheus, curva con 1, 2 y 4 API repetida tres veces, y fallos parciales (una API y un worker detenidos) durante la ráfaga.
+- **Observabilidad** — Prometheus y un dashboard de Grafana provisionado, por HTTPS.
 
-La aplicación está en [`reserva-cupos`](reserva-cupos/README.md). Sobre la Entrega 4, esta entrega piensa qué pasa cuando algo es atacado o falla:
+- [Entrega 6: patrones, mediciones y evidencias](docs/entrega-6/README.md) y [documento de patrones](docs/entrega-6/patrones.md).
+- [Inicio local y pruebas](reserva-cupos/README.md).
+
+## Entrega 5
+
+Sobre la Entrega 4, la Entrega 5 pensó qué pasa cuando algo es atacado o falla:
 
 - **Autenticación y autorización** — en Aula, login de personas (scrypt con sal, sesión del lado del servidor, CSRF) con roles administrador y alumno; en el servicio, permisos por clave de API declarados en el contrato y aplicados desde él, administración de tenants con una clave de operador (alta, permisos, webhook, límite y rotación) y límite de tasa por tenant.
 - **Cifrado en tránsito en todos los saltos** — HTTPS del navegador a Aula, de Aula y los clientes a Traefik, de Traefik a cada instancia de la API y del notificador a los webhooks; AMQPS; MySQL con `require_secure_transport` y replicación con `SOURCE_SSL`; PostgreSQL que rechaza el texto plano. CA local y verificación de identidad en cada cliente. Traefik ya no monta el socket de Docker.
 - **Recuperación probada** — contingencia y reconciliación de Aula por el feed, y una matriz de fallos que detiene cada componente con carga en curso y verifica las invariantes, incluido el failover del primario con RTO y RPO medidos.
 - **Informe de amenazas** STRIDE por flujo, con la evidencia de cada mitigación y los riesgos que quedan.
 
-- [Certificación de la Entrega 5](docs/entrega-5/README.md), [informe de amenazas](docs/entrega-5/amenazas.md) y [evidencias](docs/entrega-5/evidencias/README.md).
-- [Inicio local y pruebas](reserva-cupos/README.md).
+[Certificación de la Entrega 5](docs/entrega-5/README.md), [informe de amenazas](docs/entrega-5/amenazas.md) y [evidencias](docs/entrega-5/evidencias/README.md). Tag: `v5-seguridad`.
 
 ## Entrega 4
 
@@ -126,22 +131,26 @@ Claves de 256 bits guardadas como hash SHA-256; `tenant_id` derivado siempre de 
 
 ![Diagrama de despliegue](docs/entrega-1/arquitectura.png)
 
-Un host con **diez contenedores en tres redes** de Docker Compose. Ocho forman el servicio; dos simulan un sistema consumidor independiente.
+Un host con **catorce contenedores** de Docker Compose (diecisiete con cuatro particiones de comandos). Doce forman el servicio y su observabilidad; dos simulan un sistema consumidor independiente. El diagrama es el de la Entrega 1; las filas marcadas se agregaron después.
 
 | Contenedor | Rol | Redes | Expone |
 |---|---|---|---|
-| `traefik` | Gateway y descubrimiento de servicios: encuentra las instancias de la API y balancea (desde la Entrega 4) | pública | Sí (HTTP) |
+| `traefik` | Gateway y descubrimiento de servicios: encuentra las instancias de la API y balancea (desde la Entrega 4) | pública | Sí (HTTPS) |
+| `socket-proxy` | Solo lecturas de la API de Docker para Traefik (Entrega 5) | docker | No |
 | `api` (Node.js) | API pública v1: autenticación, admisión, consultas, listado, cancelación y feed; valida contra el contrato | pública, interna | No (por Traefik) |
 | `relay` (Node.js) | Outbox: secuenciador del feed, publicador y barredor | interna | No |
-| `worker` (Node.js) | Comandos `reservar` y `cancelar`: asignación atómica de cupos | interna | No |
+| `worker` (Node.js) | Comandos `reservar` y `cancelar`: asignación atómica de cupos; uno por partición (Entrega 6) | interna | No |
 | `notificador` (Node.js) | Webhooks salientes firmados con reintentos escalonados | interna, pública | No |
 | `rabbitmq` | Comandos, notificaciones, colas de espera y DLQ | interna | No |
+| `redis` | Límite de tasa global y caché de autenticación de la API (Entrega 6) | interna | No |
+| `prometheus` | Métricas de todos los componentes (Entrega 6) | interna | Solo 127.0.0.1 |
+| `grafana` | Dashboard sobre Prometheus (Entrega 6) | interna | Solo 127.0.0.1 |
 | `mysql-primary` (MySQL 8 · InnoDB) | Persistencia: escrituras y lecturas; binlog + GTID | interna | No |
 | `mysql-replica` (MySQL 8) | Réplica semi-sincrónica en `super_read_only`; nodo de contingencia | interna | No |
 | `aula` (Node.js) | Cliente de referencia: plataforma de e-learning mínima | pública, tenant | Sí (web) |
 | `aula-db` (PostgreSQL) | Base propia del cliente de referencia | tenant | No |
 
-La red `publica` simula internet; la red `interna` contiene el broker y las bases del servicio; la red `tenant` es privada del cliente. **Ningún consumidor tiene ruta de red hacia la base del servicio, ni el servicio hacia la del consumidor**: la única interfaz es HTTP, en ambos sentidos. Que el cliente de referencia use PostgreSQL demuestra que el servicio no impone motor ni esquema. Todos los componentes escalan horizontalmente salvo el primario, único por definición, y el relay, instancia única por diseño.
+La red `publica` simula internet; la red `interna` contiene el broker y las bases del servicio; la red `tenant` es privada del cliente. **Ningún consumidor tiene ruta de red hacia la base del servicio, ni el servicio hacia la del consumidor**: la única interfaz es HTTP, en ambos sentidos. Que el cliente de referencia use PostgreSQL demuestra que el servicio no impone motor ni esquema. La API escala horizontalmente sin estado propio (Entrega 6); los workers, de a uno por partición. El primario es único por definición, y el relay y el notificador, instancias únicas por diseño.
 
 ## Stack
 
@@ -154,8 +163,11 @@ La red `publica` simula internet; la red `interna` contiene el broker y las base
 | Broker | RabbitMQ + plugin de exchange de hash consistente | Colas durables, `ack` manual, `prefetch`, TTL y *dead-lettering* nativos; particionado por clave |
 | Base del servicio | MySQL 8 (InnoDB), primario + réplica semi-sincrónica | Transacciones ACID, bloqueo de fila, `CHECK`, columnas generadas, privilegios por columna, replicación sin pérdida de lo confirmado |
 | Cliente de referencia | Node.js + PostgreSQL | Demuestra independencia de motor y de esquema |
+| Estado compartido de la API | Redis (TLS, scripts Lua) | Límite de tasa atómico y caché de permisos comunes a todas las instancias |
+| Circuit breaker | opossum | Circuito por tenant con estados y eventos medibles |
+| Observabilidad | prom-client · Prometheus · Grafana | Métricas de negocio y de infraestructura con un dashboard versionado en el repositorio |
 | Pruebas de carga | k6 | Escenarios concurrentes reproducibles y métricas de latencia |
-| Orquestación | Docker Compose | Diez contenedores y tres redes con un comando |
+| Orquestación | Docker Compose | Todo el entorno con un comando (`node scripts/sistema.js levantar`) |
 | Integración continua | GitHub Actions | Contratos, pruebas, consumidor contra el mock e integración en cada PR |
 
 ## Estructura del repositorio
@@ -164,14 +176,18 @@ La red `publica` simula internet; la red `interna` contiene el broker y las base
 final-pdc/
 ├── .github/                       # CI, publicación de los contratos, plantillas y CODEOWNERS (desde la Entrega 4)
 ├── reserva-cupos/                 # Aplicación (desde la Entrega 2)
-│   ├── docker-compose.yml         # Diez contenedores, tres redes y cuatro volúmenes (+ k6 a pedido)
+│   ├── docker-compose.yml         # Entorno completo con TLS (+ k6 a pedido)
+│   ├── docker-compose.particiones.yml  # Cuatro particiones de comandos (Entrega 6)
 │   ├── contrato/                  # openapi.yaml, asyncapi.yaml, CHANGELOG y excepciones de oasdiff
 │   ├── compartido/                # Validación contra los contratos, usada por los componentes
 │   ├── Infraestructura/
 │   │   ├── mysql/primary/         # Primario: binlog, GTID, esquema, usuarios y semisync
 │   │   ├── mysql/replica/         # Réplica semisíncrona en solo lectura
 │   │   ├── postgres/              # Base propia de Aula
-│   │   └── rabbitmq/              # Broker con exchange de hash consistente
+│   │   ├── rabbitmq/              # Broker con exchange de hash consistente
+│   │   ├── redis/                 # Límite y caché de la API, solo TLS (Entrega 6)
+│   │   ├── prometheus/ grafana/   # Recolección y dashboard provisionado (Entrega 6)
+│   │   └── tls/                   # Configuración TLS de Traefik y RabbitMQ (Entrega 5)
 │   ├── servicios/
 │   │   ├── api/                   # API pública v1, validada contra openapi.yaml
 │   │   ├── worker/                # Comandos reservar y cancelar
@@ -180,12 +196,16 @@ final-pdc/
 │   ├── clientes/
 │   │   └── aula/                  # Cliente de referencia: cliente derivado del contrato y receptor de webhooks
 │   └── pruebas/
-│       ├── carga/                 # k6: ráfaga sobre una actividad y duplicados simultáneos
-│       └── contrato/              # Schemathesis y oasdiff
+│       ├── carga/                 # k6: ráfaga, duplicados, límite y multitenant
+│       ├── contrato/              # Schemathesis y oasdiff
+│       ├── seguridad/ fallos/     # Suites de seguridad y matriz de fallos (Entrega 5)
+│       └── final/                 # Recorrido, carga, curva, particiones, circuito y fallos bajo carga (Entrega 6)
 └── docs/                          # Documentación por entrega
     ├── api/                       # Sitio de los contratos (GitHub Pages)
     ├── entrega-0/ … entrega-3/
-    └── entrega-4/                 # Certificación y evidencias de contratos y descubrimiento
+    ├── entrega-4/                 # Certificación y evidencias de contratos y descubrimiento
+    ├── entrega-5/                 # Certificación, informe de amenazas y evidencias de seguridad
+    └── entrega-6/                 # Patrones, mediciones y evidencias de escalabilidad
 ```
 
 > **Nota:** la estructura objetivo, con los módulos compartidos y las pruebas de fallos, se describe en la vista de desarrollo de la [Entrega 1](docs/entrega-1/informe.md); esas carpetas se incorporan en las entregas siguientes.
@@ -204,6 +224,8 @@ final-pdc/
 - [`docs/entrega-3/evidencias/`](docs/entrega-3/evidencias/README.md) — salida de las pruebas de comunicación y concurrencia.
 - [`docs/entrega-4/README.md`](docs/entrega-4/README.md) — certificación de la Entrega 4: mapa de contratos, descubrimiento de servicios y verificación del desacople.
 - [`docs/entrega-4/evidencias/`](docs/entrega-4/evidencias/README.md) — salida de las verificaciones de contratos, descubrimiento, cancelación y webhooks.
+- [`docs/entrega-5/README.md`](docs/entrega-5/README.md) — certificación de la Entrega 5, [informe de amenazas](docs/entrega-5/amenazas.md) y [evidencias](docs/entrega-5/evidencias/README.md) de seguridad, cifrado y fallos.
+- [`docs/entrega-6/README.md`](docs/entrega-6/README.md) — Entrega 6: [patrones](docs/entrega-6/patrones.md), mediciones de carga y escalado, y [evidencias](docs/entrega-6/evidencias/README.md).
 - [`reserva-cupos/contrato/`](reserva-cupos/contrato/) — contratos OpenAPI 3.1 (API v1 y webhooks) y AsyncAPI 3.0 (mensajería), publicados en [GitHub Pages](https://jonimora.github.io/final-pdc/).
 
 ## Escenario de validación
@@ -227,9 +249,9 @@ Criterio de aceptación: **exactamente 10 confirmadas, 0 duplicadas, 0 cupos neg
 
 ## Alcance y límites declarados
 
-**Extensiones, en orden de recorte si el calendario lo exige:** particionado por actividad · límite de tasa por tenant (implementado en la Entrega 5) · reintentos escalonados de webhooks (implementados en la Entrega 4) · webhooks (el tenant sondearía el feed). El núcleo que prueba las garantías no se recorta.
+**Extensiones, en orden de recorte si el calendario lo exige:** particionado por actividad (implementado en la Entrega 6) · límite de tasa por tenant (implementado en la Entrega 5, global desde la Entrega 6) · reintentos escalonados de webhooks (implementados en la Entrega 4) · webhooks (el tenant sondearía el feed). El núcleo que prueba las garantías no se recorta.
 
-**Límites:** relay de instancia única (su caída demora, no pierde) · failover por script, a pedido (sin detección automática) · degradación a replicación asíncrona si vence el timeout de la réplica · límite de tasa por instancia de la API · webhooks al-menos-una-vez, el receptor deduplica · `metadata` opaca de hasta 16 KB, sin búsquedas por su contenido · un único host.
+**Límites:** relay de instancia única (su caída demora, no pierde) · failover por script, a pedido (sin detección automática) · degradación a replicación asíncrona si vence el timeout de la réplica · Redis de instancia única (si cae, la API responde `503`) · webhooks al-menos-una-vez, el receptor deduplica · `metadata` opaca de hasta 16 KB, sin búsquedas por su contenido · un único host.
 
 **Fuera de alcance:** alojar, replicar o respaldar bases de datos de los tenants · alta de tenants autoservicio (la hace el operador con la API de administración) · que el servicio conozca a los usuarios finales del tenant (los autentica el tenant; Aula lo hace desde la Revisión 3) · listas de espera · modificación de la capacidad de una actividad · pagos · certificados de una autoridad pública y TLS mutuo · cifrado en reposo.
 

@@ -1,135 +1,56 @@
 # Escenarios de carga e informe — #49
 
-Estado: caliente, multitenant y rampa aprobados en Docker el 17/11/2026.
-Cada escenario conserva k6, JSON y un reporte HTML con series reales de
-Prometheus. Las capturas generales y los intervalos por escenario se enlazan
-en evidencias/README.md. El CI completo de ec1cecf aprobo.
+Tres escenarios de k6 contra el entorno completo (TLS, Redis, cuatro particiones), una curva de admisiones con 1, 2 y 4 API repetida tres veces, y fallos parciales durante la ráfaga ([fallos bajo carga](fallos-bajo-carga.md)). Todo se midió el 20/11/2026, en una notebook con macOS y Docker Desktop, sobre el código de esta entrega.
 
-Reportes: [caliente](evidencias/carga-caliente/informe.html),
-[multitenant](evidencias/carga-multitenant/informe.html) y
-[rampa](evidencias/carga-rampa/informe.html). Los JSON `resultado.json` de
-esas carpetas registran `aprobada: true`. Las corridas fallidas anteriores
-siguen siendo antecedentes, no se reclasifican como aprobadas.
+## Escenarios
 
-## Mediciones reales ya disponibles
+`node scripts/verificar-e6.js carga` corre los tres en orden. Cada uno crea sus tenants (límite 1000/s, para medir el sistema y no el límite) con un receptor de webhooks HTTPS de prueba que verifica la firma, espera a que se decidan las reservas y se entreguen los webhooks, y deja en `evidencias/carga-<escenario>/` la salida de k6, su resumen en JSON, el resultado y un informe HTML con las series de Prometheus.
 
-Antes de incorporar Redis, la escritura en bloque de la API permitio
-admitir 500 reservas sin errores, conservando 10 confirmadas, 490 rechazadas
-y cero pendientes, con N=1 y N=4. La idempotencia concurrente tambien paso.
-Con ocho actividades, N=1 midio 4,72 decisiones/s y N=4 6,74: mejora observada
-1,43x en una corrida de cada configuracion. El p95 cliente empeoro de
-2.989 a 5.218 ms en ese escenario: throughput y latencia no son lo mismo.
+| Escenario | Carga | Resultado | p95 de admisión (k6) | p95 de la demora total del webhook | Informe |
+|---|---|---|---:|---:|---|
+| Caliente | 500 reservas simultáneas sobre una actividad de 10 cupos | 500 de 500 con `202`; **10 confirmadas, 490 rechazadas, 0 pendientes, 0 cupos**; decididas 10,5 s después de la última admisión; 1004 de 1004 checks | 5,42 s | 1,7 s | [HTML](evidencias/carga-caliente/informe.html) · [k6](evidencias/carga-caliente/k6.txt) |
+| Multitenant | 4 tenants con 2 actividades cada uno, 400 reservas, 80 usuarios virtuales | 400 de 400 con `202`; **80 confirmadas y 320 rechazadas** (10 y 40 por actividad); 400 webhooks entregados a sus tenants | 1,94 s | 1,9 s | [HTML](evidencias/carga-multitenant/informe.html) · [k6](evidencias/carga-multitenant/k6.txt) |
+| Rampa | 0 → 5 → 10 → 20 → 40 → 80 → 0 solicitudes/s, etapas de 5 s | 684 de 684 con `202`; **80 confirmadas y 604 rechazadas**; 684 webhooks entregados | 2,58 s | 2,5 s | [HTML](evidencias/carga-rampa/informe.html) · [k6](evidencias/carga-rampa/k6.txt) |
 
-Ver [detalle y limites de la comparacion](particionado.md). Los datos de esas
-ejecuciones son anteriores a Redis; no certifican el rendimiento del codigo
-nuevo. No se comparan corridas de CI y de la notebook como si fueran el mismo
-entorno, ni corridas con versiones diferentes de la API.
+En los tres: ningún cupo negativo, ningún participante con dos reservas y ninguna reserva pendiente al final.
 
-## Comandos reproducibles
+**Cómo leer los números.**
 
-Con el entorno actualizado ya levantado:
+- La latencia de admisión es de un sistema que espera la réplica en cada commit: incluye la conexión TLS de cada usuario virtual (en el caliente, 500 apretones de manos TLS a la vez: p95 de 1,5 s solo en eso) y la espera de su lote.
+- La demora del webhook (`pdc_webhook_demora_segundos`) va desde que ocurrió la decisión hasta que el receptor la aceptó: cola, worker, outbox, relay y notificador.
+- Las series de Prometheus usan ventanas de un minuto, así que sus picos están suavizados respecto de k6.
+- La tasa general de k6 incluye la preparación (crear tenants y actividades): no se usa como tasa de admisión.
 
-```powershell
-node reserva-cupos/pruebas/final/carga.js caliente
-node reserva-cupos/pruebas/final/carga.js multitenant
-node reserva-cupos/pruebas/final/carga.js rampa
+## Curva con 1, 2 y 4 API
+
+`node pruebas/final/curva-admisiones.js`: con cuatro particiones constantes, 100 reservas por corrida sobre una actividad de 10 cupos (64 conexiones, autenticación calentada, sin reintentos), tres corridas por configuración en orden rotado (1-2-4, 4-1-2, 2-4-1). Además de las admisiones por segundo, cuenta en cada API los commits de admisión (`pdc_admision_lote_tamano`). Todas las corridas: 100 de 100 con `202`, 10 confirmadas, 90 rechazadas y 0 cupos.
+
+| API | Admisiones/s (media ± desvío) | p95 del cliente | Commits para 100 admisiones | Admisiones por commit |
+|---:|---:|---:|---:|---:|
+| 1 | 64,6 ± 21,4 | 1624 ± 610 ms | 10,0 ± 3,0 | 10,7 ± 3,4 |
+| 2 | 68,0 ± 24,8 | 1635 ± 740 ms | 14,0 ± 1,7 | 7,2 ± 0,8 |
+| 4 | 57,2 ± 15,3 | 1787 ± 564 ms | 27,3 ± 3,8 | 3,7 ± 0,6 |
+
+[Gráficos](evidencias/curva-admisiones/informe.html) · [datos por corrida](evidencias/curva-admisiones/resultado.json) · [panel de Grafana](evidencias/22-admision-y-lotes.png)
+
+### Por qué más API no admiten más
+
+Cada admisión es un commit que espera la confirmación de la réplica semisincrónica: ese commit es el recurso escaso, y es del primario, no de la API. La admisión por lotes lo amortiza, pero cada API arma sus propios lotes: con la misma carga repartida entre cuatro instancias, cada una junta menos solicitudes por lote, y el primario hace casi el triple de commits (27 contra 10) para las mismas 100 reservas. Por eso las admisiones por segundo no crecen con las instancias: la dispersión entre corridas (±15 a ±25) es mayor que las diferencias entre configuraciones.
+
+Escalar la API horizontalmente sí sirve para lo que no escribe: las [lecturas autenticadas](redis.md#evidencia) casi se triplican de 1 a 2 instancias. Para que la admisión escale haría falta repartir el commit (varios primarios por grupo de tenants) o relajar la durabilidad de la admisión; las dos cambian garantías y quedan fuera de esta entrega.
+
+## Particiones
+
+La comparación de 1 y 4 particiones (decisiones por segundo y orden por actividad) está en [particionado.md](particionado.md).
+
+## Reproducir
+
+Con el entorno de cuatro particiones (`node scripts/verificar-e6.js levantar`):
+
+```shell
+node scripts/verificar-e6.js carga          # caliente, multitenant y rampa
+node pruebas/final/carga.js caliente        # o uno solo
+node pruebas/final/curva-admisiones.js
 ```
 
-O los tres en secuencia:
-
-```powershell
-node reserva-cupos/scripts/verificar-e6.js carga
-```
-
-- **Caliente:** 500 solicitudes concurrentes para 10 cupos; exige todas las
-  admisiones correctas y el resultado 10 / 490 / 0.
-- **Multitenant:** cuatro tenants, dos actividades por tenant, 400
-  solicitudes con 80 usuarios virtuales. Exige 202 en cada admision y que
-  no haya cupos negativos ni decisiones pendientes al final.
-- **Rampa:** tasas 0 -> 5 -> 10 -> 20 -> 40 -> 80 -> 0 solicitudes/s,
-  con etapas de 5 s. Mide la aparicion de 429/5xx, backlog y latencia.
-  Es una prueba de saturacion: esos rechazos se registran, no se presentan
-  como admisiones exitosas. No se exige ausencia de sobrecarga; se exige
-  coherencia del protocolo y conservacion de cupos.
-
-Cada runner crea tenants propios y un receptor HTTPS firmado de prueba
-para medir demora real de webhooks. Espera a que se entreguen los webhooks
-de las reservas decididas y restaura el notificador al terminar.
-
-## Reportes
-
-Cada escenario escribe en `evidencias/carga-<escenario>/`:
-
-- `k6.txt`: salida real y errores, sin claves.
-- `resumen.json`: metricas de k6; excluye `setup_data` y `options.env`,
-  porque pueden contener credenciales.
-- `informe.html`: tabla de metricas y graficos generados desde series reales
-  de Prometheus; no usa servicios externos ni inventa muestras.
-- `resultado.json`: estado, reservas, series y cualquier error.
-
-Se grafican admisiones/s, p95 de admision, mensajes por cola y p95 de demora
-del webhook. Si faltan muestras, el runner lo informa como pendiente y
-falla la verificacion del escenario. Los paneles equivalentes estan en
-Grafana; todavia deben guardarse capturas de las nuevas corridas.
-
-La tasa general de k6 incluye setup y teardown. No se usa ese valor como
-throughput de admision. El histograma `admision_duracion_ms` mide el intento
-HTTP; `pdc_webhook_demora_segundos` mide hasta la entrega efectiva. La demora
-del webhook incluye la cola y sus reintentos y no debe confundirse con la
-duracion del intento HTTP.
-
-## Limite del primario
-
-El issue #49 referencia aproximadamente 110-120 commits/s medidos en E3.
-Ese dato es historico, no un resultado de la notebook actual. En los
-diagnosticos actuales se observaron esperas `waiting for handler commit` y
-`Waiting for semi-sync ACK from replica`. Agregar conexiones no resolvio
-la saturacion. La escritura masiva reduce consultas y commits por admision,
-pero todos los workers siguen compartiendo el primario y su almacenamiento.
-Escalar APIs o colas no elimina ese limite y no permite prometer crecimiento
-lineal. Las nuevas curvas deben analizarse cuando terminen las corridas.
-
-## Plazo de drenaje de la rafaga
-
-La prueba admite 500 solicitudes concurrentes y exige al finalizar 10 confirmadas,
-490 rechazadas, cero pendientes y cero cupos disponibles. Espera como maximo
-180 segundos despues de las admisiones para el procesamiento asincrono. Este
-plazo funcional no es un objetivo de rendimiento: `espera_decisiones_ms` conserva
-el tiempo real y los reportes conservan la latencia de admision.
-
-La corrida del 17/11/2026 a las 13:07 UTC admitio las 500 solicitudes sin errores
-HTTP, pero alcanzo el antiguo limite de 120 segundos con 35 pendientes. Esa
-corrida sigue siendo fallida; el cambio de plazo requiere una nueva ejecucion.
-
-El cliente de admision espera hasta 60 segundos por respuesta. Este timeout
-no es un SLO ni sustituye analizar el p95. En la corrida de las 13:18 UTC,
-las 500 reservas terminaron en 10 confirmadas y 490 rechazadas, pero varias
-respuestas excedieron el anterior timeout de 20 segundos. Esa corrida tambien
-se conserva como fallida: persistir la reserva no acredita haber respondido
-HTTP 202 al cliente. La nueva corrida sigue exigiendo 500 respuestas 202.
-
-
-## Curva repetida de admisiones POST
-
-El 17/11/2026 aprobaron nueve corridas: tres con cada configuracion de 1, 2
-y 4 APIs, con cuatro workers constantes y orden de configuraciones rotado.
-Cada corrida contiene 100 solicitudes sobre una actividad de 10 cupos,
-64 conexiones maximas, autenticacion calentada y sin reintentos. Todas
-respondieron 202 y terminaron con 10 confirmadas, 90 rechazadas y cero cupos.
-Esta curva no reemplaza la rafaga separada de 500 solicitudes.
-
-| APIs | Admisiones/s: media +/- desvio muestral | p95 cliente ms: media +/- desvio muestral |
-|---|---|---|
-| 1 | 62.93 +/- 32.79 | 1816 +/- 730 |
-| 2 | 69.63 +/- 34.38 | 1546 +/- 987 |
-| 4 | 36.96 +/- 12.91 | 2892 +/- 1226 |
-
-La dispersion es alta y no hay crecimiento sostenido al agregar APIs. No
-se atribuye causalidad a un componente sin medirlo. Todas las APIs comparten
-MySQL, Redis y almacenamiento; sumar instancias no elimina esos recursos
-compartidos. El limite semisincrono historico de E3 no es una medicion de
-esta corrida. El p95 incluye espera del cliente por conexion y excluye
-consultas de drenaje; la media de tres p95 no es el percentil combinado.
-
-[Datos por corrida](evidencias/curva-admisiones/resultado.json) y
-[graficos de media y desvio](evidencias/curva-admisiones/informe.html).
+No correr dos a la vez: todos miden sobre el mismo primario. El job *Escalabilidad* del CI corre los tres escenarios en cada PR, con los mismos criterios.

@@ -1,6 +1,6 @@
-> Borrador del cierre final. La implementación de E5 cambió y E6 sigue pendiente.
-> Para ejecutar el entorno usar el README de la aplicación; las cifras y explicaciones
-> de esta guía deben actualizarse tras repetir las pruebas sobre la base corregida.
+> Borrador del cierre final (issue #55). Se completa en la integración final
+> (`v7-final`); las cifras de carga y escalado vigentes son las de la
+> [Entrega 6](../entrega-6/README.md).
 
 # Guía de defensa: qué decir y qué mostrar del código
 
@@ -26,8 +26,10 @@ PostgreSQL está caído y reconstruir después esa proyección”.
 - E3: recorrido real de actividades y reservas, outbox, mensajería y concurrencia.
 - E4: contratos, descubrimiento con Traefik, cancelación y webhooks.
 - E5: autenticación de personas, autorización, TLS y recuperación de Aula.
-- E6: integración final, recorrido completo, carga y escalado; corrección del pool
-  de salud y documentación de la demo y defensa.
+- E6: patrones y escalabilidad: Redis para el límite y la caché de autenticación,
+  particiones por actividad, circuit breaker por tenant, admisión por lotes,
+  Prometheus y Grafana, y carga y fallos medidos con k6.
+- Final: integración, demo ensayada y defensa (esta guía).
 
 ## Mapa del código para abrir en IntelliJ
 
@@ -42,7 +44,7 @@ cambiar al editar.
 | `Infraestructura/mysql/primary/init/01-esquema.sql` | Tablas tenants, actividades, reservas y cambios; restricciones que refuerzan la consistencia. |
 | `Infraestructura/mysql/primary/init/02-usuarios.sql` | Privilegios por componente. La API no decide el descuento de cupos. |
 | `Infraestructura/mysql/primary/primary.cnf` y `mysql/replica/replica.cnf` | Identidades, binlog/GTID y configuración de replicación. |
-| `Infraestructura/mysql/replica/activar-tls.sql` | Activa TLS y verificación del certificado del origen en el canal de replicación. |
+| `Infraestructura/mysql/replica/configurar-replica.sql` | Configura el canal de replicación con TLS y verificación del certificado del origen (`SOURCE_SSL`). |
 | `contrato/openapi.yaml` | Solicitudes, respuestas, estados, errores y seguridad HTTP. Es el contrato, no el código que ejecuta la reserva. |
 | `contrato/asyncapi.yaml` | Estructura de los mensajes entre componentes. |
 | `servicios/api/src/server.js` | Express, validación del contrato, errores y endpoint de salud. Buscar `poolSalud` y `/health`. |
@@ -61,9 +63,9 @@ cambiar al editar.
 | `clientes/aula/src/recuperacion.js` | `aplicarPagina` y `sincronizar`: cambios y cursor de feed en una misma transacción local. |
 | `clientes/aula/public/index.html` | Interfaz que llama al backend. Ocultar un botón no reemplaza autorización en el servidor. |
 | `scripts/preparar-seguridad.js` | Genera CA local, certificados y usuarios con contraseñas derivadas. Los archivos secretos quedan fuera de Git. |
-| `scripts/sistema.js` | Preparación, arranque seguro, migración y pruebas. E6 reutiliza este entorno. |
+| `scripts/sistema.js` | Preparación, arranque seguro, tenants y pruebas. `scripts/verificar-e6.js` levanta las cuatro particiones de E6. |
 | `pruebas/final/recorrido.js` | Comprueba el caso completo con HTTPS, roles, confirmación, rechazo, cancelación y reasignación. |
-| `pruebas/final/carga-escalado.js` | Crea tenant de ensayo, ejecuta dos escenarios k6, comprueba instancias y restaura el escalado inicial en finally. |
+| `pruebas/final/carga.js` y `curva-admisiones.js` | Escenarios k6 caliente, multitenant y rampa con informes; curva de admisiones con 1, 2 y 4 API. |
 | `pruebas/carga/rafaga.js` | Genera 500 solicitudes para diez cupos y verifica resultados finales; distingue errores HTTP de respuestas válidas. |
 | `pruebas/seguridad/aula.js` | Prueba permisos, TLS y caída/recuperación de PostgreSQL con componentes reales. |
 | `../.github/workflows/ci.yml` | Ejecuta contratos, módulos, consumidor, integración y entorno seguro; el check final exige éxito de todos los trabajos. |
@@ -98,7 +100,7 @@ tratarse como secreto de desarrollo.
 `login` verifica las credenciales, limita intentos por IP y genera un token
 aleatorio. La cookie es HttpOnly, Secure y SameSite Strict. La sesión se guarda
 en un Map del proceso usando un hash del token, con vencimiento. No usamos JWT.
-El límite cuenta intentos de login, incluidos los exitosos; no es rate limiting
+El límite cuenta solo los intentos fallidos de login por IP; no es rate limiting
 general de todos los endpoints.
 
 `autenticar` recupera la sesión y vuelve a comprobar que el usuario siga activo.
@@ -129,10 +131,10 @@ posterior no autoriza saltear cambios anteriores que faltan en la proyección.
 
 “Con carga, el health check esperaba conexiones en el mismo pool que el negocio.
 Eso podía hacer que Docker o Traefik consideraran no disponible una instancia
-ocupada. Creamos un pool de salud independiente, de una conexión, sin cola de espera
-y con tiempos limitados. Conservamos TLS. Después pasaron los dos escenarios”.
+ocupada. Creamos un pool de salud independiente, de una conexión y con tiempos
+limitados, y los chequeos simultáneos comparten la misma consulta. Conservamos TLS”.
 
-Mostrar `poolSalud` en `server.js`. El endpoint informa el estado de MySQL en el
+Mostrar `poolSalud` y `estadoMysql` en `server.js`. El endpoint informa el estado de MySQL en el
 cuerpo; HTTP 200 significa que respondió el proceso, no que una reserva esté confirmada.
 
 “También corregimos el diagnóstico de k6: antes de leer `datos` comprobamos HTTP
@@ -141,16 +143,10 @@ una lista vacía ni se oculta detrás de un error de parseo”.
 
 ## Resultados que sí podés afirmar
 
-- Recorrido final: ocho verificaciones aprobadas.
-- Seguridad y recuperación: veinte verificaciones aprobadas.
-- Carga: cada escenario tuvo 500 solicitudes, diez confirmadas, 490 rechazadas,
-  cero pendientes y cero cupos disponibles; 1004 comprobaciones aprobadas.
-- Configuraciones: una API/un worker y tres API/dos workers; se observaron las tres
-  API detrás del gateway y se restauró la configuración inicial.
-
-No afirmar que escalar siempre acelera todo. Son dos ejecuciones locales y las
-métricas HTTP incluyen consultas de seguimiento, no solo admisiones. No garantizan
-rendimiento de producción ni orden estricto entre participantes.
+Las cifras de carga, escalado y fallos bajo carga, con sus límites, están en la
+[Entrega 6](../entrega-6/README.md). Se actualizan en la integración final si se
+vuelven a medir. No afirmar que escalar siempre acelera todo: el límite es el
+commit semisincrónico del primario.
 
 ## Preguntas probables y respuestas cortas
 
@@ -190,10 +186,12 @@ RPO cero ante cualquier falla. Una réplica tampoco reemplaza backups.
 secuenciador requiere coordinación adicional; esta versión no lo implementa.
 
 **¿Qué pasa al reiniciar Aula?** Las sesiones en memoria se pierden y hay que volver
-a iniciar sesión. No se implementó almacenamiento distribuido de sesiones.
+a iniciar sesión. Las sesiones no pasaron a Redis: Aula es una sola instancia.
 
-**¿Cuántas particiones hay al escalar workers?** En la prueba comparten una cola de
-comandos. Dos workers no significan dos particiones ni orden global estricto.
+**¿Cuántas particiones hay al escalar workers?** Una por worker: con
+`docker-compose.particiones.yml` son cuatro colas en el exchange de hash consistente y
+cada worker consume la suya como consumidor exclusivo. Se conserva el orden por
+actividad, no un orden global estricto.
 
 **¿Qué demuestra el test de caída?** Continuidad de las operaciones ensayadas con
 PostgreSQL detenido y reconstrucción posterior desde el feed. No demuestra caída

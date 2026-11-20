@@ -1,100 +1,53 @@
-# Particionado por actividad — issue #46
+# Comandos particionados por actividad — #46
 
-Rama: `entrega-6-final`. Estado: criterios comprobados localmente; pendiente
-de CI y revision del PR. Este informe no declara terminada toda la entrega 6.
+**Problema.** Con una sola cola de comandos, todas las actividades esperan detrás de la más demandada; y varios workers sobre la misma cola reparten los comandos de una actividad entre sí, sin orden.
 
-## Implementacion
+**Patrón.** *Competing consumers* con particiones por clave: N colas detrás de un exchange de hash consistente (`x-consistent-hash`) cuya clave de enrutamiento es el `actividad_id`. Cada actividad cae siempre en la misma partición y cada partición tiene un único worker, así que las actividades se procesan en paralelo y cada una conserva su orden.
 
-- `compartido/src/particiones.js` valida cantidad e indice de particion.
-- El relay declara N colas `reservas.comandos.0` a `N-1`, enlazadas con peso
-  uno al exchange de hash consistente `reservas.comandos`.
-- La clave de enrutamiento es `actividad_id`: con topologia estable, todos
-  los comandos de una actividad van a la misma cola.
-- Cada worker consume su `WORKER_PARTICION`, con prefetch uno y confirmacion
-  despues del commit. El barrido del relay revisa las N colas.
-- `docker-compose.particiones.yml` configura cuatro workers separados.
-  El Compose base configura uno. No se usa `--scale worker=4`.
-- El secuenciador selecciona primero IDs de cambios confirmados y actualiza
-  ese lote, sin el antiguo UPDATE con seleccion de pendientes incorporada.
-- La API admite lotes de hasta 50 reservas mediante dos INSERT masivos en
-  una transaccion: reservas y outbox. Solo responde despues del commit. Ante
-  un lote fallido vuelve al procesamiento individual para aislar errores.
+## Implementación
 
-## Resultados de las ejecuciones
+- `compartido/src/particiones.js` valida `COMANDOS_PARTICIONES` (1 a 32) y `WORKER_PARTICION`, y nombra las colas `reservas.comandos.0` a `N-1`.
+- `servicios/relay/src/configurar-colas.js` declara las N colas y las enlaza al exchange con el mismo peso. Si encuentra colas de una configuración anterior con más particiones (por ejemplo, al bajar de 4 a 1), las desenlaza y reenvía sus comandos pendientes al exchange, que los manda a la partición que ahora les corresponde. Corre antes de que el relay publique, así que esos comandos quedan delante de los nuevos de su actividad.
+- `servicios/worker/src/main.js` consume su partición como **consumidor exclusivo** (`exclusive: true`): un segundo worker sobre la misma cola es rechazado. `prefetch(1)` y `ack` después del commit.
+- El relay barre las N colas para republicar pendientes.
+- `docker-compose.particiones.yml` levanta cuatro particiones (`worker`, `worker-p1`, `worker-p2` y `worker-p3`). El Compose base usa una.
+- El contrato AsyncAPI 1.1.0 describe las N particiones y el consumidor exclusivo.
 
-### Una actividad, 500 solicitudes y 10 cupos
+## N=1 frente a N=4
 
-| Particiones | Admisiones 202 | Confirmadas | Rechazadas | Pendientes | Cupos | p95 admision |
-|---|---:|---:|---:|---:|---:|---:|
-| 1 | 500 | 10 | 490 | 0 | 0 | 7,43 s |
-| 4 | 500 | 10 | 490 | 0 | 0 | 3,96 s |
+`node pruebas/final/particiones.js <N>`: 8 actividades de 10 cupos, 40 reservas por actividad (320 en total), 64 conexiones. Antes de cargar, verifica los enlaces (exactamente N, todos con peso 1) y que cada partición tenga un solo consumidor. Mide desde la primera admisión hasta que las 320 reservas están decididas. Las dos corridas usan el mismo código, el mismo equipo y la misma sesión.
 
-Ambas ejecuciones de k6 terminaron con codigo cero y todos los checks
-aprobados. Evidencias:
+| Particiones | Tiempo hasta decidir las 320 | Decisiones/s | p95 de admisión del cliente | Resultado |
+|---:|---:|---:|---:|---|
+| 1 | 11,15 s | 28,69 | 4744 ms | 10 confirmadas y 30 rechazadas en cada actividad |
+| 4 | 9,70 s | 32,98 | 4757 ms | 10 confirmadas y 30 rechazadas en cada actividad |
 
-- [N=1](evidencias/diagnostico-2026-11-17T04-07-12-393Z/k6.txt).
-- [N=4](evidencias/diagnostico-2026-11-17T03-55-55-916Z/k6.txt).
-- [Idempotencia concurrente](evidencias/diagnostico-2026-11-17T03-58-42-009Z/k6.txt):
-  misma clave, una admision y 19 repeticiones; mismo participante con claves
-  distintas, una admision y 19 conflictos. Exactamente dos reservas.
+Con cuatro particiones, las 320 reservas se deciden en 9,7 s contra 11,2 s con una: 33 contra 29 decisiones por segundo (1,15 veces). La mejora es chica porque la mitad del tiempo es la admisión, que dura lo mismo en las dos (4,9 y 4,8 s) porque la limita el commit del primario. Después de la última admisión, con cuatro particiones las decisiones terminan en 4,8 s y con una en 6,3 s: ahí está la ganancia del paralelismo entre actividades. Es una corrida por configuración, así que muestra la tendencia, no un factor de escala.
 
-Una actividad usa una sola particion. Estos tiempos aislados no prueban
-escalabilidad ni una mejora general de latencia.
+[N=1](evidencias/multi-particiones-n1.json) · [N=4](evidencias/multi-particiones-n4.json) · [colas en Grafana](evidencias/23-colas-rabbitmq.png)
 
-### Ocho actividades simultaneas
+## Orden por actividad
 
-La misma prueba envia 40 reservas por actividad: 320 solicitudes, 10 cupos
-por actividad y un maximo de 64 conexiones HTTPS del cliente.
+Para cada actividad, la prueba compara el orden de los comandos en el outbox con el de las decisiones persistidas, y exige que las primeras 10 sean las confirmadas. Las 8 actividades conservaron el orden con N=1 y con N=4.
 
-| Particiones | Tiempo hasta completar decisiones | Decisiones/s | p95 admision cliente |
-|---|---:|---:|---:|
-| 1 | 67,80 s | 4,72 | 2.989 ms |
-| 4 | 47,46 s | 6,74 | 5.218 ms |
+El orden es por actividad, no global: dos actividades en particiones distintas se deciden en paralelo.
 
-Mejora observada de throughput: **1,43x**. Todas las admisiones respondieron
-202 y cada actividad termino con 10 confirmadas, 30 rechazadas y cero cupos.
-El throughput se calcula desde el inicio de las admisiones hasta observar
-todas las decisiones persistidas; incluye la espera del procesamiento.
-El p95 cliente incluye la espera de conexiones del generador y no debe
-confundirse con el histograma interno de la API ni con el de k6.
+## Bajar de 4 a 1 partición
 
-La latencia de admision empeoro en N=4 en esta comparacion. Son dos
-ejecuciones en la misma instalacion local, no un benchmark con repeticiones
-ni intervalos de confianza. No se demuestra crecimiento lineal: los workers
-comparten MySQL, almacenamiento y replicacion semisincrona.
+`node pruebas/final/reducir-particiones.js`: con cuatro particiones, detiene los workers de las particiones 1 a 3, admite 40 reservas en 8 actividades (los comandos de las actividades que caen en esas particiones quedan esperando) y recrea el relay con una partición. [Resultado](evidencias/particiones-reduccion.json):
 
-Evidencia estructurada: [N=1](evidencias/multi-particiones-n1.json) y
-[N=4](evidencias/multi-particiones-n4.json).
+- 35 de los 40 comandos quedaron esperando en las colas 1 (15) y 2 (20); la 3 no tenía.
+- Al arrancar con una partición, el relay desenlazó las colas 1 a 3 y reenvió exactamente esos 35 comandos al exchange, una vez cada uno.
+- Solo quedó enlazada `reservas.comandos.0`, y su worker confirmó las 40 reservas: ningún comando quedó varado.
 
-## Verificacion de orden
+La primera corrida de esta prueba encontró que, vaciando las colas de a una, los comandos de la cola 1 caían en la 2 o la 3, todavía enlazadas, y se volvían a mover (60 reenvíos para 35 comandos). Ahora el relay desenlaza todas antes de vaciarlas.
 
-`pruebas/final/particiones.js` verifica enlaces, pesos y exactamente un
-consumidor por particion antes de generar carga. Para cada actividad compara
-el orden de IDs de reserva en comandos del outbox con el de sus decisiones
-persistidas y verifica que las primeras diez sean confirmadas.
+## Idempotencia con cuatro particiones
 
-Las ocho actividades conservaron ese orden tanto en N=1 como en N=4.
-El orden medido es el de registro en outbox, no el reloj de envio de clientes
-independientes. La prueba usa topologia estable, sin cambios de particion ni
-fallos inyectados; no acredita por si sola el requisito de fallos #50.
+`node scripts/diagnosticar-carga.js --duplicados`: 20 pedidos simultáneos con la misma `Idempotency-Key` dan un `202` y 19 `200`; 20 del mismo participante con claves distintas, un `202` y 19 `409`; quedan exactamente 2 reservas. [k6](evidencias/diagnostico-2026-11-20T04-43-47-531Z/k6.txt)
 
-## Ejecucion y cambios de topologia
+## Límites
 
-Con el entorno correspondiente ya iniciado:
-
-```powershell
-node reserva-cupos/scripts/diagnosticar-carga.js --una
-node reserva-cupos/scripts/diagnosticar-carga.js
-node reserva-cupos/scripts/diagnosticar-carga.js --duplicados
-node reserva-cupos/pruebas/final/particiones.js 1
-node reserva-cupos/pruebas/final/particiones.js 4
-```
-
-No ejecutar los escenarios simultaneamente. Para cambiar N hay que pausar
-productores, drenar reservas pendientes, outbox y colas de comandos, detener
-relay y workers, y ajustar enlaces antes de reanudar entradas. Al volver a
-N=1 hay que retirar los enlaces 1 a 3; solo detener esos workers dejaria
-mensajes en sus colas. Las colas y los volumenes no se eliminan.
-
-Los mensajes existentes en `webhooks.dlq` se conservan y se investigan por
-separado: no se purgan para conseguir que la prueba aparezca aprobada.
+- Cambiar N con tráfico en curso puede desordenar una actividad mientras dura el cambio: sus comandos viejos siguen en la cola anterior y los nuevos van a la nueva. Se cambia con la carga detenida.
+- Todas las particiones comparten el primario: más particiones aceleran las decisiones mientras el worker sea el cuello, no la admisión (ver [carga](carga.md#por-qué-más-api-no-admiten-más)).
+- Una actividad muy demandada sigue en una sola partición: el particionado reparte actividades, no la carga de una.

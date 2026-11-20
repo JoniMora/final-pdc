@@ -1,6 +1,6 @@
-> Borrador del cierre final. La implementación de E5 cambió y E6 sigue pendiente.
-> Para ejecutar el entorno usar el README de la aplicación; las cifras y explicaciones
-> de esta guía deben actualizarse tras repetir las pruebas sobre la base corregida.
+> Borrador del cierre final (issue #53). Se ensaya y completa en la integración
+> final (`v7-final`); las cifras de carga vigentes son las de la
+> [Entrega 6](../entrega-6/README.md).
 
 # Demo final: orden y explicación
 
@@ -88,17 +88,19 @@ archivo local de identidades. La recuperación utiliza el feed y un cursor propi
 
 ## 6. Carga y escalado
 
-Mostrar `02-carga-escalado.txt`: 500 solicitudes para 10 cupos, 10 confirmadas,
-490 rechazadas y cero pendientes en ambos escenarios. Mostrar las tres instancias
-que respondieron detrás de Traefik y la restauración de la configuración inicial.
+Mostrar el [informe del escenario caliente](../entrega-6/evidencias/carga-caliente/informe.html):
+500 solicitudes para 10 cupos, 10 confirmadas, 490 rechazadas y cero pendientes, con
+las series de Prometheus. Después, el dashboard de Grafana (`https://localhost:3002`)
+y la [curva con 1, 2 y 4 API](../entrega-6/evidencias/curva-admisiones/informe.html).
 
 ```powershell
-node reserva-cupos/pruebas/final/carga-escalado.js
+node reserva-cupos/scripts/verificar-e6.js carga
 ```
 
-La ejecución completa tarda varios minutos. Preferir evidencias si el tiempo de
-exposición es corto. Explicar que los dos workers comparten una cola y que esto
-no acredita orden FIFO estricto, tolerancia a caída del host ni mejora lineal.
+La ejecución completa tarda varios minutos. Preferir las evidencias si el tiempo de
+exposición es corto. Explicar que cada actividad cae en una sola partición (orden por
+actividad, no global) y que agregar API no acelera la admisión porque el límite es el
+commit semisincrónico del primario.
 
 ## 7. Cierre
 

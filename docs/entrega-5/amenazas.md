@@ -59,3 +59,5 @@ Qué se protegió, de qué y con qué evidencia. Se usa STRIDE: **S**uplantació
 - **El poseedor de una clave de tenant tiene toda la autoridad que dan sus permisos.** El servicio no distingue qué persona del tenant hizo cada pedido: eso lo resuelve el tenant (en Aula, con sus roles).
 
 Las pruebas demuestran los escenarios que se ejecutaron, no la ausencia de otros ataques o fallas.
+
+> **Entrega 6.** El límite de tasa pasó a Redis y es global entre instancias de la API (el riesgo del límite por instancia queda resuelto; las sesiones de Aula siguen en memoria). Redis, Prometheus y Grafana agregan fronteras nuevas: sus amenazas, mitigaciones y riesgos están en [Seguridad de los componentes nuevos](../entrega-6/README.md#seguridad-de-los-componentes-nuevos).
