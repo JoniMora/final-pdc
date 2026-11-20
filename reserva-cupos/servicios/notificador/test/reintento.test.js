@@ -42,6 +42,32 @@ test('un mensaje diferido indefinidamente llega a la DLQ en el plazo, no en hora
     assert.equal(ciclos, PLAZO_MS / 10_000 + 1);
 });
 
+test('un reintento nunca espera mas alla del plazo: usa la espera mas larga que termine antes', () => {
+    // Le tocaba la de 5 min, pero quedan 100 s: espera 1 min.
+    assert.deepEqual(planReintento(2, { primerFallo: T0, ahora: T0 + 300_000 }),
+        { agotado: false, cola: 'webhooks.espera.1m', intento: 3, primerFallo: T0 });
+    // Quedan 30 s: espera 10 s.
+    assert.equal(planReintento(2, { primerFallo: T0, ahora: T0 + 370_000 }).cola, 'webhooks.espera.10s');
+    // Quedan 5 s: la mas corta (10 s) es el maximo atraso posible sobre el plazo.
+    assert.equal(planReintento(1, { primerFallo: T0, ahora: T0 + 395_000 }).cola, 'webhooks.espera.10s');
+});
+
+test('con el circuito abriendose y cerrandose, ninguna entrega pasa el plazo por mas de 10 s', () => {
+    // Peor caso: cada vez que vuelve, a veces se intenta (y falla) y a veces se difiere.
+    const esperas = { 'webhooks.espera.10s': 10_000, 'webhooks.espera.1m': 60_000, 'webhooks.espera.5m': 300_000 };
+    for (let semilla = 0; semilla < 50; semilla++) {
+        let ahora = T0, intento = 0, primerFallo, plan, paso = 0;
+        do {
+            const consumir = (semilla + paso++) % 3 !== 0;
+            plan = planReintento(intento, { consumir, primerFallo, ahora });
+            if (plan.agotado) break;
+            primerFallo = plan.primerFallo; intento = plan.intento;
+            ahora += esperas[plan.cola];
+        } while (true);
+        assert.ok(ahora - T0 <= PLAZO_MS + 10_000, `semilla ${semilla}: ${(ahora - T0) / 1000} s`);
+    }
+});
+
 test('una cabecera de primer fallo ausente, futura o inválida empieza a contar ahora', () => {
     for (const primerFallo of [undefined, NaN, T0 + 5_000]) {
         assert.equal(planReintento(0, { primerFallo, ahora: T0 }).primerFallo, T0);
