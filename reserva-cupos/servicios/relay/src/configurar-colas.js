@@ -3,6 +3,52 @@ const { conexionRabbit } = require("../../../compartido/src/tls");
 const { configurarParticiones } = require("../../../compartido/src/particiones");
 const { colas } = configurarParticiones();
 
+// Máximo de particiones que admite COMANDOS_PARTICIONES.
+const MAXIMO_PARTICIONES = 32;
+
+// Al bajar la cantidad de particiones (por ejemplo, de 4 a 1), las colas
+// sobrantes seguirían enlazadas al exchange y recibirían comandos que ningún
+// worker consume. Se desenlazan, y sus comandos pendientes vuelven a pasar
+// por el exchange para caer en la partición que ahora les corresponde. Esto
+// corre antes de que el relay publique (npm start), así que los comandos
+// viejos de cada actividad quedan delante de los nuevos.
+async function retirarParticionesSobrantes(conexion) {
+    for (let numero = colas.length; numero < MAXIMO_PARTICIONES; numero++) {
+        const cola = `reservas.comandos.${numero}`;
+
+        // checkQueue cierra el canal si la cola no existe: uno por cola.
+        const canal = await conexion.createConfirmChannel();
+        canal.on("error", () => {});
+
+        try {
+            await canal.checkQueue(cola);
+        } catch {
+            continue;
+        }
+
+        try {
+            await canal.unbindQueue(cola, "reservas.comandos", "1");
+
+            let movidos = 0;
+            let mensaje;
+
+            while ((mensaje = await canal.get(cola, { noAck: false }))) {
+                canal.publish("reservas.comandos", mensaje.fields.routingKey, mensaje.content, mensaje.properties);
+                await canal.waitForConfirms();
+                canal.ack(mensaje);
+                movidos++;
+            }
+
+            console.log(`[colas] ${cola} desenlazada; ${movidos} comandos reenviados al exchange`);
+        } catch (error) {
+            // Por ejemplo, si todavía hay un worker consumiendo esa cola.
+            console.error(`[colas] No se pudo retirar ${cola}:`, error.message);
+        } finally {
+            await canal.close().catch(() => {});
+        }
+    }
+}
+
 async function configurar() {
     let conexion;
     let canal;
@@ -116,8 +162,10 @@ async function configurar() {
             });
         }
 
+        await retirarParticionesSobrantes(conexion);
+
         console.log(
-            "[colas] Topologia de RabbitMQ configurada"
+            `[colas] Topología de RabbitMQ configurada (${colas.length} particiones)`
         );
     } finally {
         if (canal) {
