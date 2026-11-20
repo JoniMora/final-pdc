@@ -1,6 +1,6 @@
 // Misma carga para N=1 y N=4. No inicia ni detiene servicios.
 // Orden comprobado: orden de registro de comandos en outbox frente al de
-// decisiones persistidas, para cada actividad y con la topologia estable.
+// decisiones persistidas, para cada actividad y con la topología estable.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');

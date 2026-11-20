@@ -1,7 +1,7 @@
 const { problemas } = require('./problemas');
 
 // TIME del servidor y descuento atomico: el balde pertenece al tenant,
-// no al proceso ni al numero de instancias de la API.
+// no al proceso ni al número de instancias de la API.
 const TOKEN_BUCKET = `
 local reloj = redis.call('TIME')
 local ahora = tonumber(reloj[1]) * 1000 + tonumber(reloj[2]) / 1000

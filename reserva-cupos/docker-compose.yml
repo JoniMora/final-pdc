@@ -100,7 +100,7 @@ services:
     image: traefik:v3.6
 
     command:
-      # Compose interpola el nivel; Traefik recibe toda su configuracion por CLI.
+      # Compose interpola el nivel; Traefik recibe toda su configuración por CLI.
       - --log.level=${TRAEFIK_LOG_LEVEL:-ERROR}
       - --providers.docker=true
       - --accesslog=true

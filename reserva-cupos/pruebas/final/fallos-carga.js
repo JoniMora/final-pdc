@@ -30,14 +30,14 @@ async function main() {
         proceso.on('error', reject);
         proceso.on('close', codigo => { terminado = true; codigoFinal = codigo; resolve(codigo); });
     });
-    final.catch(() => {}); // el error se recoge al esperar el proceso; no queda rechazo huerfano.
+    final.catch(() => {}); // el error se recoge al esperar el proceso; no queda rechazo huérfano.
     const tomar = texto => {
         const m = /PDC_CARGA_INICIADA:([a-f0-9-]{36})/.exec(texto);
         if (m) { actividad = m[1]; lanzada = true; }
     };
     proceso.stdout.on('data', b => { salida += b; tomar(salida); });
     proceso.stderr.on('data', b => { errores += b; tomar(errores); });
-    // Evita trabajos infinitos y limpia tambien el contenedor si se agota plazo.
+    // Evita trabajos infinitos y limpia también el contenedor si se agota plazo.
     const timer = setTimeout(() => proceso.kill(), 480000);
     try {
         await esperarHasta(() => {

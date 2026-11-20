@@ -4,7 +4,7 @@ const { crearAutenticacion } = require('../src/acceso');
 const { crearCacheAutenticacion, LEER, GUARDAR, INICIAR, FINALIZAR } = require('../src/cache-autenticacion');
 const { crearLimitadorRedis } = require('../src/limite-redis');
 
-// Doble del transporte, no una validacion del motor Lua. La atomicidad real
+// Doble del transporte, no una validación del motor Lua. La atomicidad real
 // y el limite entre procesos se comprueban en pruebas/final/redis.js.
 function transporte() {
     let generacion = '0';
@@ -81,7 +81,7 @@ test('durante una mutacion se autentica contra MySQL sin usar ni poblar la cache
             { id: 'tenant', scopes: 'escribir' });
     });
     assert.deepEqual(resultados, ['miss', 'bypass', 'bypass']);
-    // Lo leido durante la mutacion no quedo guardado en la generacion nueva.
+    // Lo leído durante la mutación no quedó guardado en la generación nueva.
     assert.deepEqual(await cache.buscar('hash', async () => ({ id: 'nuevo' })), { id: 'nuevo' });
 });
 

@@ -59,7 +59,7 @@ async function main() {
         return cantidad > 0 && (await control()).entregas.length === cantidad;
     }, { plazoMs: 180000, descripcion: 'webhooks entregados por cada reserva decidida' });
     informe.receptor = await control();
-    await esperar(6000); // dejar que Prometheus capture la ultima entrega
+    await esperar(6000); // dejar que Prometheus capture la última entrega
     guardar(`carga-${escenario}/resumen.json`, resumen);
     let graficos = '';
     try {

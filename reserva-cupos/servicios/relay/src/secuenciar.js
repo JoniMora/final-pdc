@@ -1,4 +1,4 @@
-// Debe ejecutarse desde un unico relay secuenciador.
+// Debe ejecutarse desde un único relay secuenciador.
 // La lectura consistente ve solo cambios confirmados. El UPDATE posterior
 // se limita a esos IDs: no vuelve a recorrer el rango de secuencias NULL.
 async function secuenciarConfirmados(pool, lote = 200) {

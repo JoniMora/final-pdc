@@ -1,7 +1,7 @@
 services:
   api:
     labels:
-      # Solo admision de reservas: el contrato exige Idempotency-Key.
+      # Solo admisión de reservas: el contrato exige Idempotency-Key.
       # No se reintentan altas de actividades, tenants ni rotaciones.
       traefik.http.routers.api-reservas.rule: "Method(`POST`) && PathRegexp(`^/v1/actividades/[^/]+/reservas\\z`)"
       traefik.http.routers.api-reservas.priority: "100"

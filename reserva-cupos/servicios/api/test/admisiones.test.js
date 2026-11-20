@@ -152,7 +152,7 @@ test('si la base cae durante la recuperacion individual, el resto falla sin mas 
     const resultados = await Promise.allSettled([1, 2, 3, 4].map(n => admitir(async () => n, {})));
     assert.deepEqual(resultados.map(r => r.status), ['fulfilled', 'rejected', 'rejected', 'rejected']);
     assert.equal(resultados[0].value, 1);
-    // Lote + primera individual + la que encuentra la base caida.
+    // Lote + primera individual + la que encuentra la base caída.
     assert.equal(transacciones, 3);
 });
 

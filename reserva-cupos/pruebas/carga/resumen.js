@@ -1,4 +1,4 @@
-// Exporta solo metricas: setup_data y options.env pueden contener claves.
+// Exporta solo métricas: setup_data y options.env pueden contener claves.
 export function resumenSeguro(data) {
     return { fecha: new Date().toISOString(), metricas: data.metrics,
         estado: data.state, escenarios: data.options?.scenarios };

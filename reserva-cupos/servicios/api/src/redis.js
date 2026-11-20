@@ -20,7 +20,7 @@ function crearRedis(entorno = process.env) {
     client.on('error', () => { listo = false; });
     client.on('reconnecting', () => { listo = false; });
     client.on('ready', async () => {
-        // Invalidar caches de permisos potencialmente viejos tras una caida.
+        // Invalidar caches de permisos potencialmente viejos tras una caída.
         try { await client.incr('pdc:auth:generacion'); listo = true; }
         catch (_) { listo = false; }
     });

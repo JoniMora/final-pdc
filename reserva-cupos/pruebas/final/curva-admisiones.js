@@ -47,7 +47,7 @@ async function main() {
             await escalar(n);
             const tenant = await crearTenant(`Curva POST ${n} ${Date.now()}`, { limite: { por_segundo: 1000, rafaga: 1000 } });
             const cliente = api(tenant.clave_api);
-            // Calentar autenticacion fuera de la ventana medida.
+            // Calentar autenticación fuera de la ventana medida.
             for (let i = 0; i < n * 8; i++) assert.equal((await cliente('/v1/cambios?limite=1')).status, 200);
             const alta = await cliente('/v1/actividades', { metodo: 'POST', cuerpo: { nombre: 'Curva POST', capacidad: 10 } });
             assert.equal(alta.status, 201);
