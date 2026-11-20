@@ -8,27 +8,45 @@ const MAXIMO_PARTICIONES = 32;
 
 // Al bajar la cantidad de particiones (por ejemplo, de 4 a 1), las colas
 // sobrantes seguirían enlazadas al exchange y recibirían comandos que ningún
-// worker consume. Se desenlazan, y sus comandos pendientes vuelven a pasar
-// por el exchange para caer en la partición que ahora les corresponde. Esto
-// corre antes de que el relay publique (npm start), así que los comandos
+// worker consume. Primero se desenlazan todas y después se reenvían sus
+// comandos pendientes al exchange, que los manda a la partición que ahora
+// les corresponde. (Desenlazar y vaciar de a una no alcanza: los comandos
+// de la cola 1 podrían caer en la 2, todavía enlazada, y moverse dos veces.)
+// Corre antes de que el relay publique (npm start), así que los comandos
 // viejos de cada actividad quedan delante de los nuevos.
 async function retirarParticionesSobrantes(conexion) {
+    const sobrantes = [];
+
     for (let numero = colas.length; numero < MAXIMO_PARTICIONES; numero++) {
         const cola = `reservas.comandos.${numero}`;
 
         // checkQueue cierra el canal si la cola no existe: uno por cola.
-        const canal = await conexion.createConfirmChannel();
+        const canal = await conexion.createChannel();
         canal.on("error", () => {});
 
         try {
             await canal.checkQueue(cola);
         } catch {
-            continue;
+            continue; // No existe: nada que retirar.
         }
 
-        try {
-            await canal.unbindQueue(cola, "reservas.comandos", "1");
+        sobrantes.push(cola);
 
+        try {
+            // Si ya estaba desenlazada (un arranque anterior), igual se vacía.
+            await canal.unbindQueue(cola, "reservas.comandos", "1");
+        } catch {
+            // Sin enlace que quitar.
+        } finally {
+            await canal.close().catch(() => {});
+        }
+    }
+
+    for (const cola of sobrantes) {
+        const canal = await conexion.createConfirmChannel();
+        canal.on("error", () => {});
+
+        try {
             let movidos = 0;
             let mensaje;
 
@@ -42,7 +60,7 @@ async function retirarParticionesSobrantes(conexion) {
             console.log(`[colas] ${cola} desenlazada; ${movidos} comandos reenviados al exchange`);
         } catch (error) {
             // Por ejemplo, si todavía hay un worker consumiendo esa cola.
-            console.error(`[colas] No se pudo retirar ${cola}:`, error.message);
+            console.error(`[colas] No se pudo vaciar ${cola}:`, error.message);
         } finally {
             await canal.close().catch(() => {});
         }
