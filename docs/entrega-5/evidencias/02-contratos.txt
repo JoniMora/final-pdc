@@ -1,0 +1,33 @@
+Contratos: validez y compatibilidad con la Entrega 4
+Ejecución: 2026-11-15T00:12:23Z · commit 3eeac3a
+
+$ npx --yes @redocly/cli@2.76.0 lint contrato/openapi.yaml --config contrato/redocly.yaml
+validating contrato/openapi.yaml...
+contrato/openapi.yaml: validated in 90ms
+
+Woohoo! Your API description is valid. 🎉
+
+(código de salida: 0)
+
+$ npx --yes @asyncapi/cli@6.3.0 validate contrato/asyncapi.yaml
+Skipping submitting anonymous metrics due to the following error: AbortError: This operation was aborted
+
+File contrato/asyncapi.yaml is valid but has (itself and/or referenced documents) governance issues.
+Information 
+contrato/asyncapi.yaml
+ 1:11  information  asyncapi-latest-version  The latest version of AsyncAPi is not used. It is recommended update to the "3.1.0" version.  asyncapi
+
+✖ 1 problem (0 errors, 0 warnings, 1 info, 0 hints)
+
+(código de salida: 0)
+
+$ pruebas/contrato/oasdiff.sh v4-middleware && echo 'Sin cambios incompatibles respecto de v4-middleware'
+
+Sin cambios incompatibles respecto de v4-middleware
+(código de salida: 0)
+
+$ pruebas/contrato/compatibilidad-mensajes.sh v4-middleware
+asyncapi.yaml 1.0.0 → 1.0.0: 10 ejemplos comparados en los dos sentidos
+Sin cambios incompatibles
+(código de salida: 0)
+

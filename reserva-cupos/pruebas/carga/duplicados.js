@@ -15,7 +15,7 @@ import { check } from "k6";
 import exec from "k6/execution";
 import { Counter } from "k6/metrics";
 
-const API_URL = __ENV.API_URL || "http://api:3000";
+const API_URL = __ENV.API_URL || "https://traefik";
 const API_KEY = __ENV.API_KEY;
 const REPETICIONES = Number(__ENV.REPETICIONES || 20);
 

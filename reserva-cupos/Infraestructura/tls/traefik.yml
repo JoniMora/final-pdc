@@ -1,0 +1,45 @@
+# Configuración dinámica de Traefik (proveedor de archivo). Lo que depende
+# de cada contenedor de la API sigue saliendo de sus etiquetas en
+# docker-compose.yml (descubrimiento); acá queda lo fijo de TLS.
+
+tls:
+  certificates:
+    - certFile: /tls/traefik.crt
+      keyFile: /tls/traefik.key
+  # También para un nombre (SNI) desconocido: Traefik nunca presenta su
+  # certificado autofirmado de fábrica.
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /tls/traefik.crt
+        keyFile: /tls/traefik.key
+  options:
+    default:
+      minVersion: VersionTLS12
+
+http:
+  # Traefik → API también va cifrado: verifica que el certificado de cada
+  # instancia sea "api" y esté firmado por la CA local.
+  serversTransports:
+    api-tls:
+      serverName: api
+      rootCAs:
+        - /tls/ca.crt
+      # Si una instancia muere con solicitudes en curso, Traefik no recibe
+      # respuesta ni un cierre de conexión: sin plazo, el cliente esperaría
+      # indefinidamente. Con estos plazos responde 502/504 y el cliente
+      # reintenta con la misma Idempotency-Key. 15 s supera la espera
+      # semisíncrona de MySQL (10 s) cuando la réplica no responde.
+      forwardingTimeouts:
+        dialTimeout: 3s
+        responseHeaderTimeout: 15s
+
+  # Panel de servicios descubiertos (Entrega 4), solo por HTTPS y solo en el
+  # puerto 8080 publicado en 127.0.0.1. Es de lectura: muestra rutas e
+  # instancias, no permite cambiarlas.
+  routers:
+    panel:
+      rule: PathPrefix(`/api`) || PathPrefix(`/dashboard`)
+      entryPoints: [traefik]
+      service: api@internal
+      tls: {}

@@ -114,8 +114,11 @@ jobs:
           npm ci
           npm test
 
+  # Desde la Entrega 5 el sistema se levanta siempre con TLS en todos los
+  # saltos: Schemathesis, k6 y las suites verifican el certificado del
+  # gateway con la CA que genera scripts/preparar-seguridad.js en el runner.
   integracion:
-    name: Integración (Schemathesis y ráfaga)
+    name: Integración (Schemathesis, ráfaga y límite de tasa)
     runs-on: ubuntu-latest
     needs: [contratos, pruebas]
     defaults:
@@ -124,34 +127,101 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Levantar el sistema
-        run: |
-          docker compose up --build -d --wait
-          docker compose exec -T mysql-replica sh -c "mysql -uroot -proot_local_2026 < /configurar-replica.sql"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Certificados, identidades y clave del operador
+        run: node scripts/sistema.js preparar
+
+      - name: Levantar el sistema (réplica incluida)
+        run: node scripts/sistema.js levantar
 
       - name: La API cumple el contrato (Schemathesis)
         run: |
-          # Tenant propio: los datos que genera Schemathesis no se mezclan
-          # con los de Aula.
-          CLAVE=$(docker compose exec -T mysql-primary mysql -uroot -proot_local_2026 reservas -N \
-            -e "SET @nombre = 'Verificación del contrato'; SOURCE /crear-tenant.sql" | awk '{print $NF}' | tail -1)
+          # Tenant propio, creado por la API de administración: los datos que
+          # genera Schemathesis no se mezclan con los de Aula.
+          CLAVE=$(node scripts/sistema.js tenant "Verificación del contrato" --limite 1000/1000)
           docker run --rm --network reserva-cupos-infra_publica \
             -e SCHEMATHESIS_HOOKS=/config/hooks.py \
             -v "$PWD/contrato:/contrato:ro" -v "$PWD/pruebas/contrato:/config:ro" \
+            -v "$PWD/seguridad/local/ca.crt:/tls/ca.crt:ro" \
             schemathesis/schemathesis:4.33.1 --config-file /config/schemathesis.toml \
-            run /contrato/openapi.yaml --url http://traefik \
-            -H "Authorization: Bearer $CLAVE" \
+            run /contrato/openapi.yaml --url https://traefik --tls-verify /tls/ca.crt \
+            -H "Authorization: Bearer $CLAVE" --exclude-tag administracion \
             --checks all --max-examples 25 --seed 2026 --generation-with-security-parameters false
 
-      - name: Ráfaga de 500 solicitudes sobre 10 cupos
+      - name: La administración de tenants cumple el contrato (Schemathesis)
         run: |
-          CLAVE=$(docker compose exec -T mysql-primary mysql -uroot -proot_local_2026 reservas -N \
-            -e "SET @nombre = 'CI'; SOURCE /crear-tenant.sql" | awk '{print $NF}' | tail -1)
+          docker run --rm --network reserva-cupos-infra_publica \
+            -v "$PWD/contrato:/contrato:ro" -v "$PWD/pruebas/contrato:/config:ro" \
+            -v "$PWD/seguridad/local/ca.crt:/tls/ca.crt:ro" \
+            schemathesis/schemathesis:4.33.1 --config-file /config/schemathesis.toml \
+            run /contrato/openapi.yaml --url https://traefik --tls-verify /tls/ca.crt \
+            -H "Authorization: Bearer $(cat seguridad/local/admin.key)" --include-tag administracion \
+            --checks all --max-examples 25 --seed 2026 --generation-with-security-parameters false
+
+      - name: Ráfaga de 500 solicitudes sobre 10 cupos (k6 por HTTPS)
+        run: |
+          CLAVE=$(node scripts/sistema.js tenant "CI ráfaga" --limite 1000/1000)
           docker compose run --rm k6 run -q -e API_KEY="$CLAVE" /pruebas/carga/rafaga.js
+
+      - name: Límite de tasa por tenant (k6)
+        run: |
+          SATURADO=$(node scripts/sistema.js tenant "CI saturado" --limite 10/20)
+          VECINO=$(node scripts/sistema.js tenant "CI vecino" --limite 10/20)
+          docker compose run --rm k6 run -q -e CLAVE_SATURADO="$SATURADO" -e CLAVE_VECINO="$VECINO" /pruebas/carga/limite.js
 
       - name: Registros ante una falla
         if: failure()
         run: docker compose logs --tail=80
+
+      - name: Bajar el sistema
+        if: always()
+        run: docker compose down -v
+
+  seguridad:
+    name: Seguridad, cifrado y matriz de fallos
+    runs-on: ubuntu-latest
+    needs: [contratos, pruebas]
+    defaults:
+      run:
+        working-directory: reserva-cupos
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Certificados, identidades y clave del operador
+        run: node scripts/sistema.js preparar
+
+      - name: Levantar el sistema (réplica incluida)
+        run: node scripts/sistema.js levantar
+
+      - name: Suites de seguridad (API, Aula y cifrado)
+        run: node scripts/sistema.js seguridad
+
+      # El failover va último: deja la réplica promovida. El escenario del
+      # tenant no espera los ~6 minutos hasta la DLQ (sí en la corrida local
+      # que deja las evidencias).
+      - name: Matriz de fallos y failover del primario
+        run: node pruebas/fallos/matriz.js --sin-dlq worker relay rabbitmq notificador api mysql-replica aula-db tenant mysql-primary
+
+      - name: Registros ante una falla
+        if: failure()
+        run: docker compose logs --tail=80
+
+      # Las evidencias no contienen claves: las genera el runner con su
+      # propia CA y credenciales efímeras.
+      - name: Guardar las evidencias de la corrida
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidencias-entrega5
+          path: docs/entrega-5/evidencias/
+          if-no-files-found: ignore
 
       - name: Bajar el sistema
         if: always()
@@ -164,7 +234,7 @@ jobs:
   resultado:
     name: CI completo
     runs-on: ubuntu-latest
-    needs: [contratos, pruebas, consumidor, integracion]
+    needs: [contratos, pruebas, consumidor, integracion, seguridad]
     if: always()
     steps:
       - name: Todos los jobs terminaron bien
@@ -173,9 +243,10 @@ jobs:
           PRUEBAS: ${{ needs.pruebas.result }}
           CONSUMIDOR: ${{ needs.consumidor.result }}
           INTEGRACION: ${{ needs.integracion.result }}
+          SEGURIDAD: ${{ needs.seguridad.result }}
         run: |
-          echo "contratos: $CONTRATOS · pruebas: $PRUEBAS · consumidor: $CONSUMIDOR · integración: $INTEGRACION"
-          for resultado in "$CONTRATOS" "$PRUEBAS" "$CONSUMIDOR" "$INTEGRACION"; do
+          echo "contratos: $CONTRATOS · pruebas: $PRUEBAS · consumidor: $CONSUMIDOR · integración: $INTEGRACION · seguridad: $SEGURIDAD"
+          for resultado in "$CONTRATOS" "$PRUEBAS" "$CONSUMIDOR" "$INTEGRACION" "$SEGURIDAD"; do
             if [ "$resultado" != success ]; then
               echo "::error::Hay un job que no terminó bien: la PR no se puede mergear"
               exit 1

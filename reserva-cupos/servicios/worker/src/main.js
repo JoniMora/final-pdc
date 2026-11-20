@@ -1,5 +1,6 @@
 const amqp = require("amqplib");
 const { crearValidadorDeMensajes } = require("../../../compartido/src/contrato");
+const { conexionRabbit } = require("../../../compartido/src/tls");
 const { crearPool, esErrorDeInfraestructura } = require("./db");
 const { reservar } = require("./reservar");
 const { cancelar, marcarFallida } = require("./cancelar");
@@ -46,12 +47,7 @@ function describir(comando, resultado) {
 }
 
 async function iniciar() {
-    const conexion = await amqp.connect({
-        hostname: process.env.RABBITMQ_HOST || "rabbitmq",
-        username: process.env.RABBITMQ_USER,
-        password: process.env.RABBITMQ_PASSWORD,
-        heartbeat: 10
-    });
+    const conexion = await amqp.connect(...conexionRabbit({ heartbeat: 10 }));
 
     conexion.on("error", salir);
     conexion.on("close", () => {

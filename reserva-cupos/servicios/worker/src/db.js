@@ -1,8 +1,10 @@
 const mysql = require("mysql2/promise");
+const { opcionesMysql } = require("../../../compartido/src/tls");
 
 function crearPool(conexiones = 2) {
     return mysql.createPool({
         host: process.env.DB_HOST,
+        ...opcionesMysql(),
         user: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
         database: process.env.DB_NAME,

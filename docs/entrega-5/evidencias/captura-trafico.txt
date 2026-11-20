@@ -1,0 +1,47 @@
+Captura de tráfico Traefik → API (puerto 3000 de la API) con tcpdump
+Ejecución: 2026-11-15T00:13:21.131Z
+Se crearon 5 actividades con el nombre "MARCADOR-389870a43e13" por https://localhost:3000.
+Paquetes capturados: 60. El nombre, la clave (Bearer) y las cabeceras HTTP no aparecen:
+el contenido viaja en registros TLS (0x17 0x03 0x03 = application data).
+
+Primeras líneas de la captura:
+tcpdump: data link type LINUX_SLL2
+tcpdump: verbose output suppressed, use -v[v]... for full protocol decode
+listening on any, link-type LINUX_SLL2 (Linux cooked v2), snapshot length 262144 bytes
+00:13:10.253955 eth0  Out IP 192.168.112.2.36442 > 192.168.112.3.3000: Flags [P.], seq 3966414688:3966414815, ack 2016000583, win 501, options [nop,nop,TS val 1262683520 ecr 2397137150], length 127
+	0x0000:  4500 00b3 1adc 4000 4006 be12 c0a8 7002  E.....@.@.....p.
+	0x0010:  c0a8 7003 8e5a 0bb8 ec6a af60 7829 ba47  ..p..Z...j.`x).G
+	0x0020:  8018 01f5 61fc 0000 0101 080a 4b43 0580  ....a.......KC..
+	0x0030:  8ee1 68fe 1703 0300 7ad6 76ca 12b2 5bff  ..h.....z.v...[.
+	0x0040:  1acb 80c4 b49f b6e5 49e3 663e a147 a5e1  ........I.f>.G..
+	0x0050:  51fa 92c3 fc26 5574 8096 f09d 4429 5268  Q....&Ut....D)Rh
+	0x0060:  62bc bb91 b4cc 5719 554e 0dce 1c2a 143f  b.....W.UN...*.?
+	0x0070:  de0c e600 1178 2797 9522 395b ff74 12ce  .....x'.."9[.t..
+	0x0080:  8b35 408c 5c44 c660 ba99 9d56 b8b1 b17c  .5@.\D.`...V...|
+	0x0090:  8e58 ea55 b1b7 4890 0bb2 eb45 758e d5e7  .X.U..H....Eu...
+	0x00a0:  b44b 194e 8337 379b 9494 5c3a 9c2b 0320  .K.N.77...\:.+..
+	0x00b0:  30d0 4c                                  0.L
+00:13:10.254075 eth0  In  IP 192.168.112.3.3000 > 192.168.112.2.36442: Flags [.], ack 127, win 501, options [nop,nop,TS val 2397139086 ecr 1262683520], length 0
+	0x0000:  4500 0034 9bb3 4000 4006 3dba c0a8 7003  E..4..@.@.=...p.
+	0x0010:  c0a8 7002 0bb8 8e5a 7829 ba47 ec6a afdf  ..p....Zx).G.j..
+	0x0020:  8010 01f5 617d 0000 0101 080a 8ee1 708e  ....a}........p.
+	0x0030:  4b43 0580                                KC..
+00:13:10.257397 eth0  In  IP 192.168.112.3.3000 > 192.168.112.2.36442: Flags [P.], seq 1:314, ack 127, win 501, options [nop,nop,TS val 2397139090 ecr 1262683520], length 313
+	0x0000:  4500 016d 9bb4 4000 4006 3c80 c0a8 7003  E..m..@.@.<...p.
+	0x0010:  c0a8 7002 0bb8 8e5a 7829 ba47 ec6a afdf  ..p....Zx).G.j..
+	0x0020:  8018 01f5 62b6 0000 0101 080a 8ee1 7092  ....b.........p.
+	0x0030:  4b43 0580 1703 0301 343a 638c 267d e24a  KC......4:c.&}.J
+	0x0040:  6821 ed76 a89e 8735 d93e 88a0 1f51 ea84  h!.v...5.>...Q..
+	0x0050:  e210 57d2 882a 3a02 f66c 097b 410a 07ec  ..W..*:..l.{A...
+	0x0060:  86aa 54bf f257 ab15 7f1f 4c00 9fd6 9f66  ..T..W....L....f
+	0x0070:  b89a 60f7 e3cc 123d cdc9 5251 88df 10bd  ..`....=..RQ....
+	0x0080:  e733 0cc9 9d08 ec09 16a0 5f18 db1a fe61  .3........_....a
+	0x0090:  c543 dfd3 748f 0d58 3744 e466 4e5d 68c8  .C..t..X7D.fN]h.
+	0x00a0:  a4dc bb19 eda9 c90c 784b 6b94 bfc2 2c09  ........xKk...,.
+	0x00b0:  3394 167e b3fa d907 33eb d4a9 e048 2961  3..~....3....H)a
+	0x00c0:  7850 ad36 75b4 e966 0339 58dd 1b6a 2d6f  xP.6u..f.9X..j-o
+	0x00d0:  47d8 da46 d3bb a67c 627a 52d3 c82a 88d9  G..F...|bzR..*..
+	0x00e0:  de01 ba13 494d 9052 1e9c 55fe 7334 7333  ....IM.R..U.s4s3
+	0x00f0:  00c6 7a61 4301 b97e cd77 b432 584d 498e  ..zaC..~.w.2XMI.
+	0x0100:  b957 af48 a8eb 3132 5964 5060 4b51 8bcf  .W.H..12YdP`KQ..
+	0x0110:  4639 a846 0cf2 1b3a ccb8 4a56 6ff7 93ac  F9.F...:..JVo...

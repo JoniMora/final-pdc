@@ -6,6 +6,7 @@
 
 const mysql = require("mysql2/promise");
 const amqp = require("amqplib");
+const { opcionesMysql, conexionRabbit } = require("../../../compartido/src/tls");
 
 async function reenviar() {
     const reservaId = process.argv[2];
@@ -16,6 +17,7 @@ async function reenviar() {
 
     const conexionDb = await mysql.createConnection({
         host: process.env.DB_HOST,
+        ...opcionesMysql(),
         user: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
         database: process.env.DB_NAME
@@ -35,11 +37,7 @@ async function reenviar() {
 
         const reserva = filas[0];
 
-        conexion = await amqp.connect({
-            hostname: process.env.RABBITMQ_HOST,
-            username: process.env.RABBITMQ_USER,
-            password: process.env.RABBITMQ_PASSWORD
-        });
+        conexion = await amqp.connect(...conexionRabbit());
 
         const canal = await conexion.createConfirmChannel();
 

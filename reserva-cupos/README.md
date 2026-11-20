@@ -1,64 +1,61 @@
-# Reserva de cupos — Entrega 4: contratos de interfaz y descubrimiento de servicios
+# Reserva de cupos — Entrega 5: seguridad y confiabilidad
 
 Proyecto final de Programación Distribuida y Componentes.
 Grupo 15: Jonathan Mora Colodrero y María Constanza Gigli.
 
 ## Alcance
 
-Sobre el recorrido de la Entrega 3, esta entrega formaliza cómo se comunican los componentes y agrega un gateway con descubrimiento de servicios:
+Sobre la Entrega 4 (contratos y descubrimiento de servicios), esta entrega agrega identidad y permisos, cifra cada enlace entre componentes y prueba qué pasa cuando cada componente falla:
 
 ```
-                 contrato/openapi.yaml (REST + webhooks)
-Aula ──HTTP──▶ Traefik ──▶ API (N instancias) ──transacción──▶ MySQL (reserva + outbox)
- ▲                (descubre por Docker)                           │
- │                                             relay ◀────────────┘ secuencia y publica
- │                                               │  contrato/asyncapi.yaml (AMQP)
- │                         reservas.comandos ◀───┤───▶ webhooks.eventos
- │                               │                          │
- │                            worker                   notificador
- │                         reservar/cancelar               │
- └──────────── webhook firmado (X-Firma, HMAC-SHA256) ──────┘
+navegador ──HTTPS──▶ Aula ──HTTPS──▶ Traefik ──HTTPS──▶ API (N) ──TLS──▶ MySQL primario ──TLS──▶ réplica
+ (login, rol,         │ TLS            ▲  lee Docker por             │ outbox         (semisíncrona)
+  CSRF)               ▼                │  socket-proxy (solo GET)    ▼
+                   aula-db                                  relay ──AMQPS──▶ RabbitMQ ──AMQPS──▶ worker
+                      ▲                                                          │
+                      └──────────── webhook HTTPS + HMAC ◀── notificador ◀──AMQPS┘
 ```
 
 Incluye:
-- **Contratos formales.** [`contrato/openapi.yaml`](contrato/openapi.yaml) 1.1.0 (API pública y webhooks) y [`contrato/asyncapi.yaml`](contrato/asyncapi.yaml) 1.0.0 (mensajes de RabbitMQ), con su [CHANGELOG](contrato/CHANGELOG.md). La documentación se publica en GitHub Pages.
-- **Validación contra el contrato en cada componente.** La API valida solicitudes y respuestas con `express-openapi-validator`; el relay, el worker y el notificador validan cada mensaje; Aula arma cada llamada a partir del contrato y valida las respuestas. La validación de mensajes y respuestas vive en el módulo [`compartido/`](compartido/src/contrato.js).
-- **Descubrimiento de servicios con Traefik.** Encuentra las instancias de la API por etiquetas de Docker, les hace health check y balancea; escalar no requiere configuración.
-- **Cancelación asíncrona:** `POST /v1/reservas/{id}/cancelacion` → comando `cancelar` → el worker devuelve el cupo.
-- **Webhooks firmados:** el notificador entrega cada decisión con `X-Firma`, reintenta a los 10 s, 1 min y 5 min, deriva a `webhooks.dlq` y protege contra SSRF. Aula verifica la firma y mantiene su proyección local.
-- **Estado `fallida`** para reservas cuyo comando falla por un error de datos después de los reintentos.
-- **Verificación automática del desacople:** pruebas `node:test` en cada componente, Aula contra un mock de Prism generado del contrato, Schemathesis contra la API real y, en cada PR, la compatibilidad de los dos contratos contra `main` (oasdiff para la API; los ejemplos de cada mensaje para AsyncAPI). La firma de los webhooks tiene un vector de prueba en el contrato que verifican, por separado, el notificador y Aula.
+- **Personas de Aula** con login (contraseñas scrypt con sal), sesión del lado del servidor, CSRF y dos roles: el administrador crea materias y gestiona inscripciones; el alumno se inscribe y cancela solo lo propio.
+- **Permisos por clave de API (scopes)**, declarados por operación en el contrato 1.2.0 y aplicados por la API leyendo esa declaración: `actividades:escribir`, `reservas:escribir`, `lectura`, `cambios:leer`.
+- **Administración de tenants** (`/admin/v1/tenants`) con una clave de operador: alta, permisos, webhook, límite de tasa y rotación de la clave. Reemplaza a `crear-tenant.sql`.
+- **Límite de tasa por tenant** (token bucket): `429` con `Retry-After`, sin afectar a otros tenants.
+- **TLS en todos los saltos**, con una CA local y verificación de identidad en cada cliente: HTTPS (navegador, Traefik, API, webhooks), AMQPS, MySQL con `require_secure_transport`, replicación con `SOURCE_SSL` y PostgreSQL con `pg_hba` que rechaza el texto plano.
+- **Traefik sin el socket de Docker:** lo consulta por un proxy que solo permite lecturas.
+- **Contingencia y reconciliación de Aula:** con `aula-db` caída, el catálogo sale del feed y las inscripciones siguen; al volver, un ciclo aplica `/v1/cambios` desde su propio punto de control.
+- **Matriz de fallos** con un arnés que detiene cada componente con carga en curso y verifica las invariantes, incluido el **failover del primario** con RTO y RPO medidos.
 
-Todavía no incluye: límite de tasa, autenticación de personas y permisos, TLS, contingencia y reconciliación de Aula (Entrega 5).
+La certificación, el informe de amenazas y las evidencias están en [`docs/entrega-5`](../docs/entrega-5/README.md).
 
 ## Requisitos
 
 - Git.
-- Docker Desktop iniciado, utilizando contenedores Linux, con Docker Compose 2.17 o superior (los servicios usan contextos de build adicionales).
+- Docker Desktop iniciado, utilizando contenedores Linux, con Docker Compose 2.17 o superior.
+- Node.js 22 o superior (scripts de preparación, operación y pruebas).
+- OpenSSL. En macOS y Linux viene instalado; en Windows sirve el que trae Git (el script lo busca solo) o se indica con `OPENSSL=<ruta>`.
 - Puertos locales 3000, 3001, 8080 y 15672 disponibles.
-- Para correr las pruebas fuera de Docker: Node.js 22 o superior.
 
-Node.js, MySQL, PostgreSQL, RabbitMQ, Traefik y k6 se ejecutan dentro de contenedores.
-
-Los ejemplos con `curl` están escritos para bash o zsh. En Windows usar `curl.exe` desde PowerShell o ejecutarlos en Git Bash o WSL.
+Los comandos son los mismos en bash, zsh, PowerShell y la terminal de IntelliJ: todo se opera con `node scripts/sistema.js <acción>`.
 
 ## Componentes
 
-| Servicio | Función en esta entrega |
+| Servicio | Función |
 |---|---|
-| traefik | Gateway y descubrimiento de servicios. Único punto de entrada HTTP a la API (puerto 3000 del host); panel en el 8080. |
-| api | API pública v1. Valida cada solicitud contra el contrato. Sin puerto propio: se escala con `--scale api=N`. |
+| traefik | Gateway y descubrimiento de servicios. Única entrada a la API: `https://localhost:3000`. Panel por HTTPS en el 8080. |
+| socket-proxy | Expone a Traefik solo las lecturas de la API de Docker (contenedores, eventos, versión). Cualquier escritura responde 403. |
+| api | API pública v1 y administración de tenants. Solo HTTPS; sin puerto propio: se escala con `--scale api=N`. |
 | relay | Topología de RabbitMQ, secuenciador del feed, publicador de comandos y de entregas de webhook, barredor de pendientes. |
 | worker | Consume `reservas.comandos.0`: comandos `reservar` y `cancelar`. |
-| notificador | Entrega los webhooks firmados con reintentos escalonados. |
-| mysql-primary | Persistencia del servicio: tenants, actividades, reservas y cambios. |
-| mysql-replica | Réplica semisíncrona en solo lectura. |
-| rabbitmq | Comandos, entregas de webhook, colas de espera y DLQ. |
-| aula | Cliente de referencia: materias, inscripciones, cancelaciones y receptor de webhooks. |
-| aula-db | Base propia de Aula (PostgreSQL), con la proyección local de las inscripciones. |
-| k6 | Herramienta de pruebas de carga. Solo se ejecuta a pedido. |
+| notificador | Entrega los webhooks firmados por HTTPS, con reintentos escalonados y protección contra SSRF. |
+| mysql-primary | Persistencia del servicio. Exige TLS en toda conexión por red. |
+| mysql-replica | Réplica semisíncrona en solo lectura, conectada por TLS. Se promueve en el failover. |
+| rabbitmq | Solo AMQPS (5671) y administración por HTTPS. |
+| aula | Cliente de referencia con login y roles, receptor de webhooks y reconciliación por feed. |
+| aula-db | Base propia de Aula (PostgreSQL), solo por TLS. |
+| k6 | Pruebas de carga. Solo se ejecuta a pedido. |
 
-Las redes no cambian: `publica`, `interna` y `tenant`. Traefik está solo en `publica`. El notificador llega a Aula por `publica`, como llegaría a cualquier tenant en internet.
+Redes: `publica`, `interna` y `tenant` como en la Entrega 4, más `docker` (interna, sin salida) entre Traefik y el proxy del socket.
 
 ## Inicio
 
@@ -67,88 +64,83 @@ Las redes no cambian: `publica`, `interna` y `tenant`. Traefik está solo en `pu
 ```shell
 git clone https://github.com/JoniMora/final-pdc.git
 cd final-pdc
-git checkout v4-middleware
+git checkout v5-seguridad
 cd reserva-cupos
 ```
 
 ### Volúmenes nuevos
 
-Esta entrega modifica los scripts iniciales de MySQL (índice de cambios por entidad y webhook del tenant Aula) y de PostgreSQL (proyección de inscripciones). Una instalación que viene de una entrega anterior debe eliminar sus volúmenes:
+Esta entrega cambia los scripts iniciales de MySQL (permisos y límite por tenant, usuario `admin_app`, webhook de Aula por HTTPS) y de PostgreSQL (punto de control del feed). Una instalación que viene de una entrega anterior debe eliminar sus volúmenes:
 
 ```shell
 docker compose down -v
 ```
 
+### Preparar la seguridad local (una vez)
+
+```shell
+node scripts/sistema.js preparar
+```
+
+Genera en `seguridad/local/` (excluido de Git) la CA de desarrollo, un certificado por servicio, las identidades de Aula con contraseñas aleatorias y la clave del operador. Las credenciales quedan en `seguridad/local/accesos-locales.txt`. Es repetible: no reemplaza lo que ya existe. Sin este paso el entorno no arranca, porque cada certificado se monta como un archivo que tiene que existir.
+
 ### Levantar el entorno
 
 ```shell
-docker compose up --build -d
-docker compose ps -a
+node scripts/sistema.js levantar
+node scripts/sistema.js estado
 ```
 
-Cuando MySQL primario y réplica estén healthy, configurar la réplica (una vez por instalación):
-
-```shell
-docker compose exec -T mysql-replica sh -c "mysql -uroot -proot_local_2026 < /configurar-replica.sql"
-```
-
-Si responde `Access denied`, la réplica todavía está inicializando: esperar unos segundos y repetir.
-
-Comprobar la replicación y el modo semisíncrono:
-
-```shell
-docker compose exec mysql-replica mysql -uroot -proot_local_2026 -e "SHOW REPLICA STATUS\G"
-docker compose exec mysql-primary mysql -uroot -proot_local_2026 -e "SHOW GLOBAL STATUS LIKE 'Rpl_semi_sync_source_status'"
-```
-
-Se espera `Replica_IO_Running: Yes`, `Replica_SQL_Running: Yes` y `Rpl_semi_sync_source_status: ON`. Hasta que la réplica esté configurada, cada escritura espera el tiempo límite semisíncrono de diez segundos.
+`levantar` construye y arranca todo, espera a que cada servicio esté healthy y configura la réplica con TLS (una vez por instalación). `estado` muestra los contenedores y la replicación.
 
 ### Accesos
 
 | Qué | Dónde |
 |---|---|
-| API v1 (a través de Traefik) | http://localhost:3000 |
-| Aula | http://localhost:3001 |
-| Panel de Traefik: servicios descubiertos | http://localhost:8080 |
-| Administración de RabbitMQ | http://localhost:15672 (demo / demo_local_2026) |
+| API v1 y administración (a través de Traefik) | https://localhost:3000 |
+| Aula | https://localhost:3001 (usuarios en `seguridad/local/accesos-locales.txt`) |
+| Panel de Traefik: servicios descubiertos | https://localhost:8080/dashboard/ |
+| Administración de RabbitMQ | https://localhost:15672 (demo / demo_local_2026) |
 
-## Tenants y claves de API
+Todos usan certificados de la CA local. Desde la terminal, `curl --cacert seguridad/local/ca.crt ...`. Para que el navegador no advierta, confiar en `seguridad/local/ca.crt` desde el administrador de certificados del sistema; es una CA solo para este entorno y su clave privada no sale de `seguridad/local/`.
+
+## Tenants, claves y permisos
 
 Toda ruta `/v1` exige `Authorization: Bearer <clave>`. La base guarda solo el hash SHA-256 de cada clave.
 
-El tenant **Aula** se crea al inicializar MySQL, con su URL de webhook (`http://aula:3001/webhooks/reservas`) y el secreto con el que se firman. La clave y el secreto, solo para desarrollo local, están en `docker-compose.yml`:
+El tenant **Aula** se crea al inicializar MySQL, con su webhook (`https://aula:3001/webhooks/reservas`), los cuatro permisos y un límite propio (500/s, ráfaga 1500). Su clave y su secreto de webhook, solo para desarrollo local, están en `docker-compose.yml`.
 
-```bash
-export CLAVE_AULA=rc_aula_5589268069a379faa72a98ae640f818c09fc6179adf5f2146bd97aadbb06bc42
-```
-
-Para crear otro tenant (las pruebas de carga y Schemathesis usan uno propio):
+Los demás tenants los crea el operador con la API de administración. El atajo:
 
 ```shell
-docker compose exec mysql-primary mysql -uroot -proot_local_2026 reservas -e "SET @nombre = 'Pruebas de carga'; SOURCE /crear-tenant.sql"
+CLAVE=$(node scripts/sistema.js tenant "Pruebas de carga" --limite 1000/1000)
+LECTOR=$(node scripts/sistema.js tenant "Solo lectura" --scopes lectura,cambios:leer)
 ```
 
-El comando muestra `tenant_id`, `nombre`, `webhook_secreto` y `clave_api`. La clave se genera con 256 bits aleatorios y no vuelve a mostrarse:
-
-```bash
-export CLAVE=<clave_api mostrada>
-```
-
-Para registrar además el webhook del tenant, se indica la URL del receptor:
+o directamente:
 
 ```shell
-docker compose exec mysql-primary mysql -uroot -proot_local_2026 reservas -e "SET @nombre = 'Mi tenant'; SET @webhook_url = 'https://tenant.ejemplo/webhooks'; SOURCE /crear-tenant.sql"
+curl --cacert seguridad/local/ca.crt -X POST https://localhost:3000/admin/v1/tenants \
+  -H "Authorization: Bearer $(cat seguridad/local/admin.key)" -H "Content-Type: application/json" \
+  -d '{"nombre":"Mi tenant","scopes":["lectura","reservas:escribir"],"webhook_url":"https://tenant.ejemplo/webhooks"}'
 ```
 
-El secreto del webhook son 32 bytes aleatorios y se muestra una sola vez, en hexadecimal (64 caracteres). La clave del HMAC de `X-Firma` son esos 32 bytes, no el texto; el contrato trae un vector de prueba (`x-vector-de-prueba`) para comprobar una implementación.
+La respuesta trae `clave_api` y, si hay webhook, `webhook_secreto`: se muestran una sola vez. Con `PATCH /admin/v1/tenants/{id}` se cambian los permisos, el webhook, el límite o el estado; con `POST /admin/v1/tenants/{id}/rotacion`, la clave (la anterior deja de autenticar en el momento). Una clave de tenant recibe `403` en `/admin`.
+
+| Permiso | Operaciones |
+|---|---|
+| `actividades:escribir` | `POST /v1/actividades`, `PATCH /v1/actividades/{id}` |
+| `reservas:escribir` | `POST /v1/actividades/{id}/reservas`, `POST /v1/reservas/{id}/cancelacion` |
+| `lectura` | `GET /v1/actividades/{id}`, `GET /v1/reservas/{id}`, `GET /v1/actividades/{id}/reservas` |
+| `cambios:leer` | `GET /v1/cambios` |
 
 ## API v1
 
-El contrato completo está en [`contrato/openapi.yaml`](contrato/openapi.yaml). Resumen:
+El contrato completo está en [`contrato/openapi.yaml`](contrato/openapi.yaml) (1.2.0). Resumen:
 
 | Método y ruta | Respuestas |
 |---|---|
-| `POST /v1/actividades` | `201` + `Location` · `400` · `401` · `415` |
+| `POST /v1/actividades` | `201` + `Location` · `400` · `401` · `403` · `415` · `429` |
 | `GET /v1/actividades/{id}` | `200` · `400` · `404` |
 | `PATCH /v1/actividades/{id}` (`{"estado":"cerrada"}`) | `200` · `400` · `404` · `415` |
 | `POST /v1/actividades/{id}/reservas` (exige `Idempotency-Key`) | `202` + `Location` + `Retry-After` · `200` repetición · `409` · `422` |
@@ -157,91 +149,84 @@ El contrato completo está en [`contrato/openapi.yaml`](contrato/openapi.yaml). 
 | `GET /v1/actividades/{id}/reservas?estado=&cursor=&limite=` | `200` · `400` |
 | `GET /v1/cambios?desde=&limite=` | `200` · `400` |
 
-Los errores son `application/problem+json` (RFC 9457). Una solicitud que no cumple el contrato responde `400` (o `405`/`415`) antes de llegar a la ruta. Si MySQL no responde, la API devuelve `503` con `Retry-After`. Un recurso de otro tenant responde `404`, igual que uno inexistente.
+Todas las operaciones de `/v1` pueden responder además `401` (clave inválida), `403` (falta el permiso) y `429` (límite de tasa, con `Retry-After`). Los errores son `application/problem+json` (RFC 9457). Una solicitud que no cumple el contrato responde `400` (o `405`/`415`) antes de llegar a la ruta. Si MySQL no responde, `503` con `Retry-After`. Un recurso de otro tenant responde `404`, igual que uno inexistente.
 
-En desarrollo (`VALIDAR_RESPUESTAS=true` en `docker-compose.yml`) la API también valida cada respuesta: una que no cumpla el contrato se registra y se responde `500`.
+## Aula
+
+https://localhost:3001: iniciar sesión con un usuario de `accesos-locales.txt`.
+
+- **admin** (administrador): crea materias, inscribe a cualquier alumno, ve todas las inscripciones y el estado de la reconciliación (`GET/POST /reconciliacion`).
+- **alumno1**, **alumno2** (alumno): se inscriben a sí mismos (el participante sale de la sesión), ven y cancelan solo lo propio. Una reserva ajena responde `404`.
+
+La sesión dura una hora, vive en memoria de Aula (reiniciarla obliga a volver a entrar) y viaja en una cookie `HttpOnly; Secure; SameSite=Strict`. Cada escritura exige el token CSRF de la sesión. Diez contraseñas incorrectas desde una IP bloquean el login de esa IP durante 15 minutos; los logins correctos no cuentan. Las identidades se administran en `seguridad/local/usuarios.json` (solo hashes; `hashPassword` de `clientes/aula/src/seguridad.js` genera uno nuevo).
+
+**Contingencia.** Si `aula-db` no responde, `/materias` responde con `X-Aula-Modo: contingencia` y un catálogo armado desde el feed; las inscripciones siguen yendo a la API y el login sigue funcionando. Un ciclo de reconciliación lee `/v1/cambios` desde `punto_control.ultima_secuencia_feed` (cada 30 s en modo normal, cada 5 s en degradado) y aplica cada instantánea si su versión es mayor, en la misma transacción que el punto de control.
 
 ## Descubrimiento de servicios
 
-Traefik observa Docker y registra cada contenedor con la etiqueta `traefik.enable`. Escalar la API no requiere tocar configuración:
+Traefik encuentra cada instancia de la API por sus etiquetas, ahora a través del proxy del socket:
 
 ```shell
 docker compose up -d --scale api=3 --no-recreate api
 pruebas/descubrimiento/instancias.sh --esperar 3
-for i in $(seq 1 9); do curl -s http://localhost:3000/health; echo; done
+for i in $(seq 1 9); do curl -s --cacert seguridad/local/ca.crt https://localhost:3000/health; echo; done
 ```
 
-`instancias.sh` consulta el panel de Traefik (`/api/http/services/api@docker`) y, con `--esperar 3`, espera a que haya tres servidores `UP`: una instancia nueva aparece cuando Docker la marca healthy, unos segundos después de arrancar. `/health` informa la `instancia` que atendió cada solicitud. Si una instancia se detiene, Traefik deja de enviarle tráfico. Para volver a una instancia: `docker compose up -d --scale api=1 api`.
-
-## Cancelación y webhooks
-
-Desde Aula (http://localhost:3001): crear una materia, inscribir alumnos y usar **Cancelar esta inscripción**. La sección *Cupos e inscriptos* muestra lo que informa la API y lo que tiene la base de Aula, actualizada por los webhooks.
-
-Desde la terminal:
-
-```bash
-curl -s -i -X POST http://localhost:3000/v1/reservas/$RESERVA/cancelacion -H "Authorization: Bearer $CLAVE_AULA"
-docker compose logs --tail=10 worker notificador aula
-```
-
-El worker informa `cancelada, cupo devuelto`, el notificador `reserva.cancelada entregado a aula:3001 (204)` y Aula `Webhook N: reserva.cancelada v3 aplicado`. Si 30 segundos después del pedido la reserva sigue activa, repetir la cancelación vuelve a registrar el comando (así lo establece el contrato).
-
-Reintentos: con `docker compose stop aula`, las entregas pasan por `webhooks.espera.10s`, `webhooks.espera.1m` y `webhooks.espera.5m` y, agotadas, quedan en `webhooks.dlq`:
-
-```shell
-docker compose exec rabbitmq rabbitmqctl list_queues name messages
-```
+Traefik le habla a cada instancia por HTTPS y verifica que su certificado sea `api`. Si una instancia muere con solicitudes en curso, Traefik responde `502`/`504` en 15 s como máximo y el cliente reintenta con la misma `Idempotency-Key`. Para volver a una instancia: `docker compose up -d --scale api=1 api`.
 
 ## Pruebas
 
 ### Pruebas de cada componente
 
 ```shell
-(cd compartido && npm ci)
 for c in compartido servicios/api servicios/worker servicios/relay servicios/notificador clientes/aula; do (cd $c && npm ci && npm test); done
 ```
 
-### Aula contra un mock del contrato
+Incluyen el control de acceso de la API (permisos, límite, `/admin`), el login, las sesiones, el CSRF y los roles de Aula (también contra el backend real de Aula con la API simulada), la reconciliación y la configuración TLS común.
+
+### Seguridad contra el entorno levantado
 
 ```shell
-docker run -d --name prism-mock -p 4010:4010 -v "$PWD/contrato:/contrato:ro" stoplight/prism:5 mock -d -m false -h 0.0.0.0 /contrato/openapi.yaml
-(cd clientes/aula && PRISM_URL=http://localhost:4010 npm test)
-docker rm -f prism-mock
+node scripts/sistema.js seguridad
 ```
 
-### La API contra el contrato (Schemathesis)
+Corre tres suites y deja su salida en `docs/entrega-5/evidencias/`:
 
-Con el entorno levantado y la clave de un tenant propio en `$CLAVE`:
+- `pruebas/seguridad/api.js`: aislamiento entre tenants, permisos, administración y rotación, límite de tasa, firma y reinyección de webhooks, SSRF.
+- `pruebas/seguridad/aula.js`: login, roles, CSRF, propiedad de las reservas, reconstrucción desde el feed y operación con `aula-db` detenida.
+- `pruebas/seguridad/cifrado.js`: TLS positivo y negativo en cada protocolo, `Ssl_cipher` por servicio, `ssl` en cada conexión de RabbitMQ y PostgreSQL, réplica cifrada, proxy del socket y una captura de tráfico Traefik → API.
+
+### Matriz de fallos
 
 ```shell
+node scripts/sistema.js fallos                 # todos (unos 10 minutos)
+node scripts/sistema.js fallos worker          # uno o varios: worker relay rabbitmq notificador api mysql-replica aula-db tenant mysql-primary
+```
+
+El arnés ([`pruebas/fallos/arnes.js`](pruebas/fallos/arnes.js)) lanza una ráfaga de reservas que reintenta como un cliente correcto, detiene el componente a mitad de la ráfaga, lo vuelve a iniciar y verifica por la API: exactamente tantas confirmadas como cupos, ninguna pendiente, ningún participante con dos reservas activas y `cupos_disponibles` coherente. Cada escenario deja `docs/entrega-5/evidencias/fallos/<escenario>.txt`, y la corrida completa, `resumen.md`.
+
+`mysql-primary` va último: termina el primario con SIGKILL, lo deja aislado, promueve la réplica, le pasa el alias de red `mysql-primary` (los clientes no cambian su configuración y el certificado de la réplica también vale para ese nombre) y mide el RTO y el RPO. Deja la réplica como primario y sin réplica; para volver a la topología inicial: `docker compose down -v` y `node scripts/sistema.js levantar`.
+
+### Contrato, carga y límite de tasa
+
+```shell
+CLAVE=$(node scripts/sistema.js tenant "Schemathesis" --limite 1000/1000)
 docker run --rm --network reserva-cupos-infra_publica -e SCHEMATHESIS_HOOKS=/config/hooks.py \
-  -v "$PWD/contrato:/contrato:ro" -v "$PWD/pruebas/contrato:/config:ro" \
+  -v "$PWD/contrato:/contrato:ro" -v "$PWD/pruebas/contrato:/config:ro" -v "$PWD/seguridad/local/ca.crt:/tls/ca.crt:ro" \
   schemathesis/schemathesis:4.33.1 --config-file /config/schemathesis.toml \
-  run /contrato/openapi.yaml --url http://traefik -H "Authorization: Bearer $CLAVE" \
-  --checks all --max-examples 25 --seed 2026 --generation-with-security-parameters false
-```
+  run /contrato/openapi.yaml --url https://traefik --tls-verify /tls/ca.crt -H "Authorization: Bearer $CLAVE" \
+  --exclude-tag administracion --checks all --max-examples 25 --seed 2026 --generation-with-security-parameters false
 
-[`pruebas/contrato/hooks.py`](pruebas/contrato/hooks.py) usa una `Idempotency-Key` nueva en cada solicitud válida, y `schemathesis.toml` alarga las secuencias con estado a 30 pasos: así Schemathesis crea, consulta y cancela reservas reales.
-
-### Cambios incompatibles de los contratos
-
-```shell
-pruebas/contrato/oasdiff.sh v3-comunicacion
-(cd compartido && npm ci) && pruebas/contrato/compatibilidad-mensajes.sh
-```
-
-`oasdiff.sh` compara `contrato/openapi.yaml` con el de otra versión (tag, rama o commit) y falla si encuentra un cambio incompatible. `compatibilidad-mensajes.sh` hace lo mismo con `contrato/asyncapi.yaml`: valida los ejemplos de cada versión contra los esquemas de la otra, porque durante un despliegue conviven consumidores y productores de las dos versiones. El CI ejecuta las dos comparaciones contra `main` en cada PR.
-
-### Caso de concurrencia (Entrega 3)
-
-Las pruebas de la Entrega 3 siguen vigentes y ahora pasan por Traefik:
-
-```shell
 docker compose run --rm k6 run -e API_KEY=$CLAVE /pruebas/carga/rafaga.js
-docker compose run --rm k6 run -e API_KEY=$CLAVE /pruebas/carga/duplicados.js
+docker compose run --rm k6 run -e CLAVE_SATURADO=$(node scripts/sistema.js tenant A --limite 10/20) \
+  -e CLAVE_VECINO=$(node scripts/sistema.js tenant B --limite 10/20) /pruebas/carga/limite.js
 ```
 
-La ráfaga verifica 10 confirmadas, 490 rechazadas, 0 pendientes y `cupos_disponibles = 0`, también con varias instancias de la API (`--scale api=2`) o del worker (`--scale worker=2`). La comparación ingenua/atómica y la reentrega de comandos se ejecutan como en la Entrega 3 (`docker compose exec worker node src/demostrar-concurrencia.js` y `docker compose exec relay node src/reenviar-comando.js`).
+k6 verifica el certificado del gateway con la CA local (`SSL_CERT_FILE`). La ráfaga de la Entrega 3 (500 solicitudes sobre 10 cupos) corre igual sobre TLS. `limite.js` satura un tenant y comprueba que recibe `429` y que el vecino no.
+
+### Cambios incompatibles de los contratos y Aula contra un mock
+
+Como en la Entrega 4: `pruebas/contrato/oasdiff.sh v4-middleware`, `pruebas/contrato/compatibilidad-mensajes.sh` y Aula contra Prism con `PRISM_URL`.
 
 ## Integración continua
 
@@ -249,61 +234,55 @@ La ráfaga verifica 10 confirmadas, 490 rechazadas, 0 pendientes y `cupos_dispon
 
 | Trabajo | Qué verifica |
 |---|---|
-| Contratos | OpenAPI y AsyncAPI válidos; sin cambios incompatibles respecto de `main` (oasdiff y ejemplos de los mensajes). |
+| Contratos | OpenAPI y AsyncAPI válidos; sin cambios incompatibles respecto de `main`. |
 | Pruebas | `npm test` en cada componente. |
 | Aula contra el mock del contrato | El consumidor funciona solo con el contrato (Prism). |
-| Integración | Schemathesis contra la API real detrás de Traefik y la ráfaga de 500 sobre 10 cupos. |
-| CI completo | Que todos los anteriores hayan terminado bien. Es el check obligatorio de `main`: GitHub cuenta como exitoso un job salteado, y con una prueba rota la integración no corre. |
+| Integración | Con TLS: Schemathesis contra la API pública y contra la administración, la ráfaga de 500 sobre 10 cupos y el límite de tasa con k6. |
+| Seguridad, cifrado y matriz de fallos | Las tres suites de seguridad y la matriz de fallos completa, failover incluido (el escenario del tenant sin esperar la DLQ). Sube las evidencias como artifact. |
+| CI completo | Que todos los anteriores hayan terminado bien. Es el check obligatorio de `main`. |
 
-[`.github/workflows/documentacion.yml`](../.github/workflows/documentacion.yml) publica la documentación de los contratos en GitHub Pages cuando cambian en `main`.
+Cada job genera en el runner su propia CA y credenciales: no hay secretos en el repositorio ni en GitHub.
 
-## Logs
+## Logs, detener y reanudar
 
 ```shell
 docker compose logs --tail=30 api relay worker notificador aula
-```
-
-## Detener y reanudar
-
-```shell
-docker compose stop
-docker compose up -d
+node scripts/sistema.js detener
+node scripts/sistema.js levantar
 ```
 
 `docker compose down` elimina contenedores y redes y conserva los volúmenes. `docker compose down -v` también elimina los datos.
 
 ## Problemas frecuentes
 
-- `dependency failed to start: container ... is unhealthy` en el primer arranque: ejecutar nuevamente `docker compose up -d`.
-- Las escrituras tardan diez segundos: la réplica no está configurada o está detenida, y el primario espera el tiempo límite semisíncrono.
-- `401` en todas las rutas: la clave no corresponde a un tenant de esta instalación (por ejemplo, volúmenes de otra entrega).
-- `404` en `http://localhost:3000` recién levantado: Traefik todavía no registró la API (espera su health check); reintentar en unos segundos.
-- `additional_contexts` no reconocido al construir: actualizar Docker Compose a 2.17 o superior.
-- Aula informa `relation "inscripciones" does not exist`: volúmenes creados con los scripts de una entrega anterior.
-- Alguno de los puertos 3000, 3001, 8080 o 15672 está en uso: detener el proceso que lo ocupa o cambiar el puerto publicado en `docker-compose.yml`.
+- `bind source path does not exist: .../seguridad/local/...`: falta `node scripts/sistema.js preparar`.
+- `unable to verify the first certificate` o advertencia del navegador: el cliente no confía en `seguridad/local/ca.crt`.
+- `401` en todas las rutas: la clave no corresponde a un tenant de esta instalación (por ejemplo, volúmenes de otra entrega o una clave rotada).
+- `403 permiso-insuficiente`: la clave no tiene el permiso de esa operación (ver la tabla de permisos).
+- `429 limite-de-tasa`: respetar `Retry-After` o pedir al operador un límite mayor para ese tenant.
+- Aula responde `503 Identidades no disponibles`: falta `seguridad/local/usuarios.json`.
+- Las escrituras tardan diez segundos: la réplica está detenida y el primario espera el tiempo límite semisíncrono.
+- `La réplica fue promovida a primario`: después de `fallos mysql-primary`, `levantar` se niega a arrancar el primario viejo, que sería un segundo primario. Recrear el entorno: `docker compose down -v` y `levantar`.
+- Alguno de los puertos 3000, 3001, 8080 o 15672 está en uso: detener el proceso que lo ocupa.
 
 ## Credenciales locales
 
 Exclusivamente para desarrollo local.
 
-- Clave de API de Aula: `rc_aula_5589268069a379faa72a98ae640f818c09fc6179adf5f2146bd97aadbb06bc42`.
-- Secreto del webhook de Aula: `WEBHOOK_SECRET` en `docker-compose.yml`, en hexadecimal (y sus 32 bytes con `UNHEX` en `03-tenants.sql`). Aula no arranca si falta o no tiene 64 caracteres hexadecimales.
-- RabbitMQ: demo / demo_local_2026.
-- MySQL: root_local_2026; api_app, worker_app, relay_app, notificador_app y replicador con las contraseñas de `docker-compose.yml` y `02-usuarios.sql`.
-- PostgreSQL: aula_admin / postgres_local_2026; aula_app / aula_local_2026.
+- Generadas por `preparar` en `seguridad/local/` (fuera de Git): CA y claves privadas de cada servicio, usuarios de Aula (`accesos-locales.txt`) y clave del operador (`admin.key`; la API recibe solo su hash).
+- En el repositorio, como en entregas anteriores: la clave de API y el secreto del webhook de Aula (`docker-compose.yml`), y las contraseñas de MySQL (root, `api_app`, `worker_app`, `relay_app`, `notificador_app`, `admin_app`, `replicador`), RabbitMQ (`demo`) y PostgreSQL (`aula_admin`, `aula_app`), en `docker-compose.yml` y los scripts iniciales. Las conexiones van cifradas, pero estas contraseñas no son secretas: ver el informe de amenazas.
 
 ## Limitaciones
 
-- La admisión durable está acotada por el `COMMIT` semisíncrono: una ráfaga de 500 se admite completa en 8 a 16 segundos según la corrida. Agregar instancias de la API no la acelera; se mide en la Entrega 6.
-- Con dos workers sobre la misma cola no se garantiza el orden de llegada; el particionado por actividad se mide en la Entrega 6.
-- La URL y el secreto de webhook de un tenant se registran con `crear-tenant.sql`; la API de administración llega en la Entrega 5.
-- El panel de Traefik (8080) no tiene autenticación y Traefik monta el socket de Docker en solo lectura; ambos se protegen en la Entrega 5. Sin TLS ni límite de tasa.
-- Aula guarda la última secuencia recibida por webhook; la reconciliación desde el feed y el modo contingencia llegan en la Entrega 5.
-- Todos los contenedores se ejecutan en un único equipo y el failover de MySQL es manual.
+- El límite de tasa y las sesiones de Aula viven en la memoria de cada instancia: con N instancias de la API el límite efectivo es hasta N veces el configurado. Pasan a Redis en la Entrega 6.
+- Se autentica cada servidor con su certificado; los clientes se autentican con credenciales, no con certificados (sin mTLS). La CA es local y sin rotación automática.
+- El failover de MySQL es un script que se ejecuta a pedido (no hay detección automática), sobre un único equipo; volver a la topología con réplica requiere recrear el entorno.
+- Las contraseñas de la infraestructura siguen en el repositorio (ver *Credenciales locales*).
+- La admisión durable está acotada por el `COMMIT` semisíncrono; el escalado horizontal se mide en la Entrega 6.
 
 ## Documentación
 
-- [Certificación y evidencias de la Entrega 4](../docs/entrega-4/README.md)
+- [Certificación, informe de amenazas y evidencias de la Entrega 5](../docs/entrega-5/README.md)
 - [Contratos](contrato/) y su [historial de versiones](contrato/CHANGELOG.md)
+- [Entrega 4](../docs/entrega-4/README.md): contratos de interfaz y descubrimiento de servicios.
 - [Entrega 3](../docs/entrega-3/README.md): comunicación síncrona y asíncrona y caso de concurrencia.
-- Las pruebas de infraestructura de la Entrega 2 (permisos, semisync, colas de espera) siguen disponibles en el tag `v2.1-infraestructura`.

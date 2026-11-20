@@ -1,6 +1,6 @@
 #!/bin/sh
 # Muestra las instancias de la API que descubrió Traefik y su estado, según
-# el panel (puerto 8080). Con --esperar N, antes espera hasta 60 s a que
+# el panel (puerto 8080, por HTTPS desde la Entrega 5). Con --esperar N, antes espera hasta 60 s a que
 # Traefik tenga exactamente N instancias UP: una instancia nueva aparece
 # cuando Docker la marca healthy, y una detenida desaparece.
 #
@@ -9,10 +9,11 @@
 #   pruebas/descubrimiento/instancias.sh --esperar 3
 set -e
 
-PANEL=${PANEL:-http://localhost:8080}
+PANEL=${PANEL:-https://localhost:8080}
+CA=${CA:-seguridad/local/ca.crt}
 
 servicio() {
-    curl -s "$PANEL/api/http/services/api@docker"
+    curl -s --cacert "$CA" "$PANEL/api/http/services/api@docker"
 }
 
 instancias_up() {

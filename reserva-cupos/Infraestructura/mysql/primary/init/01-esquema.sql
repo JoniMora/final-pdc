@@ -11,10 +11,22 @@ CREATE TABLE tenants (
                          activo BOOLEAN NOT NULL DEFAULT TRUE,
                          webhook_url VARCHAR(2048) NULL,
                          webhook_secret VARBINARY(32) NULL,
+                         -- Entrega 5: permisos de la clave y límite de tasa propio
+                         -- (NULL: rige el límite por defecto de la API).
+                         scopes SET('actividades:escribir', 'reservas:escribir', 'lectura', 'cambios:leer')
+                             NOT NULL DEFAULT 'actividades:escribir,reservas:escribir,lectura,cambios:leer',
+                         limite_por_segundo INT NULL,
+                         limite_rafaga INT NULL,
                          creado_en TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
 
                          PRIMARY KEY (id),
-                         UNIQUE KEY uq_tenant_api_key (api_key_hash)
+                         UNIQUE KEY uq_tenant_api_key (api_key_hash),
+
+                         CONSTRAINT chk_tenant_limite
+                             CHECK (
+                                 (limite_por_segundo IS NULL AND limite_rafaga IS NULL)
+                                     OR (limite_por_segundo > 0 AND limite_rafaga > 0)
+                                 )
 ) ENGINE=InnoDB;
 
 CREATE TABLE actividades (

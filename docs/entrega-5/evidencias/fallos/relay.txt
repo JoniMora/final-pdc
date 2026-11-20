@@ -1,0 +1,12 @@
+Matriz de fallos · Relay detenido con una ráfaga en curso
+Ejecución: 2026-11-15T00:15:12.252Z
+
+  · Ráfaga de 200 solicitudes sobre 10 cupos; relay detenido tras 40 admisiones
+  · 200 admitidas en 3.8 s · latencia de admisión p50 0.67 s, p95 1.08 s, máx 1.34 s · reintentos 0 (errores vistos: ninguno)
+OK: Con relay detenido, la API siguió admitiendo: 200 de 200 solicitudes respondieron 202
+  · Pendientes con relay detenido: 178 (detenido hace 1.9 s)
+  · Invariantes: 10 confirmadas, 190 rechazadas, 0 pendientes, 0 duplicadas, cupos_disponibles = 0
+  · Tiempo desde que relay vuelve hasta 0 pendientes: 7.1 s
+OK: Al volver relay, se decidieron todas sin pérdidas ni duplicados
+
+Resultado: APROBADA

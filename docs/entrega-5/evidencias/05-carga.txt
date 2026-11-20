@@ -1,0 +1,96 @@
+k6 por HTTPS: ráfaga de 500 sobre 10 cupos y límite de tasa por tenant
+Ejecución: 2026-11-15T00:14:23Z · commit 3eeac3a
+
+$ CLAVE=$(node scripts/sistema.js tenant "Ráfaga" --limite 1000/1000 2>/dev/null); docker compose run --rm k6 run -q -e API_KEY="$CLAVE" /pruebas/carga/rafaga.js --no-color
+time="2026-11-15T00:14:26Z" level=info msg="Actividad 01a1dc8e-2830-7997-b964-6b1fb9b8e0c3: 10 cupos, 500 solicitudes simultáneas" source=console
+time="2026-11-15T00:14:45Z" level=info msg="Resultado (sin pendientes tras 8.7 s de espera): confirmadas=10 rechazadas=490 pendientes=0 cupos_disponibles=0" source=console
+
+
+  █ THRESHOLDS 
+
+    checks
+    ✓ 'rate==1' rate=100.00%
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......................: 1004    51.734156/s
+    checks_succeeded...................: 100.00% 1004 out of 1004
+    checks_failed......................: 0.00%   0 out of 1004
+
+    ✓ admisión responde 202
+    ✓ admisión devuelve Location
+    ✓ 0 pendientes
+    ✓ exactamente 10 confirmadas
+    ✓ exactamente 490 rechazadas
+    ✓ cupos_disponibles = 0
+
+    HTTP
+    http_req_duration.......................................................: min=5.02ms   med=5.91s avg=5.58s p(95)=9.16s  max=9.66s 
+      { expected_response:true }............................................: min=5.02ms   med=5.91s avg=5.58s p(95)=9.16s  max=9.66s 
+    http_req_failed.........................................................: 0.00%  0 out of 550
+    http_reqs...............................................................: 550    28.340424/s
+
+    EXECUTION
+    iteration_duration......................................................: min=999.39ms med=6.74s avg=6.67s p(95)=10.22s max=10.53s
+    iterations..............................................................: 500    25.764022/s
+    vus.....................................................................: 0      min=0        max=500
+    vus_max.................................................................: 500    min=500      max=500
+
+    NETWORK
+    data_received...........................................................: 1.9 MB 95 kB/s
+    data_sent...............................................................: 366 kB 19 kB/s
+
+
+
+(código de salida: 0)
+
+$ SATURADO=$(node scripts/sistema.js tenant "Saturado" --limite 10/20 2>/dev/null); VECINO=$(node scripts/sistema.js tenant "Vecino" --limite 10/20 2>/dev/null); docker compose run --rm k6 run -q -e CLAVE_SATURADO="$SATURADO" -e CLAVE_VECINO="$VECINO" /pruebas/carga/limite.js --no-color
+
+
+  █ THRESHOLDS 
+
+    checks
+    ✓ 'rate==1' rate=100.00%
+
+    respuestas_429
+    ✓ 'count>0' count=4929
+
+    vecino_rechazado
+    ✓ 'count==0' count=0
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......................: 10117   991.463062/s
+    checks_succeeded...................: 100.00% 10117 out of 10117
+    checks_failed......................: 0.00%   0 out of 10117
+
+    ✓ saturado: 200 o 429
+    ✓ 429 trae Retry-After
+    ✓ vecino: siempre 200
+
+    CUSTOM
+    respuestas_429..........................................................: 4929   483.040568/s
+    vecino_rechazado........................................................: 0      0/s
+
+    HTTP
+    http_req_duration.......................................................: avg=39.42ms min=2.77ms  med=29.52ms max=315.05ms p(90)=72.58ms p(95)=98.85ms 
+      { expected_response:true }............................................: avg=90.12ms min=24.86ms med=65.82ms max=284.25ms p(90)=177.3ms p(95)=193.78ms
+    http_req_failed.........................................................: 97.23% 4929 out of 5069
+    http_reqs...............................................................: 5069   496.760528/s
+
+    EXECUTION
+    iteration_duration......................................................: avg=40.12ms min=2.98ms  med=29.67ms max=352.35ms p(90)=72.82ms p(95)=99.08ms 
+    iterations..............................................................: 5069   496.760528/s
+    vus.....................................................................: 20     min=20           max=20
+    vus_max.................................................................: 22     min=22           max=22
+
+    NETWORK
+    data_received...........................................................: 1.0 MB 98 kB/s
+    data_sent...............................................................: 204 kB 20 kB/s
+
+
+
+(código de salida: 0)
+

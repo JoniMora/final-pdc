@@ -24,27 +24,6 @@ const PEDIDO_CANCELACION = "reserva.cancelacion_solicitada";
 
 const rutas = express.Router();
 
-// El tenant se deriva siempre de la clave, nunca de la ruta ni del cuerpo.
-async function autenticar(req, res, next) {
-    const [esquema, clave] = (req.get("authorization") || "").split(" ");
-
-    if (esquema !== "Bearer" || !clave) {
-        throw problemas.noAutenticado();
-    }
-
-    const [filas] = await pool.query(
-        "SELECT id FROM tenants WHERE api_key_hash = ? AND activo = TRUE",
-        [sha256(clave)]
-    );
-
-    if (filas.length === 0) {
-        throw problemas.noAutenticado();
-    }
-
-    req.tenantId = filas[0].id;
-    next();
-}
-
 function entero(valor, porDefecto, minimo, maximo, nombre) {
     if (valor === undefined) return porDefecto;
 
@@ -397,4 +376,4 @@ rutas.get("/cambios", async (req, res) => {
     });
 });
 
-module.exports = { rutas, autenticar };
+module.exports = { rutas };

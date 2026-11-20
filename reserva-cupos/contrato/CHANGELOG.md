@@ -4,6 +4,16 @@ Versionado semántico sobre cada documento. Un cambio compatible sube la versió
 
 ## `openapi.yaml`: API pública
 
+### 1.2.0 · Entrega 5
+
+Compatible con 1.1.0: oasdiff no informa cambios incompatibles ni advertencias. Un cliente de 1.1.0 sigue funcionando sin cambios, porque su clave conserva los cuatro permisos y el límite de tasa por defecto (50/s, ráfaga 100) supera el uso normal.
+
+- **Nuevo: permisos por clave (scopes).** Cada operación de `/v1` declara en `security` el permiso que exige (`actividades:escribir`, `reservas:escribir`, `lectura` o `cambios:leer`). La API los aplica leyendo esa misma declaración del contrato, así que el permiso documentado y el aplicado no pueden diferir. Una clave sin el permiso responde `403` (`permiso-insuficiente`).
+- **Nuevo: límite de tasa por tenant.** Token bucket por tenant. Al superarlo, `429` (`limite-de-tasa`) con `Retry-After`. El operador puede fijar un límite propio por tenant.
+- **Nuevo: administración de tenants** (`/admin/v1/tenants`, tag `administracion`), con la clave del operador (`claveAdministrador`): alta con permisos, webhook y límite; consulta; cambio de permisos, webhook, límite o estado; y rotación de la clave, que invalida la anterior en el momento. La clave y el secreto del webhook se muestran una sola vez. Reemplaza al script `crear-tenant.sql`. Una clave de tenant recibe `403` en estas rutas.
+- **Respuestas nuevas** `403` y `429` en todas las operaciones de `/v1`. Agregar respuestas de error no es un cambio incompatible.
+- **Transporte:** el servidor del contrato pasa a `https://localhost:3000`. La API solo atiende por HTTPS.
+
 ### 1.1.0 · Entrega 4
 
 Compatible con 1.0.0 para los clientes que siguen el contrato, con dos excepciones justificadas: el `minLength` de `cursor` (ver *Precisión*) y los tipos nuevos del feed (ver *Cambio en el feed*).

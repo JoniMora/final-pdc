@@ -1,16 +1,12 @@
 const amqp = require("amqplib");
+const { conexionRabbit } = require("../../../compartido/src/tls");
 
 async function configurar() {
     let conexion;
     let canal;
 
     try {
-        conexion = await amqp.connect({
-            hostname: process.env.RABBITMQ_HOST,
-            username: process.env.RABBITMQ_USER,
-            password: process.env.RABBITMQ_PASSWORD,
-            heartbeat: 10
-        });
+        conexion = await amqp.connect(...conexionRabbit({ heartbeat: 10 }));
 
         conexion.on("error", error => {
             console.error("[colas]", error.message);
