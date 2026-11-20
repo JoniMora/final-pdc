@@ -39,8 +39,7 @@ cambiar al editar.
 
 | Archivo o carpeta | Qué mirar y explicar |
 |---|---|
-| `docker-compose.yml` | Define servicios, redes, volúmenes y dependencias. Es la topología base; no contiene por sí solo toda la configuración segura. |
-| `docker-compose.yml` | La base E5 corregida integra TLS sin overlay. |
+| `docker-compose.yml` | Servicios, redes, volúmenes y dependencias, con TLS en todos los saltos (sin overlay). `docker-compose.particiones.yml` suma los workers de las particiones 1 a 3. |
 | `Infraestructura/mysql/primary/init/01-esquema.sql` | Tablas tenants, actividades, reservas y cambios; restricciones que refuerzan la consistencia. |
 | `Infraestructura/mysql/primary/init/02-usuarios.sql` | Privilegios por componente. La API no decide el descuento de cupos. |
 | `Infraestructura/mysql/primary/primary.cnf` y `mysql/replica/replica.cnf` | Identidades, binlog/GTID y configuración de replicación. |
@@ -63,7 +62,15 @@ cambiar al editar.
 | `clientes/aula/src/recuperacion.js` | `aplicarPagina` y `sincronizar`: cambios y cursor de feed en una misma transacción local. |
 | `clientes/aula/public/index.html` | Interfaz que llama al backend. Ocultar un botón no reemplaza autorización en el servidor. |
 | `scripts/preparar-seguridad.js` | Genera CA local, certificados y usuarios con contraseñas derivadas. Los archivos secretos quedan fuera de Git. |
-| `scripts/sistema.js` | Preparación, arranque seguro, tenants y pruebas. `scripts/verificar-e6.js` levanta las cuatro particiones de E6. |
+| `scripts/sistema.js` | `demo`: todo en un comando (certificados, entorno, réplica, Grafana, tenant y comprobaciones). También preparar, levantar, tenants y pruebas. |
+| `servicios/api/src/admisiones.js` | Admisión por lotes: varias reservas comparten un commit; si cae MySQL el lote se rechaza entero. |
+| `servicios/api/src/cache-autenticacion.js` y `redis.js` | Cache-aside de la autenticación con generación; qué pasa durante un cambio de permisos y al reconectar Redis. |
+| `servicios/api/src/limite-redis.js` | Token bucket global en Lua con el reloj de Redis. |
+| `compartido/src/particiones.js` | `COMANDOS_PARTICIONES` y `WORKER_PARTICION`: N colas, un worker exclusivo por partición. |
+| `servicios/notificador/src/circuitos.js` y `reintento.js` | Circuit breaker por tenant (opossum) y el plazo de 400 s hasta la DLQ. |
+| `Infraestructura/prometheus/` y `grafana/` | Qué se recolecta y el dashboard provisionado. |
+| `pruebas/final/escenario-mas-uno.js` | La demo del escenario +1: 500 alumnos, aula-db caída y reconciliación. |
+| `pruebas/fallos/matriz.js` | La matriz de fallos: cada componente detenido con carga, failover y Redis. |
 | `pruebas/final/recorrido.js` | Comprueba el caso completo con HTTPS, roles, confirmación, rechazo, cancelación y reasignación. |
 | `pruebas/final/carga.js` y `curva-admisiones.js` | Escenarios k6 caliente, multitenant y rampa con informes; curva de admisiones con 1, 2 y 4 API. |
 | `pruebas/carga/rafaga.js` | Genera 500 solicitudes para diez cupos y verifica resultados finales; distingue errores HTTP de respuestas válidas. |
@@ -127,19 +134,24 @@ Las versiones evitan reemplazar un estado más nuevo por uno viejo.
 El cursor del feed es independiente del máximo visto por webhook: recibir un evento
 posterior no autoriza saltear cambios anteriores que faltan en la proyección.
 
-## Lo que encontramos y corregimos en E6
+## Lo que encontraron las pruebas
 
-“Con carga, el health check esperaba conexiones en el mismo pool que el negocio.
-Eso podía hacer que Docker o Traefik consideraran no disponible una instancia
-ocupada. Creamos un pool de salud independiente, de una conexión y con tiempos
-limitados, y los chequeos simultáneos comparten la misma consulta. Conservamos TLS”.
+Medir con carga y fallos encontró errores que las pruebas funcionales no mostraban.
+Conviene saber contarlos, porque muestran por qué se mide:
 
-Mostrar `poolSalud` y `estadoMysql` en `server.js`. El endpoint informa el estado de MySQL en el
-cuerpo; HTTP 200 significa que respondió el proceso, no que una reserva esté confirmada.
+- **Health check bloqueado** detrás del pool de negocio (E5): Traefik sacaba de servicio
+  a la única API. Ahora tiene su pool y los chequeos simultáneos comparten la consulta
+  (`poolSalud` y `estadoMysql` en `server.js`).
+- **Lote de admisiones en serie con MySQL caído** (E6): 50 admisiones hacían 51
+  transacciones seguidas. Ahora el lote se rechaza entero con `503`.
+- **Webhooks que tardaban horas en llegar a la DLQ** con el circuito abierto (E6):
+  ahora hay un plazo de 400 s desde el primer fallo.
+- **La API quedaba en `503` si Redis volvía cargando su AOF** (E6, lo encontró el CI):
+  la preparación se intentaba una sola vez; ahora se reintenta en cada uso.
+- **Comandos varados al bajar de 4 a 1 partición** (E6): el relay ahora los reenvía.
 
-“También corregimos el diagnóstico de k6: antes de leer `datos` comprobamos HTTP
-y la estructura JSON. Así un error de transporte o gateway no se interpreta como
-una lista vacía ni se oculta detrás de un error de parseo”.
+El detalle está en las certificaciones de la [Entrega 5](../entrega-5/README.md) y la
+[Entrega 6](../entrega-6/README.md#errores-encontrados-al-medir-y-cómo-se-corrigieron).
 
 ## Resultados que sí podés afirmar
 
@@ -197,8 +209,53 @@ actividad, no un orden global estricto.
 PostgreSQL detenido y reconstrucción posterior desde el feed. No demuestra caída
 del host completo ni failover automático de MySQL.
 
-**¿Qué queda antes de entregar?** Ensayar la demo y la explicación de ambos,
-revisar el CI del commit definitivo y publicar/verificar la versión final.
+**¿Qué patrones de diseño distribuido aplicaron?** Queue-Based Load Leveling, Transactional
+Outbox, Idempotent Consumer, Competing Consumers con particiones por actividad, Retry con
+DLQ, Circuit Breaker por tenant, Cache-aside, Token bucket distribuido y gateway con
+balanceo. Cada uno con su evidencia en [patrones.md](../entrega-6/patrones.md).
+
+**¿Cómo escala horizontalmente?** La API no guarda estado: el límite de tasa y la caché de
+permisos están en Redis, así que 1, 2 o 4 instancias detrás de Traefik respetan el mismo
+límite. Los comandos se reparten en N particiones con un worker cada una.
+
+**¿Por qué con más API no admiten más reservas por segundo?** Cada admisión espera el
+commit semisincrónico del primario. Cada API arma sus propios lotes: con cuatro, los lotes
+son más chicos y el primario hace casi el triple de commits (27 contra 10 para 100
+admisiones). El cuello es el primario, no la API.
+
+**¿Qué pasa si se cae Redis?** `/v1` responde `503` con `Retry-After` hasta que vuelve, y la
+API se reconecta sola. Se eligió así: un límite por instancia multiplicaría el de cada
+tenant por la cantidad de API. Lo ya admitido sigue su curso por el outbox.
+
+**¿Para qué el circuit breaker si ya hay reintentos?** Con el receptor caído, cada
+reintento ocupa al notificador hasta 5 s y castiga más al receptor. El circuito abierto
+difiere los envíos sin HTTP; cada 10 s prueba con uno solo. Es por tenant: uno caído no
+frena a los demás.
+
+**¿Cómo se invalida la caché de permisos?** Con una generación global: rotar una clave o
+cambiar permisos la incrementa antes y después del `UPDATE`; durante el cambio se consulta
+MySQL directo.
+
+**¿Cómo saben que funciona bajo carga?** k6 (caliente, multitenant y rampa), métricas de
+cada componente en Prometheus y Grafana, y fallos provocados durante la ráfaga. Las cifras
+y sus límites están en la Entrega 6.
+
+## Ensayo cruzado
+
+La consigna pide que cada integrante pueda explicar cualquier parte, no solo la que
+programó. En el ensayo, cada uno explica las partes del otro, con el código abierto, y
+anota la fecha en la Wiki (página "Ensayos de la demo").
+
+| Parte | La programó | La explica en el ensayo | Fecha |
+|---|---|---|---|
+| Infraestructura: Compose, MySQL primario-réplica, failover, RabbitMQ | Jonathan | Constanza | |
+| Relay (outbox y feed), worker (decisión e idempotencia), particiones | Jonathan | Constanza | |
+| Notificador: firma, reintentos, DLQ, SSRF | Jonathan | Constanza | |
+| Contratos OpenAPI y AsyncAPI, CI | Ambos | El otro | |
+| API: autenticación, admisión, permisos, administración de tenants | Constanza | Jonathan | |
+| Aula: login, roles, CSRF, contingencia y reconciliación | Constanza | Jonathan | |
+| Redis (límite y caché), circuit breaker, Prometheus y Grafana | Constanza | Jonathan | |
+| Carga con k6 y fallos bajo carga | Ambos | El otro | |
 
 ## Cómo practicar sin memorizar todo
 
