@@ -16,7 +16,9 @@ Antes de esta entrega, durante el cambio la autenticación respondía `503` a to
 
 ## Si Redis no responde
 
-La API responde `503` (`no-disponible`, con `Retry-After`) en `/v1`, y vuelve sola cuando Redis vuelve. No sigue con un límite local: con N instancias se multiplicaría por N. Lo ya admitido sigue su curso por el outbox. [Redis detenido durante una ráfaga](evidencias/matriz/redis.txt): 15 s en plena ráfaga de 200. Desde los 0,7 s, `/v1` responde `503` con `Retry-After` mientras `/health` sigue en `200`; los clientes reintentaron 521 veces con la misma clave y el resultado fue 10 confirmadas, 190 rechazadas, ninguna duplicada; la API volvió a atender en cuanto Redis quedó sano, sin reiniciarse.
+La API responde `503` (`no-disponible`, con `Retry-After`) en `/v1`, y vuelve sola cuando Redis vuelve. No sigue con un límite local: con N instancias se multiplicaría por N. Lo ya admitido sigue su curso por el outbox. [Redis detenido durante una ráfaga](evidencias/matriz/redis.txt): 15 s en plena ráfaga de 200. Desde los 0,3 s, `/v1` responde `503` con `Retry-After` mientras `/health` sigue en `200`; los clientes reintentaron 526 veces con la misma clave y el resultado fue 10 confirmadas, 190 rechazadas, ninguna duplicada; la API volvió a atender en cuanto Redis quedó sano, sin reiniciarse.
+
+Al reconectar, la API incrementa la generación de la caché antes de atender. Esa preparación se reintenta en cada uso hasta que sale bien: si Redis vuelve todavía cargando su AOF, el `INCR` responde `LOADING`, y con un solo intento la API quedaba en `503` aunque Redis ya estuviera sano (lo encontró la matriz de fallos en el CI; con una carga forzada de 3,1 s, la API corregida vuelve a los 3 s).
 
 ## Configuración y seguridad
 

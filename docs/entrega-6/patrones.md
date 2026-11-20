@@ -112,7 +112,7 @@ Los patrones 4, 5, 7 y 8 y la admisión por lotes son de esta entrega; la consig
 
 **Dónde está.** `servicios/api/src/limite-redis.js`. Si Redis no responde, `503`: no hay un límite local de reserva, que volvería a multiplicarse por N.
 
-**Evidencia.** [Redis con 4 API](evidencias/redis-escalado.json): un tenant con 1/s y ráfaga 5 envía 40 pedidos repartidos entre las cuatro: 5 admitidos y 35 `429` con `Retry-After` (con límites locales habrían sido hasta 20). [Redis detenido durante una ráfaga](evidencias/matriz/redis.txt): 15 s en plena ráfaga de 200. Desde los 0,7 s, `/v1` responde `503` con `Retry-After` mientras `/health` sigue en `200`; los clientes reintentaron 521 veces con la misma clave y el resultado fue 10 confirmadas, 190 rechazadas, ninguna duplicada; la API volvió a atender en cuanto Redis quedó sano, sin reiniciarse..
+**Evidencia.** [Redis con 4 API](evidencias/redis-escalado.json): un tenant con 1/s y ráfaga 5 envía 40 pedidos repartidos entre las cuatro: 5 admitidos y 35 `429` con `Retry-After` (con límites locales habrían sido hasta 20). [Redis detenido durante una ráfaga](evidencias/matriz/redis.txt): 15 s en plena ráfaga de 200. Desde los 0,3 s, `/v1` responde `503` con `Retry-After` mientras `/health` sigue en `200`; los clientes reintentaron 526 veces con la misma clave y el resultado fue 10 confirmadas, 190 rechazadas, ninguna duplicada; la API volvió a atender en cuanto Redis quedó sano, sin reiniciarse..
 
 **Límite.** Redis es una sola instancia: si cae, `/v1` no atiende hasta que vuelve.
 

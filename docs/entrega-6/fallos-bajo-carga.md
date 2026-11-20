@@ -37,7 +37,7 @@ Sin ese reintento, las solicitudes en curso en la API detenida llegarían al cli
 
 La [matriz de fallos](../entrega-5/README.md#recuperación-ante-fallos) de la Entrega 5 cubre worker, relay, RabbitMQ, notificador, API, réplica, aula-db, el servidor del tenant y el failover del primario. Esta entrega le agrega Redis, y vuelve a correr el escenario del tenant con el circuit breaker:
 
-- [Redis detenido durante una ráfaga](evidencias/matriz/redis.txt): 15 s en plena ráfaga de 200. Desde los 0,7 s, `/v1` responde `503` con `Retry-After` mientras `/health` sigue en `200`; los clientes reintentaron 521 veces con la misma clave y el resultado fue 10 confirmadas, 190 rechazadas, ninguna duplicada; la API volvió a atender en cuanto Redis quedó sano, sin reiniciarse.
+- [Redis detenido durante una ráfaga](evidencias/matriz/redis.txt): 15 s en plena ráfaga de 200. Desde los 0,3 s, `/v1` responde `503` con `Retry-After` mientras `/health` sigue en `200`; los clientes reintentaron 526 veces con la misma clave y el resultado fue 10 confirmadas, 190 rechazadas, ninguna duplicada; la API volvió a atender en cuanto Redis quedó sano, sin reiniciarse.
 - [Servidor del tenant caído](evidencias/matriz/tenant.txt): Con Aula y aula-db detenidas, el servicio decide igual las 20 reservas del tenant (5 confirmadas, 15 rechazadas); sus 20 webhooks llegan a la DLQ a los 409 s de la caída, con el circuito abriéndose y cerrándose (el plazo de 400 s más, como mucho, una espera de 10 s); al volver, Aula reconstruye las 20 inscripciones desde el feed en 17,9 s.
 
 ## Grabación
