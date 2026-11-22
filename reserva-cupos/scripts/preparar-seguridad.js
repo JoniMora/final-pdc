@@ -28,8 +28,9 @@ const DIRECTORIO = path.resolve(__dirname, "../seguridad/local");
 const DIAS = "365";
 
 // Servicio → nombres del certificado. La réplica también se presenta como
-// mysql-primary: al promoverla (pruebas/fallos/failover.js) recibe ese
-// alias de red y los clientes verifican la identidad contra ese nombre.
+// mysql-primary: al promoverla (pruebas/fallos/failover.js, que usa también
+// `sistema.js failover`) recibe ese alias de red y los clientes verifican
+// la identidad contra ese nombre.
 const CERTIFICADOS = {
     redis: ["redis", "localhost"],
     "receptor-pruebas": ["receptor-pruebas", "localhost"],

@@ -10,6 +10,8 @@
 //   node scripts/sistema.js tenant <nombre> [--limite <por_segundo>/<rafaga>] [--scopes a,b]
 //   node scripts/sistema.js seguridad    pruebas de acceso, cifrado y Aula (evidencias)
 //   node scripts/sistema.js fallos [escenario...]   matriz de fallos (evidencias)
+//   node scripts/sistema.js failover     promueve la réplica si se cae el primario
+//   node scripts/sistema.js restaurar [--confirmar]   vuelve a primario + réplica (BORRA los datos)
 //   node scripts/sistema.js detener      detiene sin borrar datos
 //
 // "levantar" no borra volúmenes. Esta entrega cambia los scripts iniciales
@@ -83,7 +85,7 @@ function exigirTopologiaOriginal() {
 
     if (promovida) {
         throw new Error("La réplica fue promovida a primario (failover). Para volver a la topología inicial: " +
-            "docker compose down -v y node scripts/sistema.js levantar");
+            "node scripts/sistema.js restaurar (borra los datos del entorno)");
     }
 }
 
@@ -237,6 +239,76 @@ async function demo(args) {
     ].join("\n"));
 }
 
+// --- Failover y restauración (issue #61) -------------------------------------
+//
+// failover: el primario de MySQL se cayó (o se quiere conmutar): lo deja
+// detenido, promueve la réplica (pruebas/fallos/failover.js) y mide cuándo
+// la API vuelve a aceptar escrituras. Es manual a propósito: con dos nodos,
+// decidir solo que el primario murió puede terminar en dos primarios.
+
+function estadoContenedor(servicio) {
+    const [id] = compose(["ps", "-a", "-q", servicio], { capturar: true }).trim().split("\n").filter(Boolean);
+    if (!id) return null;
+    const [estado, fin] = execFileSync("docker", ["inspect", "-f", "{{.State.Status}}|{{.State.FinishedAt}}", id],
+        { encoding: "utf8" }).trim().split("|");
+    return { id, estado, fin: new Date(fin) };
+}
+
+async function failover() {
+    const { api, claveAula } = require("../pruebas/comun");
+    const { promoverReplica } = require("../pruebas/fallos/failover");
+
+    exigirTopologiaOriginal();
+
+    const primario = estadoContenedor("mysql-primary");
+    if (primario?.estado === "running") {
+        console.log("El primario sigue en marcha: se detiene para que no queden dos primarios.");
+    }
+    // También si ya estaba caído: detenido a mano, Docker no lo reinicia.
+    compose(["stop", "mysql-primary"], { capturar: true });
+    const caida = estadoContenedor("mysql-primary").fin;
+
+    const inicio = Date.now();
+    await promoverReplica(texto => console.log(`OK: ${texto}`));
+
+    // Sonda: una escritura real por la API, con la clave del tenant de la demo.
+    const archivo = path.join(RAIZ, "seguridad/local/tenant-demo.key");
+    const clave = fs.existsSync(archivo) ? fs.readFileSync(archivo, "utf8").trim() : claveAula();
+    const cliente = api(clave);
+    for (;;) {
+        const r = await cliente("/v1/actividades", {
+            metodo: "POST", cuerpo: { nombre: "Sonda de failover", capacidad: 1 }, timeoutMs: 10000
+        }).catch(() => null);
+        if (r?.status === 201) break;
+        if (Date.now() - inicio > 120000) throw new Error("La API no volvió a aceptar escrituras en 2 minutos");
+        await esperar(250);
+    }
+
+    const segundos = ms => `${(ms / 1000).toFixed(1).replace(".", ",")} s`;
+    console.log(`OK: la API vuelve a escribir, ${segundos(Date.now() - inicio)} después de iniciar el failover` +
+        (caida.getTime() > 0 ? ` (${segundos(Date.now() - caida.getTime())} desde la caída del primario: RTO)` : ""));
+    console.log("El primario viejo queda detenido. La réplica promovida trabaja sin réplica.");
+    console.log("Para volver a primario + réplica: node scripts/sistema.js restaurar (borra los datos del entorno).");
+}
+
+// restaurar: vuelve a la topología original recreando el entorno. Borra
+// los volúmenes (reservas, materias de Aula, colas y métricas); los
+// certificados y credenciales de seguridad/local/ se conservan.
+async function restaurar(args) {
+    if (!args.includes("--confirmar")) {
+        const readline = require("node:readline/promises");
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+        const respuesta = await rl.question(
+            "Esto BORRA todos los datos del entorno (reservas, materias de Aula, colas y métricas).\n" +
+            "Escribí 'restaurar' para seguir: ");
+        rl.close();
+        if (respuesta.trim() !== "restaurar") return console.log("Cancelado: no se borró nada.");
+    }
+
+    compose(["-f", "docker-compose.yml", "-f", "docker-compose.particiones.yml", "down", "-v", "--remove-orphans"]);
+    await demo(args.filter(arg => arg !== "--confirmar"));
+}
+
 async function main() {
     const [accion = "estado", ...args] = process.argv.slice(2);
 
@@ -263,10 +335,14 @@ async function main() {
             return nodo("pruebas/seguridad/cifrado.js");
         case "fallos":
             return nodo("pruebas/fallos/matriz.js", args);
+        case "failover":
+            return failover();
+        case "restaurar":
+            return restaurar(args);
         case "detener":
             return compose(["stop"]);
         default:
-            throw new Error("Acciones: demo, preparar, levantar, estado, tenant, seguridad, fallos, detener");
+            throw new Error("Acciones: demo, preparar, levantar, estado, tenant, seguridad, fallos, failover, restaurar, detener");
     }
 }
 

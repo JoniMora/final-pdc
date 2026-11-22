@@ -62,7 +62,8 @@ cambiar al editar.
 | `clientes/aula/src/recuperacion.js` | `aplicarPagina` y `sincronizar`: cambios y cursor de feed en una misma transacción local. |
 | `clientes/aula/public/index.html` | Interfaz que llama al backend. Ocultar un botón no reemplaza autorización en el servidor. |
 | `scripts/preparar-seguridad.js` | Genera CA local, certificados y usuarios con contraseñas derivadas. Los archivos secretos quedan fuera de Git. |
-| `scripts/sistema.js` | `demo`: todo en un comando (certificados, entorno, réplica, Grafana, tenant y comprobaciones). También preparar, levantar, tenants y pruebas. |
+| `scripts/sistema.js` | `demo`: todo en un comando (certificados, entorno, réplica, Grafana, tenant y comprobaciones). `failover` y `restaurar` para el primario. También preparar, levantar, tenants y pruebas. |
+| `pruebas/fallos/failover.js` | `promoverReplica`: espera a que la réplica aplique lo recibido (`GTID_SUBSET`), corta la replicación, habilita la escritura y le da el alias de red `mysql-primary`. |
 | `servicios/api/src/admisiones.js` | Admisión por lotes: varias reservas comparten un commit; si cae MySQL el lote se rechaza entero. |
 | `servicios/api/src/cache-autenticacion.js` y `redis.js` | Cache-aside de la autenticación con generación; qué pasa durante un cambio de permisos y al reconectar Redis. |
 | `servicios/api/src/limite-redis.js` | Token bucket global en Lua con el reloj de Redis. |
@@ -190,9 +191,21 @@ La decisión se demora hasta recuperar transporte y consumidores; 202 no promete
 **¿Qué pasa si cae el worker después de actualizar?** Con commit hecho y sin ack,
 RabbitMQ reentrega. El worker ve el estado ya decidido y no repite el efecto.
 
-**¿La réplica reemplaza automáticamente al primario?** No. El failover es manual.
-La replicación semisíncrona puede degradar a asíncrona por timeout; no prometemos
-RPO cero ante cualquier falla. Una réplica tampoco reemplaza backups.
+**¿La réplica reemplaza automáticamente al primario?** No. El failover es manual, con
+un comando: `node scripts/sistema.js failover`. Detiene el primario si sigue en marcha,
+espera a que la réplica aplique todo lo que recibió, la habilita para escribir y le da
+el nombre de red `mysql-primary`: la API, el worker y el relay se reconectan sin cambiar
+su configuración. En el ensayo, la escritura volvió 11 s después de la caída y la ráfaga
+terminó con 10 confirmadas y 490 rechazadas. Es manual a propósito: con dos nodos, una
+detección automática no distingue un primario caído de uno aislado por la red y puede
+terminar con dos primarios; haría falta un tercer nodo que decida. La replicación
+semisíncrona puede degradar a asíncrona por timeout; no prometemos RPO cero ante
+cualquier falla. Una réplica tampoco reemplaza backups. Volver a primario + réplica
+recrea el entorno (`restaurar`): no reincorporamos el primario viejo como réplica.
+
+**¿Qué pasa si se cae una instancia de la API?** Traefik deja de mandarle tráfico. Las
+solicitudes que estaban en ella reciben 502 o 504 y el cliente reintenta con la misma
+`Idempotency-Key`: la admisión es idempotente, así que no se duplica ninguna reserva.
 
 **¿Por qué un solo relay?** Secuencia el feed y publica desde el outbox. Escalar ese
 secuenciador requiere coordinación adicional; esta versión no lo implementa.

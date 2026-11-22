@@ -241,7 +241,16 @@ node pruebas/fallos/matriz.js --e6 redis tenant  # evidencias en docs/entrega-6/
 
 El arnés ([`pruebas/fallos/arnes.js`](pruebas/fallos/arnes.js)) lanza una ráfaga de reservas que reintenta como un cliente correcto, detiene el componente a mitad de la ráfaga, lo vuelve a iniciar y verifica por la API: exactamente tantas confirmadas como cupos, ninguna pendiente, ningún participante con dos reservas activas y `cupos_disponibles` coherente. Cada escenario deja `docs/entrega-5/evidencias/fallos/<escenario>.txt`, y la corrida completa, `resumen.md`.
 
-`mysql-primary` va último: termina el primario con SIGKILL, lo deja aislado, promueve la réplica, le pasa el alias de red `mysql-primary` (los clientes no cambian su configuración y el certificado de la réplica también vale para ese nombre) y mide el RTO y el RPO. Deja la réplica como primario y sin réplica; para volver a la topología inicial: `docker compose down -v` y `node scripts/sistema.js levantar`.
+`mysql-primary` va último: termina el primario con SIGKILL, lo deja aislado, promueve la réplica, le pasa el alias de red `mysql-primary` (los clientes no cambian su configuración y el certificado de la réplica también vale para ese nombre) y mide el RTO y el RPO. Deja la réplica como primario y sin réplica; para volver a la topología inicial: `node scripts/sistema.js restaurar`.
+
+### Si se cae el primario
+
+```shell
+node scripts/sistema.js failover      # promueve la réplica y mide cuándo vuelve la escritura
+node scripts/sistema.js restaurar     # vuelve a primario + réplica: BORRA los datos (pide confirmación)
+```
+
+`failover` detiene el primario si sigue en marcha (para que no haya dos), espera a que la réplica aplique todo lo que recibió, la promueve, le da el alias `mysql-primary` y prueba una escritura por la API hasta que responde 201: informa cuánto tardó desde el failover y desde la caída (RTO). Es el mismo procedimiento que el escenario `mysql-primary` de la matriz ([`pruebas/fallos/failover.js`](pruebas/fallos/failover.js)). Con la réplica promovida, `demo` y `levantar` se niegan a arrancar y avisan cómo volver. `restaurar` corre `docker compose down -v` y `demo`: conserva `seguridad/local/` (certificados y claves) y borra las bases. Con `--confirmar` no pregunta.
 
 ### Contrato, carga y límite de tasa
 

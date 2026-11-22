@@ -29,6 +29,7 @@ const {
     cronometro, segundos, detener, iniciar, esperarSaludable, esperarEntornoSano, colas, rafaga, resumenRafaga,
     listar, verificarInvariantes, resumenInvariantes
 } = require("./arnes");
+const { promoverReplica } = require("./failover");
 
 const SIN_DLQ = process.argv.includes("--sin-dlq");
 const E6 = process.argv.includes("--e6");
@@ -464,30 +465,8 @@ async function tenantCaido({ ok, dato, clave, dlqAntes, caida }) {
 
 // --- Failover del primario (E5-12) --------------------------------------------
 
-// Promueve la réplica: espera a que aplique todo lo recibido, corta la
-// replicación, quita el solo lectura y le pasa el alias de red
-// mysql-primary. Los clientes no cambian su configuración: el nombre que
-// usan ahora resuelve a la réplica, cuyo certificado también es válido para
-// ese nombre.
-async function promoverReplica(dato) {
-    const [replica] = contenedores("mysql-replica");
-    const red = "reserva-cupos-infra_interna";
-
-    await esperarHasta(async () => (await mysqlAsync("mysql-replica", `
-        SELECT GTID_SUBSET(RECEIVED_TRANSACTION_SET, @@GLOBAL.gtid_executed)
-          FROM performance_schema.replication_connection_status`, { base: "" })).trim() === "1",
-    { plazoMs: 30000, intervaloMs: 200, descripcion: "que la réplica aplique todo lo recibido" });
-    dato("La réplica aplicó todas las transacciones que había recibido (GTID_SUBSET)");
-
-    await mysqlAsync("mysql-replica", `
-        STOP REPLICA;
-        RESET REPLICA ALL;
-        SET PERSIST super_read_only = OFF;
-        SET PERSIST read_only = OFF;`, { base: "" });
-
-    await dockerAsync(["network", "disconnect", red, replica], { directo: true });
-    await dockerAsync(["network", "connect", "--alias", "mysql-primary", "--alias", "mysql-replica", red, replica], { directo: true });
-}
+// La promoción de la réplica está en failover.js (la usa también
+// `node scripts/sistema.js failover`).
 
 async function escenarioPrimario({ ok, dato }) {
     const clave = await claveDeCarga();

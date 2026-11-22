@@ -1,6 +1,6 @@
 # Ensayo de la demo, paso a paso
 
-Para hacer la demo a mano, sin el script `escenario-mas-uno.js`: qué preparar, qué comando correr, qué abrir y qué tiene que verse en cada paso. Probado el 20/11/2026 en macOS. Dura unos 10 minutos.
+Para hacer la demo a mano, sin el script `escenario-mas-uno.js`: qué preparar, qué comando correr, qué abrir y qué tiene que verse en cada paso. La Parte 1 (se cae la base del cliente, unos 10 minutos) se probó el 20/11/2026; la Parte 2 (se cae nuestro servidor, unos 6 minutos) el 22/11/2026, en macOS.
 
 Los comandos son de macOS (zsh) y se corren desde `reserva-cupos`. En Windows (PowerShell), ver la última sección.
 
@@ -110,10 +110,98 @@ Los comandos son de macOS (zsh) y se corren desde `reserva-cupos`. En Windows (P
 - **Ventana C:** recorrer el dashboard: la ráfaga, las decisiones, las colas.
 - Mencionar las evidencias de carga y fallos de la [Entrega 6](../entrega-6/README.md) y la matriz de fallos de la [Entrega 5](../entrega-5/evidencias/fallos/resumen.md).
 
+## Parte 2: se cae nuestro servidor (unos 6 minutos)
+
+La Parte 1 tira abajo el servidor del **cliente**. Esta tira abajo piezas del **servicio**, con una ráfaga en curso. Se necesitan dos pestañas de terminal en `reserva-cupos`: en la **pestaña 1** corre la ráfaga y en la **pestaña 3** se provoca la falla. La pestaña 2 (logs del worker) puede seguir abierta.
+
+En la pestaña 1, cargar la clave del tenant de la demo:
+
+```shell
+DEMO=$(cat seguridad/local/tenant-demo.key)
+```
+
+Ventanas para mirar: **Grafana** (ventana C) y el **panel de Traefik**, https://localhost:8080/dashboard/ → *HTTP Services* → `api@docker`.
+
+### A. Se cae una instancia de la API
+
+- **Pestaña 3:** pasar a dos instancias de la API.
+  ```shell
+  docker compose up -d --scale api=2 --no-recreate api
+  ```
+  En el panel de Traefik, `api@docker` muestra **dos servidores**.
+- **Pestaña 1:** lanzar la ráfaga.
+  ```shell
+  docker compose run --rm k6 run -e API_KEY="$DEMO" -e REINTENTOS=8 /pruebas/carga/rafaga.js
+  ```
+- **Pestaña 3, a los 3 o 4 segundos:** matar una de las dos.
+  ```shell
+  docker kill $(docker compose ps -q api | head -1)
+  ```
+- **Qué se ve:**
+  - Traefik deja de mandarle tráfico (queda un servidor).
+  - Algunos clientes reciben 502 o 504 y reintentan con la misma `Idempotency-Key`.
+  - k6 termina con `confirmadas=10 rechazadas=490 pendientes=0`.
+- **Volver a una instancia:**
+  ```shell
+  docker compose up -d --scale api=1 api
+  ```
+
+### B. Se cae el worker
+
+- **Pestaña 1:** la misma ráfaga.
+  ```shell
+  docker compose run --rm k6 run -e API_KEY="$DEMO" -e REINTENTOS=8 /pruebas/carga/rafaga.js
+  ```
+- **Pestaña 3, a los 3 o 4 segundos:**
+  ```shell
+  docker compose stop worker
+  ```
+- **Qué se ve:**
+  - Las 500 solicitudes siguen recibiendo 202.
+  - En Grafana, "RabbitMQ: mensajes por cola" sube (`reservas.comandos.0`) y "Decisiones" queda en cero.
+- **Pestaña 3, unos 15 segundos después:**
+  ```shell
+  docker compose start worker
+  ```
+  La cola se vacía y k6 termina con `confirmadas=10 rechazadas=490 pendientes=0`.
+- **Qué decir:** la cola es durable y el worker confirma cada comando después del commit. Si cae, los comandos esperan; si cae a mitad de uno, se reentrega y la idempotencia evita descontar dos veces.
+
+### C. Se cae el MySQL primario (va última)
+
+- **Pestaña 1:** la ráfaga, con más reintentos porque el failover es a mano.
+  ```shell
+  docker compose run --rm k6 run -e API_KEY="$DEMO" -e REINTENTOS=30 /pruebas/carga/rafaga.js
+  ```
+- **Pestaña 3, a los 3 o 4 segundos:** matar el primario.
+  ```shell
+  docker compose kill mysql-primary
+  ```
+  Las escrituras fallan: la API responde 503 y los clientes reintentan (en Grafana, el panel de Traefik muestra los 503).
+- **Pestaña 3, enseguida:** promover la réplica.
+  ```shell
+  node scripts/sistema.js failover
+  ```
+  Muestra cada paso:
+  - la réplica aplicó todo lo recibido;
+  - quedó promovida;
+  - responde como `mysql-primary`;
+  - **cuánto tardó la escritura en volver** (en el ensayo: 5 s desde el failover, 11 s desde la caída).
+- **Qué se ve:** k6 termina con `confirmadas=10 rechazadas=490 pendientes=0`: ninguna reserva admitida ni confirmada se perdió.
+- **Qué decir:**
+  - La replicación es semisincrónica: el primario no confirma un commit hasta que la réplica lo tiene, por eso no se pierde nada (RPO 0).
+  - La API, el worker y el relay no cambian su configuración: el nombre `mysql-primary` ahora apunta a la réplica.
+  - El failover es manual a propósito: con dos nodos, decidir solo que el primario murió puede terminar en dos primarios; haría falta un tercero que decida.
+- **Después de la demo**, para volver a primario + réplica (**borra los datos del entorno**; los certificados y las claves se conservan):
+  ```shell
+  node scripts/sistema.js restaurar
+  ```
+  Mientras no se restaure, `demo` y `levantar` se niegan a arrancar: avisan que la réplica fue promovida.
+
 ## Después del ensayo
 
 - Anotarlo en la Wiki, página **"Ensayos de la demo"**: fecha, quiénes, duración, qué salió y qué ajustar.
 - No hace falta limpiar nada: cada ensayo crea materias nuevas. Si `aula-db` quedó detenida, `docker compose start aula-db`.
+- Si se hizo la Parte 2 C, correr `node scripts/sistema.js restaurar` antes del próximo ensayo (tarda lo mismo que `demo`).
 - Para dejar de confiar en la CA: abrir *Acceso a Llaveros*, buscar la CA de reserva-cupos y borrarla.
 
 ## Si algo falla en vivo
@@ -131,6 +219,22 @@ $ACT = "<pegar acá el id>"
 docker compose stop aula-db
 docker compose run --rm k6 run -e API_KEY="$CLAVE" -e ACTIVIDAD_ID="$ACT" -e REINTENTOS=8 /pruebas/carga/rafaga.js
 docker compose start aula-db
+```
+
+Parte 2:
+
+```powershell
+$DEMO = Get-Content seguridad\local\tenant-demo.key
+docker compose up -d --scale api=2 --no-recreate api
+docker compose run --rm k6 run -e API_KEY="$DEMO" -e REINTENTOS=8 /pruebas/carga/rafaga.js
+docker kill (docker compose ps -q api | Select-Object -First 1)
+docker compose up -d --scale api=1 api
+docker compose stop worker
+docker compose start worker
+docker compose run --rm k6 run -e API_KEY="$DEMO" -e REINTENTOS=30 /pruebas/carga/rafaga.js
+docker compose kill mysql-primary
+node scripts/sistema.js failover
+node scripts/sistema.js restaurar
 ```
 
 Para confiar en la CA: doble clic en `seguridad\local\ca.crt` → *Instalar certificado* → *Usuario actual* → *Colocar todos los certificados en el siguiente almacén* → **Entidades de certificación raíz de confianza**.

@@ -103,6 +103,24 @@ Tarda unos dos minutos sin pausas. Cada corrida deja su registro en
 CSRF, cifrado), correr antes `node reserva-cupos/scripts/sistema.js seguridad` y
 mostrar su salida.
 
+### Si se cae nuestro servidor
+
+El escenario +1 tira abajo la base del **cliente**. La Parte 2 del
+[ensayo paso a paso](ensayo-paso-a-paso.md#parte-2-se-cae-nuestro-servidor-unos-6-minutos)
+tira abajo piezas del **servicio** con una ráfaga en curso: una de dos instancias
+de la API, el worker y, al final, el MySQL primario. Para el primario:
+
+```shell
+docker compose kill mysql-primary
+node scripts/sistema.js failover
+```
+
+Decir: "nadie pierde una reserva confirmada: la réplica ya tenía cada commit
+(semisincrónica); el failover es un comando y lo hacemos a mano porque con dos
+nodos una detección automática puede terminar en dos primarios". Va al final de la
+demo: después hay que correr `node scripts/sistema.js restaurar`, que borra los
+datos del entorno.
+
 ## 6. Carga y escalado
 
 Mostrar el [informe del escenario caliente](../entrega-6/evidencias/carga-caliente/informe.html):
@@ -133,7 +151,7 @@ No presentar una ejecución anterior como si acabara de ocurrir.
 Antes de cada ensayo y el día de la defensa:
 
 - [ ] Docker Desktop abierto y con al menos 6 GB de memoria.
-- [ ] `node reserva-cupos/scripts/sistema.js demo` terminó con "Listo para la demo".
+- [ ] `node reserva-cupos/scripts/sistema.js demo` terminó con "Listo para la demo" (si dice que la réplica fue promovida, correr antes `restaurar`).
 - [ ] El navegador confía en `reserva-cupos/seguridad/local/ca.crt` (sin advertencias en https://localhost:3001).
 - [ ] Ventana normal con el administrador y ventana privada con un alumno, ya logueados.
 - [ ] Grafana abierto en https://localhost:3002 con el dashboard "Reserva de cupos".
