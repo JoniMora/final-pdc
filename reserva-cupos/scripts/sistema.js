@@ -100,7 +100,7 @@ function sincronizarGrafana() {
 
 async function levantar() {
     exigirTopologiaOriginal();
-    compose(["up", "--build", "-d", "--wait", "--wait-timeout", "300"]);
+    compose(["up", "--build", "-d", "--wait", "--wait-timeout", "600"]);
     await configurarReplica();
     sincronizarGrafana();
     console.log("Entorno listo: API https://localhost:3000 · Aula https://localhost:3001 · " +
@@ -217,7 +217,7 @@ async function demo(args) {
     // Con una partición se retiran los workers de las particiones 1 a 3 que
     // hayan quedado de una corrida con cuatro (--remove-orphans).
     const archivos = particiones === 4 ? ["-f", "docker-compose.yml", "-f", "docker-compose.particiones.yml"] : [];
-    compose([...archivos, "up", "--build", "-d", "--remove-orphans", "--wait", "--wait-timeout", "300"]);
+    compose([...archivos, "up", "--build", "-d", "--remove-orphans", "--wait", "--wait-timeout", "600"]);
     await configurarReplica();
     sincronizarGrafana();
     await comprobarListo(particiones);

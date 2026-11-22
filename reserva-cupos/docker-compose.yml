@@ -66,7 +66,10 @@ services:
       interval: 10s
       timeout: 10s
       retries: 12
-      start_period: 60s
+      # Con Docker recién iniciado y las imágenes compilándose a la vez,
+      # RabbitMQ llegó a tardar 7 minutos en arrancar: los fallos de los
+      # primeros 5 no cuentan.
+      start_period: 5m
 
     restart: unless-stopped
 

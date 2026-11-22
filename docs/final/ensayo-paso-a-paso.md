@@ -12,7 +12,8 @@ Los comandos son de macOS (zsh) y se corren desde `reserva-cupos`. En Windows (P
    cd ~/PDC-AGAIN/Funes/Final/final-pdc/reserva-cupos
    node scripts/sistema.js demo
    ```
-   Tiene que terminar con **"Listo para la demo"**. Si algo falla, el comando dice qué.
+   Tiene que terminar con **"Listo para la demo"**. Si algo falla, el comando dice qué; correrlo de nuevo no rompe nada.
+   La primera vez después de abrir Docker puede tardar varios minutos (compila las imágenes y RabbitMQ arranca lento): esperar, el comando espera hasta 10.
 3. **Confiar en la CA local** (una sola vez por equipo), para que el navegador no muestre advertencias:
    ```shell
    sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain seguridad/local/ca.crt
