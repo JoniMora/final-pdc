@@ -66,6 +66,7 @@ jobs:
           - servicios/relay
           - servicios/notificador
           - clientes/aula
+          - clientes/vitrina
     steps:
       - uses: actions/checkout@v4
 
@@ -205,6 +206,17 @@ jobs:
 
       - name: Recorrido funcional de punta a punta
         run: node pruebas/final/recorrido.js
+
+      # Issue #63: Canchas, Eventos y Aula a la vez. Cada uno termina con
+      # sus 10 confirmadas, el 429 es solo para Eventos y la actividad de un
+      # tenant pedida con la clave de otro responde 404.
+      - name: Tres clientes a la vez (k6)
+        run: |
+          docker compose run --rm k6 run \
+            -e CANCHAS="$(cat seguridad/local/canchas/clave-api)" \
+            -e EVENTOS="$(cat seguridad/local/eventos/clave-api)" \
+            -e AULA="$(grep -o 'rc_aula_[0-9a-f]*' docker-compose.yml | head -1)" \
+            /pruebas/carga/tres-clientes.js
 
       # El failover va último: deja la réplica promovida. El escenario del
       # tenant no espera los ~6 minutos hasta la DLQ (sí en la corrida local

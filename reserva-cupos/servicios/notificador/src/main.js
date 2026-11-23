@@ -5,7 +5,7 @@ const amqp = require("amqplib");
 
 const { crearValidadorDeMensajes } = require("../../../compartido/src/contrato");
 const { opcionesMysql, conexionRabbit } = require("../../../compartido/src/tls");
-const { crearMetricas, crearMetricasCircuitos } = require("../../../compartido/src/metricas");
+const { crearMetricas, crearMetricasCircuitos, crearMetricaWebhooksTenant } = require("../../../compartido/src/metricas");
 const { crearSalud, atenderSalud } = require("../../../compartido/src/salud");
 const { crearCircuitos, ErrorHttp } = require("./circuitos");
 const { planReintento } = require('./reintento');
@@ -34,6 +34,7 @@ const lookup = crearLookup(PERMITIDOS);
 const validar = crearValidadorDeMensajes();
 const metricas = crearMetricas("notificador");
 const metricasCircuitos = crearMetricasCircuitos(metricas.registro);
+const webhooksTenant = crearMetricaWebhooksTenant(metricas.registro);
 const circuitos = crearCircuitos({
     enviar: enviarMedido,
     metricas: metricasCircuitos,
@@ -67,11 +68,15 @@ function esperar(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function contar(resultado) {
+// Con el tenant ya leído, también por tenant (con su nombre): así Grafana
+// muestra que la falla del receptor de uno no frena las entregas a otro.
+function contar(resultado, tenant) {
     metricas.eventos.inc({
         tipo: "webhook",
         resultado
     });
+
+    if (tenant?.nombre) webhooksTenant.inc({ tenant: tenant.nombre, resultado });
 }
 
 // Mide cada intento HTTP, sin registrar URLs, secretos ni identificadores.
@@ -116,7 +121,7 @@ async function datosDelTenant(id) {
     }
 
     const [filas] = await pool.query(
-        "SELECT webhook_url, webhook_secret, activo FROM tenants WHERE id = ?",
+        "SELECT nombre, webhook_url, webhook_secret, activo FROM tenants WHERE id = ?",
         [id]
     );
 
@@ -234,7 +239,7 @@ async function iniciar() {
             || !tenant.webhook_secret
         ) {
             canal.ack(entrega);
-            contar("omitido");
+            contar("omitido", tenant);
             return;
         }
 
@@ -245,7 +250,7 @@ async function iniciar() {
             );
 
             canal.nack(entrega, false, false);
-            contar("dlq_secreto");
+            contar("dlq_secreto", tenant);
             return;
         }
 
@@ -264,7 +269,7 @@ async function iniciar() {
             );
 
             canal.nack(entrega, false, false);
-            contar("dlq_destino");
+            contar("dlq_destino", tenant);
             return;
         }
 
@@ -285,13 +290,13 @@ async function iniciar() {
                 );
 
                 canal.ack(entrega);
-                contar("entregado");
+                contar("entregado", tenant);
                 const demora = (Date.now() - Date.parse(mensaje.evento.ocurrido_en)) / 1000;
                 if (Number.isFinite(demora)) metricasCircuitos.demora.observe(Math.max(0, demora));
                 return;
             }
 
-            contar("error_http");
+            contar("error_http", tenant);
 
             await reprogramar(
                 entrega,
@@ -299,7 +304,7 @@ async function iniciar() {
             );
         } catch (error) {
             if (error.code === 'EOPENBREAKER') {
-                contar('diferido_circuito');
+                contar('diferido_circuito', tenant);
                 await reprogramar(entrega, "circuito abierto o prueba de recuperación en curso", { consumirIntento: false });
                 return;
             }
@@ -310,11 +315,11 @@ async function iniciar() {
                 );
 
                 canal.nack(entrega, false, false);
-                contar("dlq_destino");
+                contar("dlq_destino", tenant);
                 return;
             }
 
-            contar(error instanceof ErrorHttp ? 'error_http' : 'error_envio');
+            contar(error instanceof ErrorHttp ? 'error_http' : 'error_envio', tenant);
 
             await reprogramar(
                 entrega,

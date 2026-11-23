@@ -1,0 +1,13 @@
+{
+  "name": "reserva-cupos-vitrina",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cliente de referencia liviano: Canchas y Eventos, cada uno con su tenant.",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "express": "5.1.0"
+  }
+}

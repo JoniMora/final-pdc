@@ -103,6 +103,22 @@ Tarda unos dos minutos sin pausas. Cada corrida deja su registro en
 CSRF, cifrado), correr antes `node reserva-cupos/scripts/sistema.js seguridad` y
 mostrar su salida.
 
+### Tres clientes a la vez
+
+Aula no es el único consumidor: Canchas (https://localhost:3003, turnos de fútbol 5)
+y Eventos (https://localhost:3004, entradas) son dos organizaciones más, con su
+propio tenant. La Parte 3 del
+[ensayo paso a paso](ensayo-paso-a-paso.md#parte-3-tres-clientes-a-la-vez-unos-6-minutos)
+lanza una ráfaga simultánea a los tres:
+
+```shell
+docker compose run --rm k6 run -e CANCHAS="$CANCHAS" -e EVENTOS="$EVENTOS" -e AULA="$CLAVE" /pruebas/carga/tres-clientes.js
+```
+
+Decir: "cada organización termina con sus 10 confirmadas; el límite de tasa es por
+tenant (solo Eventos recibe 429); una actividad de otro tenant responde 404; y si se
+cae el receptor de webhooks de uno, su circuito se abre sin frenar a los demás".
+
 ### Si se cae nuestro servidor
 
 El escenario +1 tira abajo la base del **cliente**. La Parte 2 del
@@ -154,6 +170,7 @@ Antes de cada ensayo y el día de la defensa:
 - [ ] `node reserva-cupos/scripts/sistema.js demo` terminó con "Listo para la demo" (si dice que la réplica fue promovida, correr antes `restaurar`).
 - [ ] El navegador confía en `reserva-cupos/seguridad/local/ca.crt` (sin advertencias en https://localhost:3001).
 - [ ] Ventana normal con el administrador y ventana privada con un alumno, ya logueados.
+- [ ] Canchas (https://localhost:3003) y Eventos (https://localhost:3004) abiertos y en "Sincronizado".
 - [ ] Grafana abierto en https://localhost:3002 con el dashboard "Reserva de cupos".
 - [ ] El escenario +1 corrió completo al menos una vez ese día (`escenario-mas-uno.js`).
 - [ ] Terminal con letra grande; `accesos-locales.txt` cerrado y fuera de la pantalla.

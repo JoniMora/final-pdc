@@ -1,6 +1,6 @@
 # Ensayo de la demo, paso a paso
 
-Para hacer la demo a mano, sin el script `escenario-mas-uno.js`: qué preparar, qué comando correr, qué abrir y qué tiene que verse en cada paso. La Parte 1 (se cae la base del cliente, unos 10 minutos) se probó el 20/11/2026; la Parte 2 (se cae nuestro servidor, unos 6 minutos) el 22/11/2026, en macOS.
+Para hacer la demo a mano, sin el script `escenario-mas-uno.js`: qué preparar, qué comando correr, qué abrir y qué tiene que verse en cada paso. La Parte 1 (se cae la base del cliente, unos 10 minutos) se probó el 20/11/2026; la Parte 2 (se cae nuestro servidor) y la Parte 3 (tres clientes a la vez), de unos 6 minutos cada una, el 22/11/2026, en macOS.
 
 Los comandos son de macOS (zsh) y se corren desde `reserva-cupos`. En Windows (PowerShell), ver la última sección.
 
@@ -166,7 +166,7 @@ Ventanas para mirar: **Grafana** (ventana C) y el **panel de Traefik**, https://
   La cola se vacía y k6 termina con `confirmadas=10 rechazadas=490 pendientes=0`.
 - **Qué decir:** la cola es durable y el worker confirma cada comando después del commit. Si cae, los comandos esperan; si cae a mitad de uno, se reentrega y la idempotencia evita descontar dos veces.
 
-### C. Se cae el MySQL primario (va última)
+### C. Se cae el MySQL primario (va última, también después de la Parte 3)
 
 - **Pestaña 1:** la ráfaga, con más reintentos porque el failover es a mano.
   ```shell
@@ -197,6 +197,74 @@ Ventanas para mirar: **Grafana** (ventana C) y el **panel de Traefik**, https://
   ```
   Mientras no se restaure, `demo` y `levantar` se niegan a arrancar: avisan que la réplica fue promovida.
 
+## Parte 3: tres clientes a la vez (unos 6 minutos)
+
+Hasta acá, un solo cliente. El servicio es **multi-tenant**: Canchas (turnos de fútbol 5) y Eventos (entradas) son dos organizaciones más, cada una con su tenant, que `sistema.js demo` ya creó. Va **antes de la Parte 2 C** (después del failover hay que restaurar).
+
+Ventanas para agregar:
+- **D:** https://localhost:3003 (Canchas). Arriba a la derecha tiene que decir **Sincronizado**.
+- **E:** https://localhost:3004 (Eventos).
+- **C (Grafana):** bajar hasta los paneles **"Por tenant"**.
+
+En la pestaña 1, cargar las claves (la de Aula ya está en `$CLAVE`):
+
+```shell
+CANCHAS=$(cat seguridad/local/canchas/clave-api)
+EVENTOS=$(cat seguridad/local/eventos/clave-api)
+```
+
+### A. Cada uno con su dominio (1 minuto)
+
+- **Ventana D (Canchas):** *Nuevo turno* → nombre "Turno de las 20", *Cancha 2*, 10 jugadores → *Crear*. Se abre el turno: reservar a "Juan Pérez".
+- **Qué se ve:** "Solicitud admitida (202): pendiente" y, enseguida, Juan pasa a *Confirmadas* y aparece en **Webhooks recibidos** (`confirmada`).
+- **Ventana E (Eventos):** *Nuevo evento* → "Recital", lugar "Teatro", 100 lugares.
+- **Qué decir:** es el mismo servicio con otro tenant. Cada cliente tiene su vocabulario, y sus datos de dominio (cancha, lugar, fecha) viajan en `metadata`, que el servicio guarda sin interpretar.
+
+### B. Ráfagas simultáneas a los tres (2 minutos)
+
+- **Pestaña 1:**
+  ```shell
+  docker compose run --rm k6 run -e CANCHAS="$CANCHAS" -e EVENTOS="$EVENTOS" -e AULA="$CLAVE" /pruebas/carga/tres-clientes.js
+  ```
+  Crea una actividad de 10 cupos en cada tenant ("Turno de las 21 (ráfaga)", "Recital (ráfaga)" y "Materia de la ráfaga") y lanza 200 solicitudes a cada una: las 600 a la vez.
+- **Qué se ve:**
+  - En D y E aparece la actividad nueva: la barra se llena (10 de 10) y la columna de webhooks se llena de `confirmada` y `rechazada`.
+  - En A (Aula, admin) aparece la materia con 10 inscriptos.
+  - En Grafana, "Por tenant: solicitudes": **Eventos** tiene 429; Canchas y Aula, solo 202.
+  - k6 termina con `confirmadas=10 rechazadas=190 pendientes=0` para cada uno, tres líneas de `aislamiento ... HTTP 404` y, en *Por tenant*, respuestas 429 solo en `eventos` (en el ensayo, 143).
+  - En "Por tenant: webhooks", Aula puede mostrar `error_http`: 200 webhooks juntos saturan su base, Aula responde 503 y el notificador reintenta a los 10 s. Al rato quedan todos entregados.
+- **Qué decir:**
+  - Tres organizaciones compiten por la misma API, la misma cola y el mismo MySQL, y ninguna sobreasigna.
+  - El límite de tasa es por tenant. Eventos tiene 20 por segundo a propósito: se satura, sus clientes reintentan con la misma `Idempotency-Key` y terminan igual; los otros dos no lo notan.
+
+### C. Cada uno ve solo lo suyo (1 minuto)
+
+- **Ventana D (Canchas):** abrir "Turno de las 21 (ráfaga)" y hacer clic en el **id** (debajo del nombre): queda copiado.
+- **Ventana E (Eventos):** pegarlo en **Buscar por id** → *Buscar*.
+- **Qué se ve:** "No existe para el tenant Eventos (404): el servicio no muestra recursos de otro tenant".
+- **Qué decir:** el tenant sale de la clave, nunca de la URL ni del cuerpo. Un recurso ajeno responde 404 y no 403, para no confirmar siquiera que existe.
+
+### D. Se cae el receptor de webhooks de uno (2 minutos)
+
+- **Pestaña 3:**
+  ```shell
+  docker compose stop canchas
+  ```
+- **Pestaña 1:** la misma ráfaga.
+  ```shell
+  docker compose run --rm k6 run -e CANCHAS="$CANCHAS" -e EVENTOS="$EVENTOS" -e AULA="$CLAVE" /pruebas/carga/tres-clientes.js
+  ```
+- **Qué se ve:**
+  - Eventos y Aula siguen recibiendo sus webhooks (la columna de E se llena).
+  - En Grafana, "Por tenant: webhooks": Canchas pasa a `diferido_circuito` y Eventos sigue en `entregado`; "Circuito por tenant" muestra una línea en 1 (abierto).
+  - k6 termina bien para los tres: la decisión no depende del webhook.
+- **Pestaña 3:**
+  ```shell
+  docker compose start canchas
+  ```
+  Canchas rearma su vista desde el feed (las dos ráfagas, completas, en segundos) y, cuando el circuito prueba de nuevo, recibe los webhooks pendientes (en el ensayo, los 200 en menos de un minuto).
+- **Qué decir:** el circuit breaker es por tenant. Un receptor caído deja de recibir intentos y sus eventos esperan sin gastar reintentos, sin frenar a los demás. El feed garantiza que no se pierde nada.
+
 ## Después del ensayo
 
 - Anotarlo en la Wiki, página **"Ensayos de la demo"**: fecha, quiénes, duración, qué salió y qué ajustar.
@@ -219,6 +287,16 @@ $ACT = "<pegar acá el id>"
 docker compose stop aula-db
 docker compose run --rm k6 run -e API_KEY="$CLAVE" -e ACTIVIDAD_ID="$ACT" -e REINTENTOS=8 /pruebas/carga/rafaga.js
 docker compose start aula-db
+```
+
+Parte 3:
+
+```powershell
+$CANCHAS = Get-Content seguridad\local\canchas\clave-api
+$EVENTOS = Get-Content seguridad\local\eventos\clave-api
+docker compose run --rm k6 run -e CANCHAS="$CANCHAS" -e EVENTOS="$EVENTOS" -e AULA="$CLAVE" /pruebas/carga/tres-clientes.js
+docker compose stop canchas
+docker compose start canchas
 ```
 
 Parte 2:

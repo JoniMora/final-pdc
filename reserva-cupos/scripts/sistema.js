@@ -106,6 +106,7 @@ async function levantar() {
     await configurarReplica();
     sincronizarGrafana();
     console.log("Entorno listo: API https://localhost:3000 · Aula https://localhost:3001 · " +
+        "Canchas https://localhost:3003 · Eventos https://localhost:3004 (sus tenants los crea demo) · " +
         "panel de Traefik https://localhost:8080/dashboard/ · Prometheus https://localhost:9090 · " +
         "Grafana https://localhost:3002 (credenciales en seguridad/local/accesos-locales.txt)");
 }
@@ -155,17 +156,18 @@ function opcion(args, nombre, porDefecto) {
     return i >= 0 ? args[i + 1] : porDefecto;
 }
 
+async function esperarQue(descripcion, condicion, plazoMs = 90000) {
+    const inicio = Date.now();
+    for (;;) {
+        const resultado = await condicion().catch(() => null);
+        if (resultado) return console.log(`OK: ${descripcion}${resultado === true ? "" : ` (${resultado})`}`);
+        if (Date.now() - inicio > plazoMs) throw new Error(`No se cumplió: ${descripcion}`);
+        await esperar(2000);
+    }
+}
+
 async function comprobarListo(particiones) {
     const { pedir } = require("../pruebas/comun");
-    const esperarQue = async (descripcion, condicion, plazoMs = 90000) => {
-        const inicio = Date.now();
-        for (;;) {
-            const resultado = await condicion().catch(() => null);
-            if (resultado) return console.log(`OK: ${descripcion}${resultado === true ? "" : ` (${resultado})`}`);
-            if (Date.now() - inicio > plazoMs) throw new Error(`No se cumplió: ${descripcion}`);
-            await esperar(2000);
-        }
-    };
 
     await esperarQue("la API responde por Traefik y ve MySQL", async () => {
         const r = await pedir("https://localhost:3000/health", { timeoutMs: 5000 });
@@ -209,6 +211,49 @@ async function tenantDemo() {
     console.log("OK: tenant de la demo creado");
 }
 
+// Canchas y Eventos (issue #63): un tenant propio cada uno, con su webhook
+// y su límite de tasa. Eventos tiene uno bajo a propósito: es el tenant que
+// se satura en la Parte 3 del ensayo sin frenar a los otros. La clave y el
+// secreto quedan en seguridad/local/<cliente>/, la carpeta que el
+// contenedor monta; si la clave sigue autenticando, se reutiliza.
+const CLIENTES_LIVIANOS = [
+    { id: "canchas", nombre: "Canchas", puerto: 3003, limite: { por_segundo: 500, rafaga: 500 } },
+    { id: "eventos", nombre: "Eventos", puerto: 3004, limite: { por_segundo: 20, rafaga: 20 } }
+];
+
+async function tenantsClientes() {
+    const { api, crearTenant, pedir } = require("../pruebas/comun");
+
+    for (const cliente of CLIENTES_LIVIANOS) {
+        const carpeta = path.join(RAIZ, "seguridad/local", cliente.id);
+        const archivoClave = path.join(carpeta, "clave-api");
+        fs.mkdirSync(carpeta, { recursive: true });
+
+        const existente = fs.existsSync(archivoClave) && fs.readFileSync(archivoClave, "utf8").trim();
+        if (existente && (await api(existente)("/v1/cambios?limite=1")).status === 200) {
+            console.log(`OK: tenant de ${cliente.nombre} (ya existía)`);
+        } else {
+            const creado = await crearTenant(cliente.nombre, {
+                limite: cliente.limite,
+                webhook_url: `https://${cliente.id}:${cliente.puerto}/webhooks/reservas`
+            });
+            // El contenedor corre como otro usuario y tiene que poder
+            // leerlos (como los certificados). La clave va última: con ella
+            // el cliente se da por configurado.
+            fs.writeFileSync(path.join(carpeta, "webhook-secreto"), creado.webhook_secreto + "\n", { mode: 0o644 });
+            fs.writeFileSync(path.join(carpeta, "tenant.json"),
+                JSON.stringify({ id: creado.id, nombre: creado.nombre }, null, 2) + "\n", { mode: 0o644 });
+            fs.writeFileSync(archivoClave, creado.clave_api + "\n", { mode: 0o644 });
+            console.log(`OK: tenant de ${cliente.nombre} creado (límite ${cliente.limite.por_segundo}/s)`);
+        }
+
+        await esperarQue(`${cliente.nombre} responde y lee su feed`, async () => {
+            const r = await pedir(`https://localhost:${cliente.puerto}/api/estado`, { timeoutMs: 5000 });
+            return r.status === 200 && r.datos.tenant.configurado && r.datos.tenant.sincronizado_en && !r.datos.tenant.error;
+        }, 60000);
+    }
+}
+
 async function demo(args) {
     const particiones = Number(opcion(args, "--particiones", "1"));
     if (![1, 4].includes(particiones)) throw new Error("--particiones admite 1 o 4");
@@ -224,12 +269,15 @@ async function demo(args) {
     sincronizarGrafana();
     await comprobarListo(particiones);
     await tenantDemo();
+    await tenantsClientes();
 
     console.log([
         "",
         "Listo para la demo:",
         "  API (por Traefik)  https://localhost:3000",
         "  Aula               https://localhost:3001",
+        "  Canchas            https://localhost:3003",
+        "  Eventos            https://localhost:3004",
         "  Traefik            https://localhost:8080/dashboard/",
         "  RabbitMQ           https://localhost:15672",
         "  Prometheus         https://localhost:9090",

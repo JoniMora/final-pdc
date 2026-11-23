@@ -60,4 +60,32 @@ function crearMetricaLoteAdmision(registro) {
     });
 }
 
-module.exports = { crearMetricas, crearMetricasCircuitos, crearMetricaLoteAdmision };
+// Por tenant, con su nombre (issue #63): cada cliente de referencia es un
+// tenant y Grafana muestra qué le pasa a cada uno durante una ráfaga
+// simultánea. Solo dos etiquetas: la cantidad de series crece con los
+// tenants, no con las rutas.
+function crearMetricaSolicitudesTenant(registro) {
+    return new Counter({
+        name: "pdc_tenant_solicitudes_total",
+        help: "Solicitudes HTTP autenticadas por tenant y código de respuesta",
+        labelNames: ["tenant", "estado"],
+        registers: [registro]
+    });
+}
+
+function crearMetricaWebhooksTenant(registro) {
+    return new Counter({
+        name: "pdc_webhook_tenant_total",
+        help: "Resultados de la entrega de webhooks por tenant",
+        labelNames: ["tenant", "resultado"],
+        registers: [registro]
+    });
+}
+
+module.exports = {
+    crearMetricas,
+    crearMetricasCircuitos,
+    crearMetricaLoteAdmision,
+    crearMetricaSolicitudesTenant,
+    crearMetricaWebhooksTenant
+};

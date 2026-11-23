@@ -257,6 +257,66 @@
       }
     },
     {
+      "id": 15,
+      "title": "Por tenant: solicitudes por segundo y código HTTP",
+      "description": "Solicitudes autenticadas en la API, por tenant (su nombre) y código. Un 429 aparece solo en el tenant que agotó su límite.",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 37
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (tenant, estado) (rate(pdc_tenant_solicitudes_total[1m]))",
+          "legendFormat": "{{tenant}} · {{estado}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 16,
+      "title": "Por tenant: webhooks por segundo y resultado",
+      "description": "Entregas del notificador por tenant. Si el receptor de uno se cae, sus webhooks quedan diferidos (circuito abierto) y los demás siguen entregados.",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 37
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (tenant, resultado) (rate(pdc_webhook_tenant_total[1m]))",
+          "legendFormat": "{{tenant}} · {{resultado}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "min": 0
+        },
+        "overrides": []
+      }
+    },
+    {
       "id": 9,
       "title": "Circuito por tenant: 0 cerrado, 1 abierto, 2 semiabierto",
       "type": "timeseries",
@@ -264,7 +324,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 37
+        "y": 45
       },
       "datasource": {
         "type": "prometheus",
@@ -293,7 +353,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 37
+        "y": 45
       },
       "datasource": {
         "type": "prometheus",
@@ -322,7 +382,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 45
+        "y": 53
       },
       "datasource": {
         "type": "prometheus",
@@ -351,7 +411,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 45
+        "y": 53
       },
       "datasource": {
         "type": "prometheus",
@@ -380,7 +440,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 53
+        "y": 61
       },
       "datasource": {
         "type": "prometheus",
@@ -409,7 +469,7 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 61
+        "y": 69
       },
       "datasource": {
         "type": "prometheus",

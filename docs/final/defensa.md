@@ -61,6 +61,9 @@ cambiar al editar.
 | `clientes/aula/src/seguridad.js` | `hashPassword`, `login`, `autenticar`, `administrador` y `puedeVer`. |
 | `clientes/aula/src/recuperacion.js` | `aplicarPagina` y `sincronizar`: cambios y cursor de feed en una misma transacción local. |
 | `clientes/aula/public/index.html` | Interfaz que llama al backend. Ocultar un botón no reemplaza autorización en el servidor. |
+| `clientes/vitrina/src/server.js` y `proyeccion.js` | Canchas y Eventos: un mismo cliente con dos perfiles y un tenant cada uno. Vista en memoria desde el feed y los webhooks, por versión. |
+| `compartido/src/firma-webhook.js` | `verificarFirma`: HMAC-SHA256 sobre `t.cuerpo`, comparación en tiempo constante y ventana de 5 minutos. La usan los tres clientes. |
+| `pruebas/carga/tres-clientes.js` | Ráfaga simultánea a Canchas, Eventos y Aula: 10 confirmadas en cada uno, 429 solo para Eventos y 404 cruzado. |
 | `scripts/preparar-seguridad.js` | Genera CA local, certificados y usuarios con contraseñas derivadas. Los archivos secretos quedan fuera de Git. |
 | `scripts/sistema.js` | `demo`: todo en un comando (certificados, entorno, réplica, Grafana, tenant y comprobaciones). `failover` y `restaurar` para el primario. También preparar, levantar, tenants y pruebas. |
 | `pruebas/fallos/failover.js` | `promoverReplica`: espera a que la réplica aplique lo recibido (`GTID_SUBSET`), corta la replicación, habilita la escritura y le da el alias de red `mysql-primary`. |
@@ -181,6 +184,23 @@ al cliente Aula. Separarlas evita que el servicio dependa del esquema de cada te
 
 **¿Un tenant es un alumno?** No. El tenant es la organización que consume la API con
 su clave. El alumno es una persona autenticada dentro de Aula.
+
+**¿Por qué tres clientes y no solo Aula?** Para mostrar que el servicio es multi-tenant:
+Canchas (turnos de fútbol 5), Eventos (entradas) y Aula usan la misma API a la vez, cada uno
+con su clave, su límite de tasa y su webhook. En la ráfaga simultánea cada uno termina con sus
+10 confirmadas, solo Eventos (20 por segundo) recibe 429 y la actividad de uno pedida con la
+clave de otro responde 404. Canchas y Eventos son el mismo código con dos perfiles: el dominio
+(cancha, lugar, fecha) va en `metadata`, que el servicio no interpreta.
+
+**¿Por qué Canchas y Eventos no tienen base?** No la necesitan para mostrar el multi-tenant:
+arman su vista con el feed (completo y ordenado) y la mantienen con los webhooks, aplicando
+cada instantánea por su versión. Si se reinician, la reconstruyen desde el feed. La contingencia
+con base propia y reconciliación la muestra Aula.
+
+**¿Qué pasa si se cae el receptor de webhooks de un cliente?** El circuito de ese tenant se
+abre y sus eventos esperan sin gastar reintentos (hasta 400 s); los demás tenants siguen
+recibiendo. Al volver, el circuito prueba y entrega lo pendiente, y el feed cubre cualquier
+hueco.
 
 **¿Qué evita acceder a otra reserva?** El filtro de tenant en la API y la comprobación
 de participante/rol en Aula. Un identificador difícil de adivinar no reemplaza permisos.

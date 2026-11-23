@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cliente de referencia</title>
+    <link rel="stylesheet" href="/estilos.css">
+    <link rel="stylesheet" href="/tema.css">
+    <script src="/app.js" defer></script>
+</head>
+<body>
+<header class="barra">
+    <div class="marca">
+        <span class="logo" id="logo" aria-hidden="true"></span>
+        <div>
+            <h1 id="nombre">Cliente</h1>
+            <p id="titulo" class="sutil"></p>
+        </div>
+    </div>
+    <div class="estado-tenant">
+        <span class="pastilla" id="sincronizacion">Conectando…</span>
+        <span class="sutil" id="tenant"></span>
+    </div>
+</header>
+
+<div class="aviso oculto" id="aviso" role="status"></div>
+
+<main class="tablero">
+    <section class="principal" aria-labelledby="titulo-actividades">
+        <div class="encabezado-seccion">
+            <h2 id="titulo-actividades">Actividades</h2>
+            <div class="acciones">
+                <form id="buscar" class="buscar" autocomplete="off">
+                    <label class="oculto-visual" for="buscar-id">Buscar por id</label>
+                    <input id="buscar-id" name="id" placeholder="Buscar por id (UUID)" spellcheck="false">
+                    <button type="submit" class="boton secundario">Buscar</button>
+                </form>
+                <button type="button" class="boton" id="nueva">Nueva</button>
+            </div>
+        </div>
+        <div id="actividades" class="tarjetas"></div>
+    </section>
+
+    <aside class="lateral" aria-labelledby="titulo-webhooks">
+        <div class="encabezado-seccion">
+            <h2 id="titulo-webhooks">Webhooks recibidos</h2>
+            <span class="sutil" id="contador-webhooks"></span>
+        </div>
+        <p class="sutil nota">Firmados por el servicio con el secreto de este tenant (HMAC-SHA256). Una firma inválida se rechaza con 401.</p>
+        <ol id="webhooks" class="webhooks"></ol>
+    </aside>
+</main>
+
+<dialog id="dialogo-nueva" class="dialogo">
+    <form id="form-nueva" method="dialog" autocomplete="off">
+        <h2 id="titulo-nueva">Nueva actividad</h2>
+        <label>Nombre <input name="nombre" required maxlength="200"></label>
+        <label><span id="etiqueta-capacidad">Capacidad</span> <input name="capacidad" type="number" min="1" max="100000" required></label>
+        <div id="campos"></div>
+        <p class="error" id="error-nueva" role="alert"></p>
+        <div class="pie-dialogo">
+            <button type="button" class="boton secundario" data-cerrar>Cancelar</button>
+            <button type="submit" class="boton">Crear</button>
+        </div>
+    </form>
+</dialog>
+
+<dialog id="dialogo-detalle" class="dialogo ancho">
+    <div class="detalle">
+        <div class="cabecera-detalle">
+            <div>
+                <h2 id="detalle-nombre"></h2>
+                <p class="sutil" id="detalle-meta"></p>
+                <p class="sutil id-copiable" id="detalle-id"></p>
+            </div>
+            <button type="button" class="boton secundario" data-cerrar aria-label="Cerrar">✕</button>
+        </div>
+        <div class="cifras" id="detalle-cifras"></div>
+        <div class="barra-progreso grande"><span id="detalle-progreso"></span></div>
+        <form id="form-reserva" class="fila-form" autocomplete="off">
+            <label class="oculto-visual" for="participante">Participante</label>
+            <input id="participante" name="participante" required maxlength="128">
+            <button type="submit" class="boton" id="boton-reservar">Reservar</button>
+            <button type="button" class="boton secundario" id="boton-estado">Cerrar inscripción</button>
+        </form>
+        <p class="sutil" id="resultado-reserva" role="status"></p>
+        <div class="pestanas" role="tablist" id="pestanas"></div>
+        <ul class="reservas" id="detalle-reservas"></ul>
+    </div>
+</dialog>
+
+<div class="tostadas" id="tostadas" aria-live="polite"></div>
+</body>
+</html>
