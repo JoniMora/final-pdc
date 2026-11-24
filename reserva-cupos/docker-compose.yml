@@ -6,6 +6,12 @@ name: reserva-cupos-infra
 # seguridad/local/ (excluido de Git); sin ese paso, el entorno no arranca:
 # cada montaje de un archivo de seguridad es un bind que exige que exista.
 
+# Cada healthcheck tiene un start_period de 2 minutos (RabbitMQ, 5): con
+# Docker recién iniciado y las imágenes compilándose a la vez, un servicio
+# sano puede tardar en responder, y `up --wait` aborta en cuanto uno queda
+# unhealthy. Dentro de ese plazo los fallos no cuentan; el primer chequeo
+# que pasa lo marca healthy, así que en un arranque normal no demora nada.
+
 # Certificado de la CA local: con él cada cliente verifica al servidor.
 x-ca: &ca
   type: bind
@@ -31,6 +37,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 12
+      start_period: 2m
     restart: unless-stopped
 
   rabbitmq:
@@ -157,6 +164,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+      start_period: 2m
 
     restart: unless-stopped
 
@@ -237,6 +245,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+      start_period: 2m
 
     restart: unless-stopped
 
@@ -287,7 +296,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 12
-      start_period: 20s
+      start_period: 2m
 
     restart: unless-stopped
 
@@ -337,7 +346,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
-      start_period: 45s
+      start_period: 2m
 
     restart: unless-stopped
 
@@ -383,7 +392,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
-      start_period: 45s
+      start_period: 2m
 
     restart: unless-stopped
 
@@ -436,7 +445,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
-      start_period: 20s
+      start_period: 2m
 
     restart: unless-stopped
 
@@ -498,6 +507,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+      start_period: 2m
 
     restart: unless-stopped
 
@@ -551,6 +561,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+      start_period: 2m
 
     restart: unless-stopped
 
@@ -593,6 +604,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+      start_period: 2m
 
     restart: unless-stopped
 
@@ -643,7 +655,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 12
-      start_period: 20s
+      start_period: 2m
 
     restart: unless-stopped
 
@@ -702,7 +714,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 12
-      start_period: 20s
+      start_period: 2m
 
     restart: unless-stopped
 

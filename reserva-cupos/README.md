@@ -346,13 +346,14 @@ node scripts/sistema.js levantar
 ## Problemas frecuentes
 
 - `bind source path does not exist: .../seguridad/local/...`: falta `node scripts/sistema.js preparar`.
+- `dependency failed to start: container ... is unhealthy` al levantar: con Docker recién abierto todo arranca lento. Cada servicio tiene 2 minutos de gracia (RabbitMQ, 5); si igual pasa, volver a correr el mismo comando: no borra nada y lo que ya está sano no se reinicia.
 - `unable to verify the first certificate` o advertencia del navegador: el cliente no confía en `seguridad/local/ca.crt`.
 - `401` en todas las rutas: la clave no corresponde a un tenant de esta instalación (por ejemplo, volúmenes de otra entrega o una clave rotada).
 - `403 permiso-insuficiente`: la clave no tiene el permiso de esa operación (ver la tabla de permisos).
 - `429 limite-de-tasa`: respetar `Retry-After` o pedir al operador un límite mayor para ese tenant.
 - Aula responde `503 Identidades no disponibles`: falta `seguridad/local/usuarios.json`.
 - Las escrituras tardan diez segundos: la réplica está detenida y el primario espera el tiempo límite semisíncrono.
-- `La réplica fue promovida a primario`: después de `fallos mysql-primary`, `levantar` se niega a arrancar el primario viejo, que sería un segundo primario. Recrear el entorno: `docker compose down -v` y `levantar`.
+- `La réplica fue promovida a primario`: después de `failover` o `fallos mysql-primary`, `demo` y `levantar` se niegan a arrancar el primario viejo, que sería un segundo primario. Volver a la topología inicial: `node scripts/sistema.js restaurar` (borra los datos del entorno).
 - `503 no-disponible` en todo `/v1` con MySQL sano: Redis no responde (`docker compose ps redis`). La API no sigue sin él: no limitaría por tenant de forma global.
 - Grafana rechaza la contraseña de `accesos-locales.txt`: el volumen es anterior; `node scripts/sistema.js grafana` la vuelve a fijar.
 - Alguno de los puertos 3000, 3001, 3002, 8080, 9090 o 15672 está en uso: detener el proceso que lo ocupa.
