@@ -210,8 +210,12 @@ async function escenarioRedis({ ok, dato }) {
         concurrencia: 40,
         durante: {
             tras: 40,
-            accion: async () => {
+            // Las 160 restantes salen con Redis ya detenido: así los
+            // clientes ven el 503 y reintentan hasta que vuelve.
+            frenar: true,
+            accion: async ({ continuar }) => {
                 await detener("redis");
+                continuar();
                 const caida = cronometro();
 
                 // La API sigue viva, pero no atiende /v1 sin Redis.
