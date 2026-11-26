@@ -1,0 +1,202 @@
+
+> reserva-cupos-aula@0.2.0 test
+> node --test
+
+TAP version 13
+# Subtest: crear una materia usa crearActividad según el contrato
+ok 1 - crear una materia usa crearActividad según el contrato # SKIP PRISM_URL no definida: requiere el mock de Prism
+  ---
+  duration_ms: 1.4367
+  type: 'test'
+  ...
+# Subtest: consultar una materia y sus inscriptos
+ok 2 - consultar una materia y sus inscriptos # SKIP PRISM_URL no definida: requiere el mock de Prism
+  ---
+  duration_ms: 0.2189
+  type: 'test'
+  ...
+# Subtest: inscribirse con Idempotency-Key y consultar el resultado
+ok 3 - inscribirse con Idempotency-Key y consultar el resultado # SKIP PRISM_URL no definida: requiere el mock de Prism
+  ---
+  duration_ms: 0.1617
+  type: 'test'
+  ...
+# Subtest: cancelar una inscripción
+ok 4 - cancelar una inscripción # SKIP PRISM_URL no definida: requiere el mock de Prism
+  ---
+  duration_ms: 0.1392
+  type: 'test'
+  ...
+# Subtest: el mock rechaza una solicitud fuera de contrato antes de que llegue a una API real
+ok 5 - el mock rechaza una solicitud fuera de contrato antes de que llegue a una API real # SKIP PRISM_URL no definida: requiere el mock de Prism
+  ---
+  duration_ms: 0.2856
+  type: 'test'
+  ...
+# Subtest: alumno: cupos, protección de texto, solicitud pendiente, actualización y cancelación
+ok 6 - alumno: cupos, protección de texto, solicitud pendiente, actualización y cancelación
+  ---
+  duration_ms: 1674.3552
+  type: 'test'
+  ...
+# Subtest: contingencia en alumno y administrador; recuperación y datos obsoletos
+ok 7 - contingencia en alumno y administrador; recuperación y datos obsoletos
+  ---
+  duration_ms: 113.7956
+  type: 'test'
+  ...
+# Subtest: administrador: indicadores, crear, inscriptos y reconciliar con CSRF
+ok 8 - administrador: indicadores, crear, inscriptos y reconciliar con CSRF
+  ---
+  duration_ms: 55.5094
+  type: 'test'
+  ...
+# Subtest: un reintento tras un fallo de red conserva la clave y el mensaje de error
+ok 9 - un reintento tras un fallo de red conserva la clave y el mensaje de error
+  ---
+  duration_ms: 47.7124
+  type: 'test'
+  ...
+# Subtest: login separado: error comprensible y sin volcar la respuesta del servidor
+ok 10 - login separado: error comprensible y sin volcar la respuesta del servidor
+  ---
+  duration_ms: 21.1293
+  type: 'test'
+  ...
+# Subtest: tras un fallo de la base, no se reintenta hasta que pasa la espera
+ok 11 - tras un fallo de la base, no se reintenta hasta que pasa la espera
+  ---
+  duration_ms: 6.9381
+  type: 'test'
+  ...
+# Subtest: la sonda de reconciliación cierra el interruptor cuando la base vuelve
+ok 12 - la sonda de reconciliación cierra el interruptor cuando la base vuelve
+  ---
+  duration_ms: 1.6836
+  type: 'test'
+  ...
+# [AULA] Reconciliación pendiente: PostgreSQL detenido
+# Subtest: el feed admite saltos de secuencia y confirma datos y punto de control juntos
+ok 13 - el feed admite saltos de secuencia y confirma datos y punto de control juntos
+  ---
+  duration_ms: 2.5133
+  type: 'test'
+  ...
+# Subtest: si falla la aplicación, se revierte y el punto de control no avanza
+ok 14 - si falla la aplicación, se revierte y el punto de control no avanza
+  ---
+  duration_ms: 0.9833
+  type: 'test'
+  ...
+# Subtest: si otro proceso ya movió el punto de control, la página no se aplica
+ok 15 - si otro proceso ya movió el punto de control, la página no se aplica
+  ---
+  duration_ms: 0.498
+  type: 'test'
+  ...
+# Subtest: un feed fuera de orden o un punto de control inválido se rechazan
+ok 16 - un feed fuera de orden o un punto de control inválido se rechazan
+  ---
+  duration_ms: 0.4431
+  type: 'test'
+  ...
+# Subtest: sin PostgreSQL queda en modo degradado y el catálogo se arma desde la API
+ok 17 - sin PostgreSQL queda en modo degradado y el catálogo se arma desde la API
+  ---
+  duration_ms: 4.0856
+  type: 'test'
+  ...
+# Subtest: pedidos simultáneos del catálogo comparten una sola lectura del feed
+ok 18 - pedidos simultáneos del catálogo comparten una sola lectura del feed
+  ---
+  duration_ms: 23.8442
+  type: 'test'
+  ...
+# Subtest: backend real de Aula: login, roles, CSRF y propiedad de las reservas
+ok 19 - backend real de Aula: login, roles, CSRF y propiedad de las reservas
+  ---
+  duration_ms: 4093.8609
+  type: 'test'
+  ...
+# Subtest: contraseñas: sal aleatoria, verificación y rechazo de una incorrecta
+ok 20 - contraseñas: sal aleatoria, verificación y rechazo de una incorrecta
+  ---
+  duration_ms: 358.1063
+  type: 'test'
+  ...
+# Subtest: sesiones, CSRF, roles, logout y vencimiento se comprueban en el servidor
+ok 21 - sesiones, CSRF, roles, logout y vencimiento se comprueban en el servidor
+  ---
+  duration_ms: 1629.9306
+  type: 'test'
+  ...
+# Subtest: desactivar a una persona corta su sesión abierta
+ok 22 - desactivar a una persona corta su sesión abierta
+  ---
+  duration_ms: 178.1101
+  type: 'test'
+  ...
+# Subtest: autorización de reserva: un alumno solo ve la suya; el administrador, todas
+ok 23 - autorización de reserva: un alumno solo ve la suya; el administrador, todas
+  ---
+  duration_ms: 0.3532
+  type: 'test'
+  ...
+# Subtest: diez contraseñas incorrectas bloquean la IP con 429; los logins correctos no cuentan
+ok 24 - diez contraseñas incorrectas bloquean la IP con 429; los logins correctos no cuentan
+  ---
+  duration_ms: 2113.3303
+  type: 'test'
+  ...
+# Subtest: HSTS no se envía en localhost (afectaría a otros servicios locales)
+ok 25 - HSTS no se envía en localhost (afectaría a otros servicios locales)
+  ---
+  duration_ms: 0.4316
+  type: 'test'
+  ...
+# [AULA] PostgreSQL, conexión perdida: Connection terminated unexpectedly
+# Subtest: confirma la transacción y devuelve la conexión al pool
+ok 26 - confirma la transacción y devuelve la conexión al pool
+  ---
+  duration_ms: 4.7712
+  type: 'test'
+  ...
+# Subtest: si aula-db cae con la conexión tomada, falla la operación y no el proceso
+ok 27 - si aula-db cae con la conexión tomada, falla la operación y no el proceso
+  ---
+  duration_ms: 2.4206
+  type: 'test'
+  ...
+# Subtest: un evento firmado según el contrato se acepta y cumple el esquema
+ok 28 - un evento firmado según el contrato se acepta y cumple el esquema
+  ---
+  duration_ms: 14.5494
+  type: 'test'
+  ...
+# Subtest: se rechazan la firma de otro secreto, el cuerpo alterado y la reinyección
+ok 29 - se rechazan la firma de otro secreto, el cuerpo alterado y la reinyección
+  ---
+  duration_ms: 0.9276
+  type: 'test'
+  ...
+# Subtest: el receptor acepta el vector de prueba del contrato
+ok 30 - el receptor acepta el vector de prueba del contrato
+  ---
+  duration_ms: 0.8404
+  type: 'test'
+  ...
+# Subtest: sin un secreto de 32 bytes no se acepta ninguna firma
+ok 31 - sin un secreto de 32 bytes no se acepta ninguna firma
+  ---
+  duration_ms: 0.943
+  type: 'test'
+  ...
+1..31
+# tests 31
+# suites 0
+# pass 26
+# fail 0
+# cancelled 0
+# skipped 5
+# todo 0
+# duration_ms 10718.5197

@@ -34,7 +34,7 @@ const reserva = {
 };
 
 function apiSimulada() {
-    const llamadas = { cancelaciones: 0, reservas: [] };
+    const llamadas = { cancelaciones: 0, reservas: [], cursores: [], fallarListado: false };
 
     const servidor = http.createServer((req, res) => {
         let cuerpo = "";
@@ -44,7 +44,9 @@ function apiSimulada() {
             res.setHeader("Content-Type", "application/json");
 
             if (req.url.startsWith("/v1/cambios")) {
-                return res.end(JSON.stringify({ datos: [], ultima_secuencia: 0 }));
+                const desde = Number(new URL(req.url, 'http://prueba').searchParams.get('desde') || 0);
+                return res.end(JSON.stringify({ datos: desde < 1 ? [{ secuencia: 1,
+                    tipo: 'actividad.creada', ocurrido_en: actividad.creado_en, entidad: actividad }] : [], ultima_secuencia: 1 }));
             }
 
             if (req.url.endsWith("/cancelacion")) {
@@ -60,7 +62,21 @@ function apiSimulada() {
             }
 
             if (req.url.startsWith("/v1/reservas/")) return res.end(JSON.stringify(reserva));
-            if (req.url.includes("/reservas")) return res.end(JSON.stringify({ datos: [reserva], siguiente_cursor: null }));
+            if (req.url.includes("/reservas")) {
+                const query = new URL(req.url, 'http://prueba').searchParams;
+                if (llamadas.fallarListado) {
+                    res.statusCode = 503;
+                    return res.end(JSON.stringify({ type: 'about:blank', title: 'No disponible', status: 503 }));
+                }
+                if (query.has('estado')) return res.end(JSON.stringify({ datos: [reserva], siguiente_cursor: null }));
+                llamadas.cursores.push(query.get('cursor'));
+                const propias = ['pendiente', 'confirmada', 'rechazada', 'cancelada'].map((estado, i) => ({
+                    ...reserva, id: '019a0000-0000-7000-8000-' + String(i + 10).padStart(12, '0'), estado
+                }));
+                return res.end(JSON.stringify(query.has('cursor')
+                    ? { datos: propias, siguiente_cursor: null }
+                    : { datos: [{ ...reserva, participante: 'alumno-ajeno' }], siguiente_cursor: 'pagina-propia' }));
+            }
             if (req.url.startsWith("/v1/actividades/")) return res.end(JSON.stringify(actividad));
 
             res.statusCode = 404;
@@ -161,6 +177,7 @@ test("backend real de Aula: login, roles, CSRF y propiedad de las reservas", asy
     }
 
     assert.equal((await pedir("/materias")).status, 401);
+    assert.equal((await pedir("/inscripciones")).status, 401);
 
     const admin = await login("admin");
     const uno = await login("uno");
@@ -191,9 +208,28 @@ test("backend real de Aula: login, roles, CSRF y propiedad de las reservas", asy
     assert.equal((await pedir(`/inscripciones/${reserva.id}/cancelacion`, { metodo: "POST", sesion: uno })).status, 202);
     assert.equal(llamadas.cancelaciones, 1);
 
-    // Contingencia: sin PostgreSQL, el catálogo sale del feed (vacío acá).
+    // Contingencia: sin PostgreSQL, el catálogo sale del feed y los cupos del servicio.
     const catalogo = await pedir("/materias", { sesion: dos });
     assert.equal(catalogo.status, 200);
+    assert.equal(catalogo.datos[0].cupos_disponibles, 1);
+    assert.equal(catalogo.datos[0].cupo, 2);
+    assert.equal(catalogo.datos[0].estado, 'abierta');
+
+    // La ruta nueva funciona sin PostgreSQL y recorre páginas antes de filtrar.
+    const propias = await pedir('/inscripciones?participante=alumno-ajeno', { sesion: uno });
+    assert.equal(propias.status, 200);
+    assert.equal(propias.datos.length, 4);
+    assert.ok(propias.datos.every(r => r.participante === 'alumno-1' && r.materia === 'Prueba'));
+    assert.deepEqual(new Set(propias.datos.map(r => r.estado)), new Set(['pendiente', 'confirmada', 'rechazada', 'cancelada']));
+    assert.deepEqual(llamadas.cursores.slice(-2), [null, 'pagina-propia']);
+    assert.deepEqual((await pedir('/inscripciones', { sesion: dos })).datos, []);
+    assert.equal((await pedir('/inscripciones', { sesion: admin })).status, 403);
+    llamadas.fallarListado = true;
+    assert.equal((await pedir('/inscripciones', { sesion: uno })).status, 503);
+    llamadas.fallarListado = false;
+
+    // No se altera la protección CSRF de las operaciones existentes.
+    assert.equal((await pedir(inscripcion, { metodo: 'POST', cuerpo: {}, sesion: { ...uno, csrf: 'incorrecto' } })).status, 403);
 
     // Estado de las conexiones (el panel de la página): informa PostgreSQL
     // caído y la API simulada sin /health, sin fallar.

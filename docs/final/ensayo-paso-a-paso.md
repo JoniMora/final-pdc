@@ -13,7 +13,7 @@ Los comandos son de macOS (zsh) y se corren desde `reserva-cupos`. En Windows (P
    node scripts/sistema.js demo
    ```
    Tiene que terminar con **"Listo para la demo"**. Si algo falla, el comando dice qué; correrlo de nuevo no rompe nada.
-   La primera vez después de abrir Docker puede tardar varios minutos (compila las imágenes y RabbitMQ arranca lento): esperar, el comando espera hasta 10. Si igual termina con `container ... is unhealthy`, correrlo de nuevo.
+   La primera vez después de abrir Docker puede tardar varios minutos (compila las imágenes y RabbitMQ arranca lento): esperar: el comando permite hasta 30 minutos para el arranque completo. Si termina con `container ... is unhealthy`, conservar la salida y revisar los logs antes de repetirlo.
 3. **Confiar en la CA local** (una sola vez por equipo), para que el navegador no muestre advertencias:
    ```shell
    sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain seguridad/local/ca.crt
@@ -39,71 +39,65 @@ Los comandos son de macOS (zsh) y se corren desde `reserva-cupos`. En Windows (P
 
 ### 1. El sistema sano (1 minuto)
 
-- **Ventana A:** "Estado de las conexiones" → *Actualizar estado*. Se ve `postgresql: conectado`, `recuperacion: normal`, `api: conectada (instancia …)` y el contrato `openapi.yaml 1.3.0`.
-- **Qué decir:** Aula es un cliente del servicio, con su propia base PostgreSQL; el servicio decide los cupos en MySQL.
+- **Ventana A:** el login está en su propia pantalla. Ingresar como administrador: aparecen **Estado del sistema**, **Crear materia**, **Sincronizar Aula** y **Materias e inscriptos**.
+- Los indicadores muestran **Conectada**, **Disponible** y **Al día**. Se actualizan solos; **Actualizar** permite adelantar la consulta.
+- **Ventana B:** ingresar como alumno: aparecen solamente **Materias disponibles** y **Mis inscripciones**, sin formularios de administración ni JSON.
+- **Qué decir:** Aula tiene su propia base PostgreSQL; el servicio decide los cupos en MySQL.
 
 ### 2. Una inscripción normal (2 minutos)
 
-- **Ventana A:** en "Crear materia", nombre `Taller`, cupo `1` → *Crear materia*. Aparece `HTTP 201` y la materia en la lista.
-- **Ventana B:** *Ver materias* → *Seleccionar* en **Taller** → *Inscribirse*. Primero `HTTP 202 … "estado": "pendiente"` y enseguida **`confirmada`**.
-- **Ventana B:** "Cupos e inscriptos" → *Actualizar*: `Cupos disponibles: 0 de 1`, `alumno-1` confirmado y, en "Según la base de Aula", `1`.
-- **Pestaña 2:** aparece la decisión del worker (`reservar … confirmada`).
-- **Qué decir:** la API responde 202 apenas guarda la solicitud; el worker decide con un UPDATE condicional y el webhook firmado actualiza la base de Aula.
-- *(Opcional)* **Ventana B:** *Cancelar esta inscripción* → `cancelada`, y el cupo vuelve a `1 de 1`.
+- **Ventana A:** crear **Taller**, con un cupo. Se muestra una confirmación en lenguaje de usuario y la materia en la tabla.
+- **Ventana B:** la tarjeta muestra **1 de 1 cupos libres**. Pulsar **Inscribirme**. En **Mis inscripciones** aparece **Pendiente**, luego **Confirmada** y “¡Listo! Tenés tu lugar en Taller”. La aceptación inicial todavía no confirma el lugar.
+- **Ventana A:** la ocupación pasa a **1 de 1**. **Ver inscriptos** abre la lista de participantes confirmados; si hay más de una página, usar **Ver más inscriptos**.
+- **Ventana B:** el botón queda deshabilitado mientras exista una inscripción pendiente o confirmada. **Cancelar** pide confirmación; al procesarse, aparece **Cancelada** y se libera el cupo.
+- **Pestaña 2:** aparece la decisión del worker. La idempotencia, los roles y CSRF siguen aplicándose en el backend.
 
 ### 3. Se abre la materia del escenario +1 (30 segundos)
 
-- **Ventana A:** nombre `Programación Distribuida`, cupo `10` → *Crear materia*.
-- Copiar el **`"id"`** del JSON que aparece abajo (`HTTP 201`). En la **pestaña 1**:
-  ```shell
-  ACT=<pegar acá el id>
-  ```
+- **Ventana A:** crear **Programación Distribuida**, cupo **10**.
+- La pantalla ya no muestra identificadores ni respuestas técnicas. Para obtener el identificador que necesita k6, ejecutar desde la terminal (sirve también en PowerShell):
+
+```shell
+node -e "const {sesionAula,aula}=require('./pruebas/comun');(async()=>{const c=aula(await sesionAula('admin'));const r=await c('/materias');if(r.status!==200)throw Error('No se pudo consultar el catálogo');const m=r.datos.find(x=>x.nombre==='Programación Distribuida');if(!m)throw Error('Materia no encontrada');console.log(m.actividad_id);})().catch(e=>{console.error(e.message);process.exitCode=1;});"
+```
+
+- Copiar la salida en `ACT=<id>` (macOS) o `$ACT="<id>"` (PowerShell). Si se repite el ensayo, usar un nombre único y buscar ese nombre.
 
 ### 4. Se cae la base de Aula (1 minuto)
 
-- **Pestaña 1:**
-  ```shell
-  docker compose stop aula-db
-  ```
-- **Ventana A:** *Actualizar estado* → **`postgresql: no disponible`**. (`recuperacion` pasa a `degradado` en el próximo ciclo, dentro de 30 s.)
-- **Ventana A:** *Ver materias* → la lista sigue apareciendo: sin su base, Aula arma el catálogo desde el feed de la API.
-- **Qué decir:** Aula no se cae; sigue operando contra la API, que nunca dependió de su base.
+```shell
+docker compose stop aula-db
+```
+
+- En ambas ventanas aparece **“La base de Aula no responde: los datos vienen del servicio y las inscripciones siguen funcionando”**. Puede tardar el próximo refresco y el plazo de conexión.
+- El administrador ve **Base de Aula: En contingencia** y reconciliación **Pendiente**. El catálogo y los cupos siguen viniendo del servicio.
+- **Qué decir:** Aula sigue operando contra la API, que no depende de su base local.
 
 ### 5. 500 alumnos a la vez (1 minuto)
 
-- **Pestaña 1:**
-  ```shell
-  docker compose run --rm k6 run -e API_KEY="$CLAVE" -e ACTIVIDAD_ID="$ACT" -e REINTENTOS=8 /pruebas/carga/rafaga.js
-  ```
-  k6 hace de 500 alumnos que piden la misma materia a la vez, con la clave de Aula, como lo haría su backend.
-- **Mirar mientras corre:**
-  - **Pestaña 2:** pasan las decisiones: 10 `confirmada` y el resto `rechazada`.
-  - **Ventana C (Grafana):** suben "Reservas admitidas por segundo", "Decisiones de reserva por segundo" y "RabbitMQ: mensajes por cola".
-- **Al terminar, k6 muestra** `Resultado (…): confirmadas=10 rechazadas=490 pendientes=0 cupos_disponibles=0` y los checks con ✓.
-- **Qué decir:**
-  - Las 500 reciben 202 rápido.
-  - La decisión es de a una, con un UPDATE condicional en MySQL, y por eso nunca hay más de 10.
-  - Si una respuesta se pierde, k6 reintenta con la misma `Idempotency-Key` y no se duplica.
+```shell
+docker compose run --rm k6 run -e API_KEY="$CLAVE" -e ACTIVIDAD_ID="$ACT" -e REINTENTOS=8 /pruebas/carga/rafaga.js
+```
+
+- Mirar las decisiones en la terminal y las curvas de admisión, decisiones y colas en Grafana.
+- Al terminar, k6 debe mostrar **10 confirmadas, 490 rechazadas, 0 pendientes y 0 cupos disponibles**. Estos resultados se verifican en el informe, no se deducen de la pantalla.
+- **Qué decir:** 202 admite el trabajo; el worker decide con un UPDATE condicional. Los reintentos conservan la Idempotency-Key.
 
 ### 6. Lo que ve Aula sin su base (1 minuto)
 
-- **Ventana A:** *Seleccionar* en **Programación Distribuida** → "Cupos e inscriptos" → *Actualizar*:
-  - `Cupos disponibles: 0 de 10`;
-  - 10 inscriptos confirmados según la API;
-  - "Según la base de Aula, actualizada por webhooks: **Base de Aula no disponible**".
-- **Ventana B:** *Ver materias* → *Seleccionar* **Programación Distribuida** → *Inscribirse* → `pendiente` y después **`rechazada`**: no quedan cupos.
-- **Qué decir:** con la base caída, Aula sigue mostrando el estado real y sigue inscribiendo, porque la fuente de verdad es el servicio.
+- **Ventana A:** la tabla muestra **10 de 10** ocupados, **0** libres. **Ver inscriptos** consulta los confirmados al servicio.
+- **Ventana B:** el catálogo muestra **Sin cupos disponibles** y no permite otra solicitud con información actualizada. Una solicitud admitida antes de agotarse los cupos puede pasar de **Pendiente** a **Rechazada** en **Mis inscripciones**; se explica que no quedaban cupos o las inscripciones estaban cerradas.
+- No intentar demostrar un rechazo pulsando un botón ya deshabilitado: la competencia se muestra con la ráfaga o con dos alumnos que soliciten el último cupo antes del refresco.
 
 ### 7. Vuelve la base y se reconcilia (1 minuto)
 
-- **Pestaña 1:**
-  ```shell
-  docker compose start aula-db
-  ```
-- Esperar unos 10 segundos.
-- **Ventana A:** *Actualizar estado* → `postgresql: conectado`, `recuperacion: normal`.
-- **Ventana A:** "Cupos e inscriptos" → *Actualizar* → "Según la base de Aula": **10**, los mismos que confirmó la API.
-- **Qué decir:** Aula leyó `/v1/cambios` desde su último punto de control y quedó igual al servicio. Es el criterio del plan: 10 confirmadas, 0 duplicadas, 0 cupos negativos y la base de Aula idéntica al servicio.
+```shell
+docker compose start aula-db
+```
+
+- **Ventana A:** pulsar **Reconciliar ahora**. Si la base todavía está iniciando, la pantalla informa que sigue pendiente y el ciclo automático vuelve a intentar.
+- Al terminar, los indicadores muestran **Conectada** y **Al día**, y aparece **“Los datos de Aula están al día”**. El aviso de contingencia desaparece en ambos roles en el próximo refresco.
+- **Qué decir:** el feed recupera la proyección desde el punto de control. La igualdad de datos se comprueba además con la prueba de seguridad o del escenario +1; no se infiere solamente del indicador.
 
 ### 8. Cierre (1 minuto)
 

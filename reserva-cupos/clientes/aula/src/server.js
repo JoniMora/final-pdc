@@ -171,32 +171,69 @@ app.get("/estado", async (req, res) => {
     });
 });
 
-// Materias guardadas en la base propia de Aula.
+// El catálogo usa la proyección local; en contingencia se reconstruye del feed.
+async function catalogoMaterias(res) {
+    try {
+        const resultado = await base(() => pool.query(
+            "SELECT id, actividad_id, nombre, cupo, creado_en FROM materias ORDER BY creado_en DESC"
+        ));
+        return resultado.rows;
+    } catch (error) {
+        console.error("[AULA] Catálogo en contingencia:", error.message);
+        await recuperacion.actualizarCatalogo();
+        res.set("X-Aula-Modo", "contingencia");
+        return [...recuperacion.catalogo.values()].sort((a, b) => b.creado_en.localeCompare(a.creado_en));
+    }
+}
+
+async function reservasDeActividad(id, aceptar) {
+    const reservas = [];
+    const vistos = new Set();
+    let cursor;
+    do {
+        const respuesta = await api.llamar("listarReservas", {
+            parametros: { id }, query: { limite: 100, ...(cursor ? { cursor } : {}) }
+        });
+        if (respuesta.status !== 200) throw new Error("No se pudieron consultar las inscripciones");
+        reservas.push(...respuesta.cuerpo.datos.filter(aceptar));
+        cursor = respuesta.cuerpo.siguiente_cursor;
+        if (cursor && vistos.has(cursor)) throw new Error("El servicio repitió un cursor de inscripciones");
+        if (cursor) vistos.add(cursor);
+    } while (cursor);
+    return reservas;
+}
+
+// Los cupos provienen del servicio: la proyección de Aula puede estar atrasada.
 app.get("/materias", async (req, res) => {
     try {
-        const result = await base(() => pool.query(
-            `SELECT id, actividad_id, nombre, cupo, creado_en
-               FROM materias
-              ORDER BY creado_en DESC
-              LIMIT 20`
-        ));
-
-        res.json(result.rows);
-    } catch (error) {
-        console.error("[AULA] Consulta:", error.message);
-
-        // Contingencia: el catálogo se arma desde el feed de la API.
-        try {
-            await recuperacion.actualizarCatalogo();
-            const materias = [...recuperacion.catalogo.values()]
-                .sort((a, b) => b.creado_en.localeCompare(a.creado_en))
-                .slice(0, 20);
-
-            res.set("X-Aula-Modo", "contingencia").json(materias);
-        } catch (fallo) {
-            errorDeApi(res, fallo);
+        const materias = await catalogoMaterias(res);
+        const resultado = [];
+        for (const materia of materias) {
+            const actividad = await api.llamar("consultarActividad", { parametros: { id: materia.actividad_id } });
+            if (actividad.status !== 200) return reenviar(res, actividad);
+            resultado.push({ ...materia, nombre: actividad.cuerpo.nombre,
+                cupo: actividad.cuerpo.capacidad, cupos_disponibles: actividad.cuerpo.cupos_disponibles,
+                estado: actividad.cuerpo.estado });
         }
-    }
+        res.json(resultado);
+    } catch (error) { errorDeApi(res, error); }
+});
+
+// El participante se toma exclusivamente de la sesión, nunca de la consulta.
+// Se recorren todas las páginas, incluso si la inscripción propia está al final.
+app.get("/inscripciones", async (req, res) => {
+    if (req.usuario.rol !== "alumno") return res.status(403).json({ error: "Esta vista es para alumnos" });
+    try {
+        const materias = await catalogoMaterias(res);
+        const propias = [];
+        for (const materia of materias) {
+            const reservas = await reservasDeActividad(materia.actividad_id,
+                reserva => reserva.participante === req.usuario.participante);
+            propias.push(...reservas.map(reserva => ({ ...reserva, materia: materia.nombre })));
+        }
+        propias.sort((a, b) => b.creado_en.localeCompare(a.creado_en) || a.id.localeCompare(b.id));
+        res.json(propias);
+    } catch (error) { errorDeApi(res, error); }
 });
 
 // Crea la actividad en el servicio y la registra como materia local.
@@ -251,7 +288,7 @@ app.get("/materias/:actividadId", async (req, res) => {
 
         const inscriptos = await api.llamar("listarReservas", {
             parametros,
-            query: { estado: "confirmada", limite: 100 }
+            query: { estado: "confirmada", limite: 100, ...(req.query.cursor ? { cursor: req.query.cursor } : {}) }
         });
 
         let locales = null;

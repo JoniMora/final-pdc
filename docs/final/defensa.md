@@ -296,3 +296,13 @@ Primero explicar el recorrido con tus palabras. Después abrir `reservar.js` y
 seguir sus seis pasos. Luego explicar seguridad y recuperación. Por último,
 mostrar las evidencias y sus límites. Cada integrante debe poder repetir ese
 recorrido y ubicar estos archivos, aunque se dividan los minutos de exposición.
+
+## Aula por rol (issue #62)
+
+Mostrar el login separado y abrir dos sesiones: administrador en ventana normal y alumno en privada. El alumno tiene tarjetas con cupos y Mis inscripciones; el administrador, indicadores, creación y tabla de materias con Ver inscriptos y paginación. No se presentan respuestas JSON.
+
+Explicar que Pendiente es una solicitud admitida, no un cupo confirmado. La pantalla consulta automáticamente el resultado y muestra Confirmada, Rechazada o Cancelada. Los botones deshabilitados ayudan al usuario; la autorización y la concurrencia se siguen resolviendo en los servidores.
+
+La ruta GET /inscripciones de Aula obtiene el participante de la sesión y filtra todas las páginas del servicio antes de responder. Nunca acepta un participante elegido desde el navegador. La consulta de materias agrega cupos_disponibles desde el servicio, para no confundir una proyección local atrasada con el estado definitivo.
+
+Durante la caída de aula-db mostrar el aviso de contingencia en ambos roles y los indicadores del administrador. Al volver, Reconciliar ahora informa si se completó o quedó pendiente. El ensayo manual actualizado está en ensayo-paso-a-paso.md.

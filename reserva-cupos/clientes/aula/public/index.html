@@ -1,422 +1,209 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Aula - Inscripciones</title>
-
-    <style>
-        body {
-            font-family: system-ui, sans-serif;
-            background: #f3f5f9;
-            color: #172033;
-            margin: 0;
-        }
-
-        main {
-            max-width: 760px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-
-        section {
-            background: white;
-            padding: 24px;
-            border-radius: 12px;
-            margin: 20px 0;
-        }
-
-        button {
-            background: #2447a7;
-            color: white;
-            border: 0;
-            padding: 12px 16px;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-
-        input {
-            box-sizing: border-box;
-            padding: 12px;
-            width: 100%;
-            margin: 12px 0;
-        }
-
-        pre {
-            white-space: pre-wrap;
-            overflow-wrap: anywhere;
-            background: #eef1f6;
-            padding: 14px;
-        }
-
-        ul {
-            padding-left: 0;
-            list-style: none;
-        }
-
-        li {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 12px;
-            padding: 8px 0;
-            border-bottom: 1px solid #e3e7ef;
-        }
-    </style>
-</head>
-
-<body>
-<main>
-    <h1>Aula</h1>
-    <p>Cliente de referencia del servicio de reserva de cupos (Entrega 5: seguridad y recuperación).</p>
-
-    <section>
-        <h2>Acceso</h2>
-
-        <form id="login">
-            <label for="usuario">Usuario</label>
-            <input id="usuario" autocomplete="username" required maxlength="80">
-
-            <label for="password">Contraseña</label>
-            <input id="password" type="password" autocomplete="current-password" required maxlength="256">
-
-            <button type="submit">Iniciar sesión</button>
-        </form>
-
-        <p id="sesion">Sin sesión.</p>
-        <button id="salir" hidden>Cerrar sesión</button>
-    </section>
-
-    <section>
-        <h2>Estado de las conexiones</h2>
-        <button id="actualizar">Actualizar estado</button>
-        <pre id="estado">Consultando...</pre>
-    </section>
-
-    <section id="solo-admin" hidden>
-        <h2>Crear materia</h2>
-        <p>
-            Aula crea la actividad en el servicio por HTTPS
-            y guarda la materia en su base PostgreSQL. Solo el administrador.
-        </p>
-
-        <form id="crear">
-            <label for="nombre">Nombre</label>
-            <input id="nombre" required maxlength="200" value="Programación Distribuida">
-
-            <label for="cupo">Cupo</label>
-            <input id="cupo" type="number" required min="1" max="100000" value="10">
-
-            <button type="submit">Crear materia</button>
-        </form>
-
-        <pre id="creada">Todavía no se creó una materia.</pre>
-    </section>
-
-    <section>
-        <h2>Materias</h2>
-        <button id="listar">Ver materias</button>
-        <ul id="materias"></ul>
-    </section>
-
-    <section>
-        <h2>Inscripción</h2>
-        <p id="seleccionada">Seleccionar una materia de la lista.</p>
-
-        <form id="inscribir">
-            <label for="alumno">Alumno</label>
-            <input id="alumno" required maxlength="128" value="alumno-1">
-            <button type="submit">Inscribirse</button>
-        </form>
-
-        <p>
-            La API responde 202: la solicitud quedó registrada como pendiente.
-            La página consulta el estado hasta que el worker la decide.
-        </p>
-
-        <pre id="inscripcion">Todavía no se solicitó una inscripción.</pre>
-
-        <button id="cancelar" disabled>Cancelar esta inscripción</button>
-        <p>
-            La cancelación también es asíncrona: la API responde 202 y el worker
-            devuelve el cupo. Aula se entera por un webhook firmado.
-        </p>
-    </section>
-
-    <section>
-        <h2>Cupos e inscriptos</h2>
-        <button id="detalle">Actualizar</button>
-        <pre id="inscriptos">Seleccionar una materia de la lista.</pre>
-    </section>
-</main>
-
-<script>
-    let actividadId = null;
-    let reservaId = null;
-
-    // Sesión: el token CSRF se envía en cada escritura. La cookie de sesión
-    // es HttpOnly: esta página no puede leerla.
-    let usuarioActual = null;
-    let csrf = null;
-
-    // Inscripción en curso: si la respuesta no llega (error de red o 5xx),
-    // reintentar la misma materia y alumno reutiliza la Idempotency-Key.
-    let inscripcionPendiente = null;
-
-    function mostrar(destino, texto) {
-        document.getElementById(destino).textContent = texto;
-    }
-
-    async function pedir(url, opciones = {}) {
-        const escritura = opciones.method && opciones.method !== "GET";
-        const response = await fetch(url, {
-            ...opciones,
-            headers: {
-                ...opciones.headers,
-                ...(csrf && escritura ? { "X-CSRF-Token": csrf } : {})
-            }
-        });
-
-        return { response, data: await response.json() };
-    }
-
-    async function consultar(url, destino, opciones = {}) {
-        mostrar(destino, "Procesando...");
-
-        try {
-            const { response, data } = await pedir(url, opciones);
-            mostrar(destino, `HTTP ${response.status}\n${JSON.stringify(data, null, 2)}`);
-            return { response, data };
-        } catch (error) {
-            mostrar(destino, `No se pudo completar la consulta: ${error.message}`);
-        }
-    }
-
-    function esperar(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
-    function seleccionar(materia) {
-        actividadId = materia.actividad_id;
-        mostrar("seleccionada", `Materia: ${materia.nombre} (cupo ${materia.cupo})`);
-        verDetalle();
-    }
-
-    async function listar() {
-        const lista = document.getElementById("materias");
-        lista.replaceChildren();
-
-        try {
-            const { response, data } = await pedir("/materias");
-
-            if (!response.ok) {
-                lista.textContent = data.error;
-                return;
-            }
-
-            for (const materia of data) {
-                const item = document.createElement("li");
-                const texto = document.createElement("span");
-                const boton = document.createElement("button");
-
-                texto.textContent = `${materia.nombre} · cupo ${materia.cupo}`;
-                boton.textContent = "Seleccionar";
-                boton.onclick = () => seleccionar(materia);
-
-                item.append(texto, boton);
-                lista.append(item);
-            }
-        } catch (error) {
-            lista.textContent = `No se pudo completar la consulta: ${error.message}`;
-        }
-    }
-
-    async function verDetalle() {
-        if (!actividadId) return;
-
-        mostrar("inscriptos", "Procesando...");
-
-        try {
-            const { response, data } = await pedir(`/materias/${actividadId}`);
-
-            if (!response.ok) {
-                mostrar("inscriptos", `HTTP ${response.status}\n${JSON.stringify(data, null, 2)}`);
-                return;
-            }
-
-            const nombres = data.inscriptos.map(reserva => `- ${reserva.participante}`);
-            const locales = data.inscriptos_locales === null
-                ? "Base de Aula no disponible"
-                : `${data.inscriptos_locales.length} (${data.inscriptos_locales.join(", ") || "ninguno"})`;
-
-            mostrar(
-                "inscriptos",
-                `Cupos disponibles: ${data.cupos_disponibles} de ${data.capacidad}\n` +
-                `Inscriptos confirmados según la API (${data.inscriptos.length}):\n` +
-                (nombres.join("\n") || "(ninguno)") +
-                `\n\nSegún la base de Aula, actualizada por webhooks: ${locales}`
-            );
-        } catch (error) {
-            mostrar("inscriptos", `No se pudo completar la consulta: ${error.message}`);
-        }
-    }
-
-    // Consulta el estado respetando Retry-After hasta que deje de estar pendiente.
-    async function seguir(reservaId, lineas) {
-        for (let intento = 0; intento < 30; intento++) {
-            const { response, data } = await pedir(`/inscripciones/${reservaId}`);
-
-            lineas.push(`GET estado → HTTP ${response.status}: ${data.estado}`);
-            mostrar("inscripcion", lineas.join("\n"));
-
-            if (data.estado !== "pendiente" && !lineas.esperandoCancelacion) return;
-            if (lineas.esperandoCancelacion && data.estado === "cancelada") return;
-
-            const segundos = Number(response.headers.get("retry-after") || 1);
-            await esperar(segundos * 1000);
-        }
-    }
-
-    document.getElementById("actualizar").onclick = () => {
-        consultar("/estado", "estado");
-    };
-
-    document.getElementById("listar").onclick = listar;
-    document.getElementById("detalle").onclick = verDetalle;
-
-    document.getElementById("crear").onsubmit = async event => {
-        event.preventDefault();
-
-        const resultado = await consultar("/materias", "creada", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                nombre: document.getElementById("nombre").value,
-                cupo: document.getElementById("cupo").value
-            })
-        });
-
-        if (resultado?.response.status === 201) listar();
-    };
-
-    document.getElementById("inscribir").onsubmit = async event => {
-        event.preventDefault();
-
-        if (!actividadId) {
-            mostrar("inscripcion", "Primero seleccionar una materia.");
-            return;
-        }
-
-        mostrar("inscripcion", "Procesando...");
-
-        const alumno = document.getElementById("alumno").value;
-        const identidad = JSON.stringify([actividadId, alumno]);
-
-        if (inscripcionPendiente?.identidad !== identidad) {
-            inscripcionPendiente = { identidad, clave: crypto.randomUUID() };
-        }
-
-        try {
-            const { response, data } = await pedir(`/materias/${actividadId}/inscripciones`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Idempotency-Key": inscripcionPendiente.clave
-                },
-                body: JSON.stringify({ alumno })
-            });
-
-            // Con una respuesta definitiva, la próxima inscripción es otra.
-            if (response.status < 500) inscripcionPendiente = null;
-
-            const lineas = [
-                `POST inscripción → HTTP ${response.status}`,
-                `Location: ${response.headers.get("location") || "-"}`,
-                JSON.stringify(data, null, 2)
-            ];
-
-            mostrar("inscripcion", lineas.join("\n"));
-
-            if (response.status === 202 || response.status === 200) {
-                reservaId = data.id;
-                document.getElementById("cancelar").disabled = false;
-                await seguir(data.id, lineas);
-                verDetalle();
-            }
-        } catch (error) {
-            mostrar("inscripcion", `No se pudo completar la consulta: ${error.message}`);
-        }
-    };
-
-    document.getElementById("cancelar").onclick = async () => {
-        if (!reservaId) return;
-
-        const { response, data } = await pedir(`/inscripciones/${reservaId}/cancelacion`, { method: "POST" });
-        const lineas = [`POST cancelación → HTTP ${response.status}`, JSON.stringify(data, null, 2)];
-        lineas.esperandoCancelacion = true;
-
-        mostrar("inscripcion", lineas.join("\n"));
-
-        if (response.status === 202) {
-            await seguir(reservaId, lineas);
-        }
-
-        verDetalle();
-    };
-
-    // La página solo oculta lo que el rol no puede usar: los permisos los
-    // controla el servidor en cada pedido.
-    function mostrarSesion(data) {
-        usuarioActual = data.usuario;
-        csrf = data.csrf;
-
-        const esAlumno = usuarioActual.rol === "alumno";
-
-        mostrar("sesion", `${usuarioActual.usuario} · ${usuarioActual.rol}`);
-        document.getElementById("login").hidden = true;
-        document.getElementById("salir").hidden = false;
-        document.getElementById("solo-admin").hidden = usuarioActual.rol !== "administrador";
-        document.getElementById("alumno").readOnly = esAlumno;
-        document.getElementById("alumno").value = esAlumno ? usuarioActual.participante : "alumno-1";
-
-        consultar("/estado", "estado");
-        listar();
-    }
-
-    document.getElementById("login").onsubmit = async event => {
-        event.preventDefault();
-
-        try {
-            const { response, data } = await pedir("/auth/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    usuario: document.getElementById("usuario").value,
-                    password: document.getElementById("password").value
-                })
-            });
-
-            document.getElementById("password").value = "";
-
-            if (response.ok) mostrarSesion(data);
-            else mostrar("sesion", data.error);
-        } catch (_) {
-            mostrar("sesion", "No se pudo iniciar sesión.");
-        }
-    };
-
-    document.getElementById("salir").onclick = async () => {
-        const { response } = await pedir("/auth/logout", { method: "POST" });
-
-        if (response.ok) location.reload();
-    };
-
-    // Una sesión abierta sobrevive a recargar la página.
-    pedir("/auth/me")
-        .then(({ response, data }) => {
-            if (response.ok) mostrarSesion(data);
-        })
-        .catch(() => {});
-</script>
-</body>
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>Aula · Inscripciones</title>
+        <link rel="stylesheet" href="/aula.css" />
+        <script src="/aula.js" defer></script>
+    </head>
+    <body>
+        <div id="cargando" class="cargando" role="status">
+            Cargando tu espacio…
+        </div>
+        <div id="aplicacion" hidden>
+            <header class="barra">
+                <a class="marca" href="/" aria-label="Aula, inicio"
+                    >aula<span class="punto">.</span></a
+                ><span class="separador"></span
+                ><span id="rol" class="rol"></span>
+                <div class="cuenta">
+                    <span id="persona"></span
+                    ><button id="salir" class="texto">Cerrar sesión</button>
+                </div>
+            </header>
+            <main class="contenido">
+                <div class="encabezado">
+                    <div>
+                        <p class="ceja">TU ESPACIO EN AULA</p>
+                        <h1 id="titulo"></h1>
+                        <p id="subtitulo" class="suave"></p>
+                    </div>
+                    <div class="actualizacion">
+                        <span class="pulso" aria-hidden="true"></span
+                        ><span id="actualizado">Actualizando…</span
+                        ><button id="actualizar" class="texto">
+                            Actualizar
+                        </button>
+                    </div>
+                </div>
+                <div
+                    id="contingencia"
+                    class="contingencia"
+                    role="status"
+                    hidden
+                >
+                    <strong>Seguimos con vos.</strong> La base de Aula no
+                    responde: los datos vienen del servicio y las inscripciones
+                    siguen funcionando.
+                </div>
+                <p
+                    id="mensaje"
+                    class="mensaje"
+                    role="status"
+                    aria-live="polite"
+                    hidden
+                ></p>
+                <p id="error" class="mensaje error" role="alert" hidden></p>
+                <div id="alumno" hidden>
+                    <section aria-labelledby="titulo-materias">
+                        <div class="titulo-seccion">
+                            <h2 id="titulo-materias">Materias disponibles</h2>
+                            <span class="etiqueta"
+                                >Elegí tu próxima materia</span
+                            >
+                        </div>
+                        <div id="materias" class="grilla"></div>
+                    </section>
+                    <section
+                        class="tarjeta bloque"
+                        aria-labelledby="titulo-inscripciones"
+                    >
+                        <div class="titulo-seccion">
+                            <div>
+                                <p class="ceja">TU RECORRIDO</p>
+                                <h2 id="titulo-inscripciones">
+                                    Mis inscripciones
+                                </h2>
+                            </div>
+                            <span class="suave"
+                                >Los estados se actualizan solos</span
+                            >
+                        </div>
+                        <div id="inscripciones"></div>
+                    </section>
+                </div>
+                <div id="administrador" hidden>
+                    <section aria-labelledby="titulo-sistema">
+                        <h2 id="titulo-sistema">Estado del sistema</h2>
+                        <div class="indicadores">
+                            <article class="tarjeta indicador">
+                                <p>Base de Aula</p>
+                                <strong id="base-estado">Consultando…</strong
+                                ><span>Proyección local</span>
+                            </article>
+                            <article class="tarjeta indicador">
+                                <p>Servicio de reservas</p>
+                                <strong id="api-estado">Consultando…</strong
+                                ><span>Disponibilidad del servicio</span>
+                            </article>
+                            <article class="tarjeta indicador">
+                                <p>Reconciliación</p>
+                                <strong id="reconciliacion-estado"
+                                    >Consultando…</strong
+                                ><span id="ultima-reconciliacion"
+                                    >Sin información</span
+                                >
+                            </article>
+                        </div>
+                    </section>
+                    <div class="admin-columnas">
+                        <section class="tarjeta bloque crear">
+                            <p class="ceja">OFERTA ACADÉMICA</p>
+                            <h2>Crear materia</h2>
+                            <p class="suave">
+                                Definí el nombre y la cantidad de lugares.
+                            </p>
+                            <form id="crear">
+                                <label for="nombre">Nombre de la materia</label
+                                ><input
+                                    id="nombre"
+                                    name="nombre"
+                                    required
+                                    maxlength="120"
+                                    placeholder="Ej. Sistemas distribuidos"
+                                /><label for="cupo">Cupos totales</label
+                                ><input
+                                    id="cupo"
+                                    name="cupo"
+                                    type="number"
+                                    min="1"
+                                    max="1000000"
+                                    value="10"
+                                    required
+                                /><button class="primario ancho" type="submit">
+                                    Crear materia
+                                </button>
+                            </form>
+                        </section>
+                        <section class="tarjeta bloque reconciliar">
+                            <p class="ceja">DATOS AL DÍA</p>
+                            <h2>Sincronizar Aula</h2>
+                            <p class="suave">
+                                La reconciliación recupera los cambios
+                                pendientes del servicio cuando vuelve la base de
+                                Aula.
+                            </p>
+                            <button id="reconciliar" class="secundario">
+                                Reconciliar ahora
+                            </button>
+                            <p id="resultado-reconciliacion" role="status"></p>
+                        </section>
+                    </div>
+                    <section class="tarjeta bloque">
+                        <div class="titulo-seccion">
+                            <h2>Materias e inscriptos</h2>
+                            <span
+                                id="cantidad-materias"
+                                class="etiqueta"
+                            ></span>
+                        </div>
+                        <div class="tabla-scroll">
+                            <table>
+                                <caption class="solo-lector">
+                                    Materias, ocupación e inscriptos confirmados
+                                </caption>
+                                <thead>
+                                    <tr>
+                                        <th>Materia</th>
+                                        <th>Ocupación</th>
+                                        <th>Cupos libres</th>
+                                        <th>
+                                            <span class="solo-lector"
+                                                >Acciones</span
+                                            >
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabla-materias"></tbody>
+                            </table>
+                        </div>
+                        <div id="detalle" class="detalle" hidden>
+                            <div class="titulo-seccion">
+                                <h3 id="detalle-titulo"></h3>
+                                <button id="cerrar-detalle" class="texto">
+                                    Cerrar lista
+                                </button>
+                            </div>
+                            <ul id="lista-inscriptos"></ul>
+                            <button
+                                id="mas-inscriptos"
+                                class="secundario"
+                                hidden
+                            >
+                                Ver más inscriptos
+                            </button>
+                        </div>
+                    </section>
+                </div>
+                <footer>
+                    Aula · Gestión de inscripciones
+                    <span
+                        >Los lugares se confirman al procesar cada
+                        solicitud.</span
+                    >
+                </footer>
+            </main>
+        </div>
+    </body>
 </html>

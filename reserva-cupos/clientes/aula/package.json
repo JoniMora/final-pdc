@@ -9,5 +9,8 @@
   "dependencies": {
     "express": "5.1.0",
     "pg": "8.16.3"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0"
   }
 }
