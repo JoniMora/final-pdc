@@ -14,7 +14,7 @@
 
 `npm test --prefix reserva-cupos/clientes/aula`: 26 pruebas aprobadas y 5 de contrato omitidas por no estar Prism disponible. Incluye el backend real frente a una API simulada, control de propiedad, paginación, contingencia, CSRF y las cinco pruebas del DOM. No es una prueba visual del navegador ni del entorno Docker.
 
-La configuración de Docker de la sesión del agente devuelve permiso denegado al motor. La vista previa del navegador tampoco pudo conectarse al servidor local. Quedan pendientes de ejecutar en la terminal y navegador del equipo:
+La usuaria ejecutó estos comandos en PowerShell/IntelliJ: Aula quedó healthy, el recorrido aprobó sus ocho comprobaciones y la suite de seguridad aprobó sus dieciséis comprobaciones, incluida la operación sin PostgreSQL y la reconciliación. Evidencias en [ensayos/aula-por-rol](ensayos/aula-por-rol/).
 
 ```powershell
 cd C:\Users\mcons\Documents\final-pdc\reserva-cupos
@@ -23,15 +23,16 @@ node pruebas/final/recorrido.js
 node pruebas/seguridad/aula.js
 ```
 
-La última suite detiene `aula-db` brevemente y la vuelve a iniciar en su bloque de limpieza; no elimina volúmenes. Se amplió para comprobar Mis inscripciones y cupos durante la caída. Sus resultados todavía no están certificados aquí.
+La última suite detiene `aula-db` brevemente y la vuelve a iniciar en su bloque de limpieza; no elimina volúmenes. Se amplió para comprobar Mis inscripciones y cupos durante la caída. Los resultados aprobados fueron aportados por la usuaria y se conservaron en el directorio de evidencias. La primera ejecución cortó un socket HTTPS después de docker stop; la corrección de la prueba solicita una conexión nueva después de comandos síncronos largos, sin reintentar ni desactivar TLS.
 
-## Revisión visual pendiente
+## Revisión visual
 
-1. Abrir https://localhost:3001: debe mostrar el login separado.
-2. Entrar como admin en ventana normal y como alumno1 en privada: cada uno debe ver su pantalla y ningún JSON.
-3. Crear materia de un cupo, inscribirse, esperar Confirmada y cancelar. Verificar cupo y bloqueo del botón durante la inscripción activa.
-4. En el admin, abrir Ver inscriptos. Revisar también una materia con más de 100 confirmados si está disponible para comprobar Ver más inscriptos.
-5. Detener `aula-db`, comprobar el aviso en ambas ventanas y que siga funcionando la consulta e inscripción. Volver a iniciarla y pulsar Reconciliar ahora: al completarse, debe desaparecer el aviso.
-6. Revisar la página con ventana angosta y con zoom de proyector. Las pruebas DOM no sustituyen esa revisión.
+Las capturas aportadas muestran:
+
+- [Alumno](ensayos/aula-por-rol/alumno.png): catálogo con cupos, botones deshabilitados, inscripciones confirmadas y canceladas; sin panel de administración ni JSON.
+- [Administrador](ensayos/aula-por-rol/administrador.png): indicadores, creación, ocupación y acceso a inscriptos.
+- [Contingencia](ensayos/aula-por-rol/contingencia.png): aviso visible con aula-db detenida. La usuaria confirmó que desaparece automáticamente al iniciar de nuevo la base.
+
+La revisión automatizada del DOM comprueba el aviso en ambos roles y su desaparición, además de inscripción, cancelación, creación, listado y reconciliación. La revisión visual de ventana angosta/proyector y el listado administrativo de más de 100 confirmados no se ensayaron manualmente en esta sesión. El backend sí tiene cobertura de paginación para la ruta Mis inscripciones.
 
 El ensayo paso a paso y la guía de defensa ya usan los nombres de estas pantallas. La PR debe apuntar a `feature/entrega-7-integracion-final`; no a main. No se hizo merge ni se cerró el issue.

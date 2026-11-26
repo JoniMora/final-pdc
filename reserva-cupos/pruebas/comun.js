@@ -97,12 +97,15 @@ function contenedores(servicio) {
 
 // --- HTTP ------------------------------------------------------------------
 
-function pedir(url, { metodo = "GET", cuerpo, encabezados = {}, ca = CA, timeoutMs = 30000 } = {}) {
+function pedir(url, { metodo = "GET", cuerpo, encabezados = {}, ca = CA, timeoutMs = 30000, conexionNueva = false } = {}) {
     return new Promise((resolve, reject) => {
         const datos = cuerpo === undefined ? null : JSON.stringify(cuerpo);
         const solicitud = https.request(url, {
             method: metodo,
-            ...(ca === CA ? { agent: agente } : { ca, agent: false }),
+            // Tras un comando síncrono largo, un socket libre puede haberse cerrado
+            // sin que Node haya procesado aún el cierre. Se puede exigir uno nuevo,
+            // conservando la verificación TLS y sin repetir solicitudes fallidas.
+            ...(ca === CA && !conexionNueva ? { agent: agente } : { ca, agent: false }),
             headers: {
                 ...(datos ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(datos) } : {}),
                 ...encabezados

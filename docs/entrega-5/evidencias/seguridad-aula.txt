@@ -1,5 +1,5 @@
 Personas de Aula, permisos y contingencia (E5-1, E5-5)
-Ejecución: 2026-11-15T00:12:56.060Z
+Ejecución: 2026-11-26T02:26:24.309Z
 
 OK: Sin sesión, las rutas de Aula responden 401
 OK: Contraseña incorrecta: 401 con el mismo mensaje que un usuario inexistente
@@ -8,11 +8,13 @@ OK: Un alumno no crea materias ni consulta la reconciliación: 403
 OK: Una escritura sin token CSRF no modifica nada: 403
 OK: Un alumno no puede inscribir a otro: 403
 OK: Otro alumno no consulta ni cancela la inscripción ajena: 404
+OK: Mis inscripciones usa la sesión y no expone reservas ajenas ni acepta suplantación por query
 OK: El detalle de la materia no muestra a otro alumno sus compañeros inscriptos
 OK: La reconciliación por feed reconstruye la materia borrada de aula-db
 OK: Con aula-db detenida, el catálogo sale del feed de la API (X-Aula-Modo: contingencia)
 OK: Con aula-db detenida, la sesión sigue válida: las identidades no dependen de PostgreSQL
 OK: Con aula-db detenida, un alumno se inscribe y el servicio confirma la reserva
+OK: Sin aula-db, Mis inscripciones conserva la propiedad y el catálogo muestra los cupos reales
 OK: Al volver aula-db, la reconciliación agrega la inscripción hecha durante la caída
 OK: Logout invalida la sesión en el servidor
 

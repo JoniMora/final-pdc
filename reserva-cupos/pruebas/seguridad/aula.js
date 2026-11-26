@@ -96,7 +96,7 @@ async function prueba({ ok }) {
         psql(`DELETE FROM materias WHERE actividad_id = '${id}';
               UPDATE punto_control SET ultima_secuencia_feed = 0 WHERE id = 1;`);
         await esperarHasta(async () => {
-            const resultado = await admin("/reconciliacion", { metodo: "POST" });
+            const resultado = await admin("/reconciliacion", { metodo: "POST", conexionNueva: true });
             return resultado.status === 200 && resultado.datos?.modo === "normal"
                 && psql(`SELECT count(*) FROM materias WHERE actividad_id = '${id}';`).trim() === "1";
         }, { descripcion: "la materia reconstruida por el feed" });
@@ -105,7 +105,9 @@ async function prueba({ ok }) {
         docker(["stop", "aula-db"]);
         aulaDbDetenida = true;
 
-        const catalogo = await dos("/materias");
+        // docker stop bloquea el event loop: no reutilizar un socket ocioso
+        // anterior a la pausa. El pedido se hace una sola vez con TLS verificado.
+        const catalogo = await dos("/materias", { conexionNueva: true });
         assert.equal(catalogo.status, 200);
         assert.equal(catalogo.encabezados["x-aula-modo"], "contingencia");
         assert.ok(catalogo.datos.some(m => m.actividad_id === id));
@@ -135,7 +137,7 @@ async function prueba({ ok }) {
         // Modo normal no implica que el relay ya haya secuenciado el cambio.
         // Esperar el efecto persistido evita la carrera entre confirmación y feed.
         await esperarHasta(async () => {
-            const resultado = await admin("/reconciliacion", { metodo: "POST" });
+            const resultado = await admin("/reconciliacion", { metodo: "POST", conexionNueva: true });
             return resultado.status === 200 && resultado.datos?.modo === "normal"
                 && psql(`SELECT estado FROM inscripciones WHERE reserva_id = '${durante.datos.id}';`).trim() === "confirmada";
         }, { descripcion: "la inscripción recuperada en PostgreSQL" });
