@@ -6,7 +6,7 @@ name: reserva-cupos-infra
 # seguridad/local/ (excluido de Git); sin ese paso, el entorno no arranca:
 # cada montaje de un archivo de seguridad es un bind que exige que exista.
 
-# Cada healthcheck tiene un start_period de 2 minutos (RabbitMQ, 5): con
+# Los healthchecks tienen 2 minutos de gracia (RabbitMQ, 5; MySQL, 8): con
 # Docker recién iniciado y las imágenes compilándose a la vez, un servicio
 # sano puede tardar en responder, y `up --wait` aborta en cuanto uno queda
 # unhealthy. Dentro de ese plazo los fallos no cuentan; el primer chequeo
@@ -66,10 +66,9 @@ services:
 
     healthcheck:
       test:
-        - CMD
-        - rabbitmq-diagnostics
-        - -q
-        - check_running
+        - CMD-SHELL
+        # No iniciar una VM Erlang como root antes de que el servidor cree su cookie.
+        - test -s /var/lib/rabbitmq/.erlang.cookie && gosu rabbitmq rabbitmq-diagnostics -q check_running
       interval: 10s
       timeout: 10s
       retries: 12
@@ -346,7 +345,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
-      start_period: 2m
+      start_period: 8m
 
     restart: unless-stopped
 
@@ -392,7 +391,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
-      start_period: 2m
+      start_period: 8m
 
     restart: unless-stopped
 

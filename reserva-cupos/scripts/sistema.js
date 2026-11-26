@@ -89,22 +89,41 @@ function exigirTopologiaOriginal() {
     }
 }
 
-// Grafana toma la contraseña generada solo al crear el admin en un volumen
-// nuevo. En un volumen anterior (con admin/admin de fábrica) se fija acá,
-// así que siempre coincide con seguridad/local/grafana-admin.txt.
-function sincronizarGrafana() {
+// En un volumen nuevo Grafana aplica la contraseña configurada al crear el admin.
+// Esperar las migraciones y verificar el acceso antes de modificar la base.
+async function sincronizarGrafana() {
+    const { pedir } = require("../pruebas/comun");
     const password = fs.readFileSync(path.join(RAIZ, "seguridad/local/grafana-admin.txt"), "utf8").trim();
-
-    compose(["exec", "-T", "grafana", "grafana", "cli", "admin", "reset-admin-password", "--password-from-stdin"],
-        { capturar: true, input: password });
-    console.log("Grafana: contraseña del admin tomada de seguridad/local/grafana-admin.txt.");
+    await esperarQue("Grafana termina de inicializar su base", async () => {
+        const r = await pedir("https://localhost:3002/api/health", { timeoutMs: 5000 });
+        return r.status === 200 && r.datos.database === "ok";
+    }, 300000);
+    const verificar = () => pedir("https://localhost:3002/api/user", {
+        encabezados: { Authorization: "Basic " + Buffer.from("admin:" + password).toString("base64") },
+        timeoutMs: 10000
+    });
+    const acceso = await verificar();
+    if (acceso.status === 200) {
+        console.log("Grafana: acceso del admin verificado por HTTPS; no hace falta cambiar la contraseña.");
+        return;
+    }
+    if (acceso.status !== 401) throw new Error("Grafana: no se pudo verificar el admin (HTTP " + acceso.status + ")");
+    // Compatibilidad con volúmenes anteriores que conservan otra contraseña.
+    try {
+        compose(["exec", "-T", "grafana", "grafana", "cli", "admin", "reset-admin-password", "--password-from-stdin"],
+            { capturar: true, input: password + "\n" });
+    } catch (_) {
+        throw new Error("Grafana: no se pudo sincronizar la contraseña del volumen anterior; los datos se conservaron.");
+    }
+    if ((await verificar()).status !== 200) throw new Error("Grafana: la contraseña sincronizada no permite autenticar al admin");
+    console.log("Grafana: contraseña sincronizada y acceso verificado por HTTPS.");
 }
 
 async function levantar() {
     exigirTopologiaOriginal();
-    compose(["up", "--build", "-d", "--wait", "--wait-timeout", "600"]);
+    compose(["up", "--build", "-d", "--wait", "--wait-timeout", "1800"]);
     await configurarReplica();
-    sincronizarGrafana();
+    await sincronizarGrafana();
     console.log("Entorno listo: API https://localhost:3000 · Aula https://localhost:3001 · " +
         "Canchas https://localhost:3003 · Eventos https://localhost:3004 (sus tenants los crea demo) · " +
         "panel de Traefik https://localhost:8080/dashboard/ · Prometheus https://localhost:9090 · " +
@@ -264,9 +283,9 @@ async function demo(args) {
     // Con una partición se retiran los workers de las particiones 1 a 3 que
     // hayan quedado de una corrida con cuatro (--remove-orphans).
     const archivos = particiones === 4 ? ["-f", "docker-compose.yml", "-f", "docker-compose.particiones.yml"] : [];
-    compose([...archivos, "up", "--build", "-d", "--remove-orphans", "--wait", "--wait-timeout", "600"]);
+    compose([...archivos, "up", "--build", "-d", "--remove-orphans", "--wait", "--wait-timeout", "1800"]);
     await configurarReplica();
-    sincronizarGrafana();
+    await sincronizarGrafana();
     await comprobarListo(particiones);
     await tenantDemo();
     await tenantsClientes();
