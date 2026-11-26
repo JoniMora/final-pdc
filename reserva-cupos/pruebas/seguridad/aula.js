@@ -77,6 +77,15 @@ async function prueba({ ok }) {
         assert.equal((await dos(`/inscripciones/${propia.datos.id}/cancelacion`, { metodo: "POST" })).status, 404);
         ok("Otro alumno no consulta ni cancela la inscripción ajena: 404");
 
+        const propias = await uno('/inscripciones?participante=alumno-2');
+        assert.equal(propias.status, 200);
+        assert.ok(propias.datos.some(r => r.id === propia.datos.id && r.estado === 'confirmada'));
+        assert.ok(propias.datos.every(r => r.participante === 'alumno-1'));
+        const ajenas = await dos('/inscripciones');
+        assert.equal(ajenas.status, 200);
+        assert.ok(ajenas.datos.every(r => r.id !== propia.datos.id));
+        ok("Mis inscripciones usa la sesión y no expone reservas ajenas ni acepta suplantación por query");
+
         const detalle = await dos(`/materias/${id}`);
         assert.equal(detalle.datos.inscriptos.length, 0);
         assert.deepEqual(detalle.datos.inscriptos_locales, []);
@@ -110,6 +119,15 @@ async function prueba({ ok }) {
         await esperarHasta(async () => (await dos(`/inscripciones/${durante.datos.id}`)).datos?.estado === "confirmada",
             { descripcion: "la confirmación durante la caída" });
         ok("Con aula-db detenida, un alumno se inscribe y el servicio confirma la reserva");
+
+        const propiasSinBase = await dos('/inscripciones');
+        assert.equal(propiasSinBase.status, 200);
+        assert.equal(propiasSinBase.encabezados['x-aula-modo'], 'contingencia');
+        assert.ok(propiasSinBase.datos.some(r => r.id === durante.datos.id && r.estado === 'confirmada'));
+        assert.ok(propiasSinBase.datos.every(r => r.participante === 'alumno-2'));
+        const cuposSinBase = await dos('/materias');
+        assert.equal(cuposSinBase.datos.find(m => m.actividad_id === id).cupos_disponibles, 0);
+        ok("Sin aula-db, Mis inscripciones conserva la propiedad y el catálogo muestra los cupos reales");
 
         docker(["start", "aula-db"]);
         aulaDbDetenida = false;
