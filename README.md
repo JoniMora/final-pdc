@@ -149,6 +149,7 @@ Un host con **catorce contenedores** de Docker Compose (diecisiete con cuatro pa
 | `mysql-replica` (MySQL 8) | Réplica semi-sincrónica en `super_read_only`; nodo de contingencia | interna | No |
 | `aula` (Node.js) | Cliente de referencia: plataforma de e-learning mínima | pública, tenant | Sí (web) |
 | `aula-db` (PostgreSQL) | Base propia del cliente de referencia | tenant | No |
+| `canchas`, `eventos` (Node.js) | Dos clientes de referencia livianos, cada uno con su tenant: turnos de fútbol 5 y entradas a eventos (versión final) | pública | Solo 127.0.0.1 |
 
 La red `publica` simula internet; la red `interna` contiene el broker y las bases del servicio; la red `tenant` es privada del cliente. **Ningún consumidor tiene ruta de red hacia la base del servicio, ni el servicio hacia la del consumidor**: la única interfaz es HTTP, en ambos sentidos. Que el cliente de referencia use PostgreSQL demuestra que el servicio no impone motor ni esquema. La API escala horizontalmente sin estado propio (Entrega 6); los workers, de a uno por partición. El primario es único por definición, y el relay y el notificador, instancias únicas por diseño.
 
@@ -194,9 +195,10 @@ final-pdc/
 │   │   ├── relay/                 # Topología, secuenciador del feed, publicador y barredor
 │   │   └── notificador/           # Webhooks firmados con reintentos y protección SSRF
 │   ├── clientes/
-│   │   └── aula/                  # Cliente de referencia: cliente derivado del contrato y receptor de webhooks
+│   │   ├── aula/                  # Cliente de referencia: cliente derivado del contrato y receptor de webhooks
+│   │   └── vitrina/               # Canchas y Eventos: un cliente liviano con dos perfiles y un tenant cada uno
 │   └── pruebas/
-│       ├── carga/                 # k6: ráfaga, duplicados, límite y multitenant
+│       ├── carga/                 # k6: ráfaga, duplicados, límite, multitenant y tres clientes a la vez
 │       ├── contrato/              # Schemathesis y oasdiff
 │       ├── seguridad/ fallos/     # Suites de seguridad y matriz de fallos (Entrega 5)
 │       └── final/                 # Recorrido, carga, curva, particiones, circuito y fallos bajo carga (Entrega 6)

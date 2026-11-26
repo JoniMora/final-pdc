@@ -66,6 +66,7 @@ jobs:
           - servicios/relay
           - servicios/notificador
           - clientes/aula
+          - clientes/vitrina
     steps:
       - uses: actions/checkout@v4
 
@@ -194,17 +195,28 @@ jobs:
         with:
           node-version: 22
 
-      - name: Certificados, identidades y clave del operador
-        run: node scripts/sistema.js preparar
-
-      - name: Levantar el sistema (réplica incluida)
-        run: node scripts/sistema.js levantar
+      # El comando único de la demo (issue #52), desde volúmenes vacíos:
+      # certificados, entorno, réplica, Grafana, tenant de la demo y
+      # comprobaciones.
+      - name: Levantar todo con un comando (sistema.js demo)
+        run: node scripts/sistema.js demo
 
       - name: Suites de seguridad (API, Aula y cifrado)
         run: node scripts/sistema.js seguridad
 
       - name: Recorrido funcional de punta a punta
         run: node pruebas/final/recorrido.js
+
+      # Issue #63: Canchas, Eventos y Aula a la vez. Cada uno termina con
+      # sus 10 confirmadas, el 429 es solo para Eventos y la actividad de un
+      # tenant pedida con la clave de otro responde 404.
+      - name: Tres clientes a la vez (k6)
+        run: |
+          docker compose run --rm k6 run \
+            -e CANCHAS="$(cat seguridad/local/canchas/clave-api)" \
+            -e EVENTOS="$(cat seguridad/local/eventos/clave-api)" \
+            -e AULA="$(grep -o 'rc_aula_[0-9a-f]*' docker-compose.yml | head -1)" \
+            /pruebas/carga/tres-clientes.js
 
       # El failover va último: deja la réplica promovida. El escenario del
       # tenant no espera los ~6 minutos hasta la DLQ (sí en la corrida local

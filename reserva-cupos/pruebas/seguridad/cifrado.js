@@ -54,16 +54,17 @@ function ejecutarEn(servicio, ...comando) {
 }
 
 async function prueba({ ok, dato }) {
-    // --- HTTPS publicado: API (Traefik), Aula y panel ------------------------
-    for (const [nombre, puerto] of [["API (Traefik)", 3000], ["Aula", 3001], ["Panel de Traefik", 8080]]) {
+    // --- HTTPS publicado: API (Traefik), clientes de referencia y panel ------
+    const publicados = [["API (Traefik)", 3000], ["Aula", 3001], ["Canchas", 3003], ["Eventos", 3004], ["Panel de Traefik", 8080]];
+    for (const [nombre, puerto] of publicados) {
         const sesion = await handshake(puerto);
         dato(`${nombre} en ${puerto}: ${sesion.protocolo}, ${sesion.cifrado}, certificado CN=${sesion.certificado}`);
         await assert.rejects(handshake(puerto, { ca: null }), /self-signed|unable to verify|SELF_SIGNED|local issuer/i);
         await assert.rejects(handshake(puerto, { servername: "otro-nombre.ejemplo" }), /altnames|Hostname/i);
     }
-    ok("API, Aula y panel: TLS 1.2+ verificado con la CA local; sin la CA o con otro nombre, el cliente rechaza la conexión");
+    ok("API, Aula, Canchas, Eventos y panel: TLS 1.2+ verificado con la CA local; sin la CA o con otro nombre, el cliente rechaza la conexión");
 
-    for (const puerto of [3000, 3001, 8080]) {
+    for (const [, puerto] of publicados) {
         const resultado = await textoPlano(puerto);
         dato(`HTTP sin TLS al puerto ${puerto}: ${resultado}`);
         assert.ok(!/HTTP 2\d\d/.test(resultado));

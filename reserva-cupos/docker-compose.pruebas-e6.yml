@@ -1,7 +1,7 @@
 services:
   notificador:
     environment:
-      NOTIFICADOR_HOSTS_PERMITIDOS: aula,receptor-pruebas
+      NOTIFICADOR_HOSTS_PERMITIDOS: aula,canchas,eventos,receptor-pruebas
 
   receptor-pruebas:
     profiles: [pruebas-e6]

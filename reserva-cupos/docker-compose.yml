@@ -6,6 +6,12 @@ name: reserva-cupos-infra
 # seguridad/local/ (excluido de Git); sin ese paso, el entorno no arranca:
 # cada montaje de un archivo de seguridad es un bind que exige que exista.
 
+# Los healthchecks tienen 2 minutos de gracia (RabbitMQ, 5; MySQL, 8): con
+# Docker recién iniciado y las imágenes compilándose a la vez, un servicio
+# sano puede tardar en responder, y `up --wait` aborta en cuanto uno queda
+# unhealthy. Dentro de ese plazo los fallos no cuentan; el primer chequeo
+# que pasa lo marca healthy, así que en un arranque normal no demora nada.
+
 # Certificado de la CA local: con él cada cliente verifica al servidor.
 x-ca: &ca
   type: bind
@@ -31,6 +37,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 12
+      start_period: 2m
     restart: unless-stopped
 
   rabbitmq:
@@ -59,14 +66,16 @@ services:
 
     healthcheck:
       test:
-        - CMD
-        - rabbitmq-diagnostics
-        - -q
-        - check_running
+        - CMD-SHELL
+        # No iniciar una VM Erlang como root antes de que el servidor cree su cookie.
+        - test -s /var/lib/rabbitmq/.erlang.cookie && gosu rabbitmq rabbitmq-diagnostics -q check_running
       interval: 10s
       timeout: 10s
       retries: 12
-      start_period: 60s
+      # Con Docker recién iniciado y las imágenes compilándose a la vez,
+      # RabbitMQ llegó a tardar 7 minutos en arrancar: los fallos de los
+      # primeros 5 no cuentan.
+      start_period: 5m
 
     restart: unless-stopped
 
@@ -154,6 +163,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+      start_period: 2m
 
     restart: unless-stopped
 
@@ -203,7 +213,11 @@ services:
       traefik.http.services.api.loadbalancer.serverstransport: api-tls@file
       traefik.http.services.api.loadbalancer.healthcheck.path: /health
       traefik.http.services.api.loadbalancer.healthcheck.interval: 5s
-      traefik.http.services.api.loadbalancer.healthcheck.timeout: 3s
+      # Traefik saca la instancia con un solo chequeo fallido. Con 3 s, una
+      # API sola y ocupada por una ráfaga de 500 quedaba afuera y Traefik
+      # respondía 503 (visto en el ensayo de la demo). Una instancia caída
+      # se detecta igual al instante: la conexión se rechaza.
+      traefik.http.services.api.loadbalancer.healthcheck.timeout: 10s
 
     volumes:
       - *ca
@@ -230,6 +244,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+      start_period: 2m
 
     restart: unless-stopped
 
@@ -272,6 +287,15 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+
+    # /health en el servidor interno de métricas (issue #10): el proceso
+    # atiende e informa MySQL y RabbitMQ. Verifica la CA local.
+    healthcheck:
+      test: [CMD, node, -e, "fetch('https://localhost:9464/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 2m
 
     restart: unless-stopped
 
@@ -321,7 +345,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
-      start_period: 45s
+      start_period: 8m
 
     restart: unless-stopped
 
@@ -367,7 +391,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
-      start_period: 45s
+      start_period: 8m
 
     restart: unless-stopped
 
@@ -420,7 +444,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
-      start_period: 20s
+      start_period: 2m
 
     restart: unless-stopped
 
@@ -482,6 +506,104 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+      start_period: 2m
+
+    restart: unless-stopped
+
+  # Clientes de referencia livianos (issue #63): el mismo código con dos
+  # perfiles, cada uno con su propio tenant, para mostrar varias
+  # organizaciones a la vez. La clave y el secreto del webhook no están
+  # acá: `node scripts/sistema.js demo` crea cada tenant con la API de
+  # administración y los escribe en seguridad/local/<cliente>/, que se monta
+  # en solo lectura. Sin base propia: arman su vista con el feed y los
+  # webhooks.
+  canchas:
+    build: &vitrina
+      context: ./clientes/vitrina
+      additional_contexts:
+        compartido: ./compartido
+        contrato: ./contrato
+
+    environment:
+      VITRINA_PERFIL: canchas
+      PORT: "3003"
+      TLS_CERT: /tls/canchas.crt
+      TLS_KEY: /tls/canchas.key
+      NODE_EXTRA_CA_CERTS: /tls/ca.crt
+      API_URL: https://traefik
+      CREDENCIALES_DIR: /credenciales
+
+    ports:
+      - "127.0.0.1:3003:3003"
+
+    volumes:
+      - *ca
+      - { type: bind, source: ./seguridad/local/canchas.crt, target: /tls/canchas.crt, read_only: true }
+      - { type: bind, source: ./seguridad/local/canchas.key, target: /tls/canchas.key, read_only: true }
+      - { type: bind, source: ./seguridad/local/canchas, target: /credenciales, read_only: true }
+
+    networks:
+      - publica
+
+    depends_on:
+      api:
+        condition: service_healthy
+      traefik:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('https://localhost:3003/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 2m
+
+    restart: unless-stopped
+
+  eventos:
+    build: *vitrina
+
+    environment:
+      VITRINA_PERFIL: eventos
+      PORT: "3004"
+      TLS_CERT: /tls/eventos.crt
+      TLS_KEY: /tls/eventos.key
+      NODE_EXTRA_CA_CERTS: /tls/ca.crt
+      API_URL: https://traefik
+      CREDENCIALES_DIR: /credenciales
+
+    ports:
+      - "127.0.0.1:3004:3004"
+
+    volumes:
+      - *ca
+      - { type: bind, source: ./seguridad/local/eventos.crt, target: /tls/eventos.crt, read_only: true }
+      - { type: bind, source: ./seguridad/local/eventos.key, target: /tls/eventos.key, read_only: true }
+      - { type: bind, source: ./seguridad/local/eventos, target: /credenciales, read_only: true }
+
+    networks:
+      - publica
+
+    depends_on:
+      api:
+        condition: service_healthy
+      traefik:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('https://localhost:3004/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 2m
 
     restart: unless-stopped
 
@@ -525,6 +647,15 @@ services:
       rabbitmq:
         condition: service_healthy
 
+    # /health en el servidor interno de métricas (issue #10): el proceso
+    # atiende e informa MySQL y RabbitMQ. Verifica la CA local.
+    healthcheck:
+      test: [CMD, node, -e, "fetch('https://localhost:9464/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 2m
+
     restart: unless-stopped
 
   notificador:
@@ -547,8 +678,9 @@ services:
       RABBITMQ_USER: demo
       RABBITMQ_PASSWORD: demo_local_2026
       # Protección contra SSRF: solo se admiten destinos internos de esta
-      # lista. En el entorno local, el receptor de Aula.
-      NOTIFICADOR_HOSTS_PERMITIDOS: aula
+      # lista. En el entorno local, los receptores de los clientes de
+      # referencia.
+      NOTIFICADOR_HOSTS_PERMITIDOS: aula,canchas,eventos
       WEBHOOK_TIMEOUT_MS: "5000"
       TLS_CERT: /tls/notificador.crt
       TLS_KEY: /tls/notificador.key
@@ -573,6 +705,15 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+
+    # /health en el servidor interno de métricas (issue #10): el proceso
+    # atiende e informa MySQL y RabbitMQ. Verifica la CA local.
+    healthcheck:
+      test: [CMD, node, -e, "fetch('https://localhost:9464/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 2m
 
     restart: unless-stopped
 

@@ -14,6 +14,7 @@
 /reserva-cupos/servicios/worker/        @JoniMora @Mariaubp
 /reserva-cupos/servicios/relay/         @JoniMora @Mariaubp
 /reserva-cupos/clientes/aula/           @JoniMora @Mariaubp
+/reserva-cupos/clientes/vitrina/        @JoniMora @Mariaubp
 /reserva-cupos/Infraestructura/         @JoniMora @Mariaubp
 /reserva-cupos/docker-compose.yml       @JoniMora @Mariaubp
 /.github/                               @JoniMora @Mariaubp

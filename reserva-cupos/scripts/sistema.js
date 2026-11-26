@@ -3,12 +3,15 @@
 // necesita Node.js 22, Docker y OpenSSL (en Windows, el que trae Git).
 //
 // Uso, desde reserva-cupos:
+//   node scripts/sistema.js demo [--particiones 4]   todo lo siguiente en un comando, listo para la demo
 //   node scripts/sistema.js preparar     certificados, identidades, clave del operador y de Grafana
 //   node scripts/sistema.js levantar     compose up + réplica configurada y cifrada + admin de Grafana
 //   node scripts/sistema.js estado       contenedores y replicación
 //   node scripts/sistema.js tenant <nombre> [--limite <por_segundo>/<rafaga>] [--scopes a,b]
 //   node scripts/sistema.js seguridad    pruebas de acceso, cifrado y Aula (evidencias)
 //   node scripts/sistema.js fallos [escenario...]   matriz de fallos (evidencias)
+//   node scripts/sistema.js failover     promueve la réplica si se cae el primario
+//   node scripts/sistema.js restaurar [--confirmar]   vuelve a primario + réplica (BORRA los datos)
 //   node scripts/sistema.js detener      detiene sin borrar datos
 //
 // "levantar" no borra volúmenes. Esta entrega cambia los scripts iniciales
@@ -82,27 +85,47 @@ function exigirTopologiaOriginal() {
 
     if (promovida) {
         throw new Error("La réplica fue promovida a primario (failover). Para volver a la topología inicial: " +
-            "docker compose down -v y node scripts/sistema.js levantar");
+            "node scripts/sistema.js restaurar (borra los datos del entorno)");
     }
 }
 
-// Grafana toma la contraseña generada solo al crear el admin en un volumen
-// nuevo. En un volumen anterior (con admin/admin de fábrica) se fija acá,
-// así que siempre coincide con seguridad/local/grafana-admin.txt.
-function sincronizarGrafana() {
+// En un volumen nuevo Grafana aplica la contraseña configurada al crear el admin.
+// Esperar las migraciones y verificar el acceso antes de modificar la base.
+async function sincronizarGrafana() {
+    const { pedir } = require("../pruebas/comun");
     const password = fs.readFileSync(path.join(RAIZ, "seguridad/local/grafana-admin.txt"), "utf8").trim();
-
-    compose(["exec", "-T", "grafana", "grafana", "cli", "admin", "reset-admin-password", "--password-from-stdin"],
-        { capturar: true, input: password });
-    console.log("Grafana: contraseña del admin tomada de seguridad/local/grafana-admin.txt.");
+    await esperarQue("Grafana termina de inicializar su base", async () => {
+        const r = await pedir("https://localhost:3002/api/health", { timeoutMs: 5000 });
+        return r.status === 200 && r.datos.database === "ok";
+    }, 300000);
+    const verificar = () => pedir("https://localhost:3002/api/user", {
+        encabezados: { Authorization: "Basic " + Buffer.from("admin:" + password).toString("base64") },
+        timeoutMs: 10000
+    });
+    const acceso = await verificar();
+    if (acceso.status === 200) {
+        console.log("Grafana: acceso del admin verificado por HTTPS; no hace falta cambiar la contraseña.");
+        return;
+    }
+    if (acceso.status !== 401) throw new Error("Grafana: no se pudo verificar el admin (HTTP " + acceso.status + ")");
+    // Compatibilidad con volúmenes anteriores que conservan otra contraseña.
+    try {
+        compose(["exec", "-T", "grafana", "grafana", "cli", "admin", "reset-admin-password", "--password-from-stdin"],
+            { capturar: true, input: password + "\n" });
+    } catch (_) {
+        throw new Error("Grafana: no se pudo sincronizar la contraseña del volumen anterior; los datos se conservaron.");
+    }
+    if ((await verificar()).status !== 200) throw new Error("Grafana: la contraseña sincronizada no permite autenticar al admin");
+    console.log("Grafana: contraseña sincronizada y acceso verificado por HTTPS.");
 }
 
 async function levantar() {
     exigirTopologiaOriginal();
-    compose(["up", "--build", "-d", "--wait", "--wait-timeout", "300"]);
+    compose(["up", "--build", "-d", "--wait", "--wait-timeout", "1800"]);
     await configurarReplica();
-    sincronizarGrafana();
+    await sincronizarGrafana();
     console.log("Entorno listo: API https://localhost:3000 · Aula https://localhost:3001 · " +
+        "Canchas https://localhost:3003 · Eventos https://localhost:3004 (sus tenants los crea demo) · " +
         "panel de Traefik https://localhost:8080/dashboard/ · Prometheus https://localhost:9090 · " +
         "Grafana https://localhost:3002 (credenciales en seguridad/local/accesos-locales.txt)");
 }
@@ -140,10 +163,225 @@ async function tenant(args) {
     console.log(creado.clave_api);
 }
 
+// --- Un comando para la demo (issue #52) -----------------------------------
+//
+// Desde volúmenes vacíos o sobre una instalación existente: genera lo que
+// falte en seguridad/local/, levanta todo (con 1 o 4 particiones de
+// comandos), configura la réplica y Grafana, crea el tenant de la demo y
+// comprueba que cada parte responda. No borra volúmenes.
+
+function opcion(args, nombre, porDefecto) {
+    const i = args.indexOf(nombre);
+    return i >= 0 ? args[i + 1] : porDefecto;
+}
+
+async function esperarQue(descripcion, condicion, plazoMs = 90000) {
+    const inicio = Date.now();
+    for (;;) {
+        const resultado = await condicion().catch(() => null);
+        if (resultado) return console.log(`OK: ${descripcion}${resultado === true ? "" : ` (${resultado})`}`);
+        if (Date.now() - inicio > plazoMs) throw new Error(`No se cumplió: ${descripcion}`);
+        await esperar(2000);
+    }
+}
+
+async function comprobarListo(particiones) {
+    const { pedir } = require("../pruebas/comun");
+
+    await esperarQue("la API responde por Traefik y ve MySQL", async () => {
+        const r = await pedir("https://localhost:3000/health", { timeoutMs: 5000 });
+        return r.status === 200 && r.datos.mysql === "conectado";
+    });
+    await esperarQue("Aula responde", async () => (await pedir("https://localhost:3001/health", { timeoutMs: 5000 })).status === 200);
+    await esperarQue("replicación semisincrónica activa", async () => {
+        const fila = compose(["exec", "-T", "mysql-primary", "sh", "-c",
+            'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -N -B -e "SHOW GLOBAL STATUS LIKE \'Rpl_semi_sync_source_status\'" 2>/dev/null'],
+        { capturar: true }).trim();
+        return fila.endsWith("ON");
+    });
+    await esperarQue(`${particiones} partición(es) de comandos enlazada(s)`, async () => {
+        const enlaces = compose(["exec", "-T", "rabbitmq", "rabbitmqctl", "-q", "list_bindings", "source_name", "destination_name"],
+            { capturar: true }).split("\n").filter(l => l.startsWith("reservas.comandos\t"));
+        return enlaces.length === particiones;
+    });
+    await esperarQue("Prometheus recolecta todos sus destinos", async () => {
+        const r = await pedir("https://localhost:9090/api/v1/targets?state=active", { timeoutMs: 5000 });
+        const destinos = r.datos.data.activeTargets;
+        return destinos.length > 0 && destinos.every(d => d.health === "up") ? `${destinos.length} destinos` : null;
+    }, 120000);
+}
+
+// Tenant con límite alto para la demo de carga. La clave queda en
+// seguridad/local/tenant-demo.key (fuera de Git); si ya existe y sigue
+// autenticando (los volúmenes son los mismos), se reutiliza.
+async function tenantDemo() {
+    const { api, crearTenant } = require("../pruebas/comun");
+    const archivo = path.join(RAIZ, "seguridad/local/tenant-demo.key");
+
+    if (fs.existsSync(archivo)) {
+        const clave = fs.readFileSync(archivo, "utf8").trim();
+        if ((await api(clave)("/v1/cambios?limite=1")).status === 200) {
+            return console.log("OK: tenant de la demo (ya existía)");
+        }
+    }
+
+    const creado = await crearTenant("Demostración", { limite: { por_segundo: 1000, rafaga: 1000 } });
+    fs.writeFileSync(archivo, creado.clave_api + "\n", { mode: 0o600 });
+    console.log("OK: tenant de la demo creado");
+}
+
+// Canchas y Eventos (issue #63): un tenant propio cada uno, con su webhook
+// y su límite de tasa. Eventos tiene uno bajo a propósito: es el tenant que
+// se satura en la Parte 3 del ensayo sin frenar a los otros. La clave y el
+// secreto quedan en seguridad/local/<cliente>/, la carpeta que el
+// contenedor monta; si la clave sigue autenticando, se reutiliza.
+const CLIENTES_LIVIANOS = [
+    { id: "canchas", nombre: "Canchas", puerto: 3003, limite: { por_segundo: 500, rafaga: 500 } },
+    { id: "eventos", nombre: "Eventos", puerto: 3004, limite: { por_segundo: 20, rafaga: 20 } }
+];
+
+async function tenantsClientes() {
+    const { api, crearTenant, pedir } = require("../pruebas/comun");
+
+    for (const cliente of CLIENTES_LIVIANOS) {
+        const carpeta = path.join(RAIZ, "seguridad/local", cliente.id);
+        const archivoClave = path.join(carpeta, "clave-api");
+        fs.mkdirSync(carpeta, { recursive: true });
+
+        const existente = fs.existsSync(archivoClave) && fs.readFileSync(archivoClave, "utf8").trim();
+        if (existente && (await api(existente)("/v1/cambios?limite=1")).status === 200) {
+            console.log(`OK: tenant de ${cliente.nombre} (ya existía)`);
+        } else {
+            const creado = await crearTenant(cliente.nombre, {
+                limite: cliente.limite,
+                webhook_url: `https://${cliente.id}:${cliente.puerto}/webhooks/reservas`
+            });
+            // El contenedor corre como otro usuario y tiene que poder
+            // leerlos (como los certificados). La clave va última: con ella
+            // el cliente se da por configurado.
+            fs.writeFileSync(path.join(carpeta, "webhook-secreto"), creado.webhook_secreto + "\n", { mode: 0o644 });
+            fs.writeFileSync(path.join(carpeta, "tenant.json"),
+                JSON.stringify({ id: creado.id, nombre: creado.nombre }, null, 2) + "\n", { mode: 0o644 });
+            fs.writeFileSync(archivoClave, creado.clave_api + "\n", { mode: 0o644 });
+            console.log(`OK: tenant de ${cliente.nombre} creado (límite ${cliente.limite.por_segundo}/s)`);
+        }
+
+        await esperarQue(`${cliente.nombre} responde y lee su feed`, async () => {
+            const r = await pedir(`https://localhost:${cliente.puerto}/api/estado`, { timeoutMs: 5000 });
+            return r.status === 200 && r.datos.tenant.configurado && r.datos.tenant.sincronizado_en && !r.datos.tenant.error;
+        }, 60000);
+    }
+}
+
+async function demo(args) {
+    const particiones = Number(opcion(args, "--particiones", "1"));
+    if (![1, 4].includes(particiones)) throw new Error("--particiones admite 1 o 4");
+
+    nodo("scripts/preparar-seguridad.js");
+    exigirTopologiaOriginal();
+
+    // Con una partición se retiran los workers de las particiones 1 a 3 que
+    // hayan quedado de una corrida con cuatro (--remove-orphans).
+    const archivos = particiones === 4 ? ["-f", "docker-compose.yml", "-f", "docker-compose.particiones.yml"] : [];
+    compose([...archivos, "up", "--build", "-d", "--remove-orphans", "--wait", "--wait-timeout", "1800"]);
+    await configurarReplica();
+    await sincronizarGrafana();
+    await comprobarListo(particiones);
+    await tenantDemo();
+    await tenantsClientes();
+
+    console.log([
+        "",
+        "Listo para la demo:",
+        "  API (por Traefik)  https://localhost:3000",
+        "  Aula               https://localhost:3001",
+        "  Canchas            https://localhost:3003",
+        "  Eventos            https://localhost:3004",
+        "  Traefik            https://localhost:8080/dashboard/",
+        "  RabbitMQ           https://localhost:15672",
+        "  Prometheus         https://localhost:9090",
+        "  Grafana            https://localhost:3002",
+        "Credenciales: seguridad/local/accesos-locales.txt · clave del tenant de la demo: seguridad/local/tenant-demo.key",
+        "Confiar en seguridad/local/ca.crt en el navegador para evitar advertencias."
+    ].join("\n"));
+}
+
+// --- Failover y restauración (issue #61) -------------------------------------
+//
+// failover: el primario de MySQL se cayó (o se quiere conmutar): lo deja
+// detenido, promueve la réplica (pruebas/fallos/failover.js) y mide cuándo
+// la API vuelve a aceptar escrituras. Es manual a propósito: con dos nodos,
+// decidir solo que el primario murió puede terminar en dos primarios.
+
+function estadoContenedor(servicio) {
+    const [id] = compose(["ps", "-a", "-q", servicio], { capturar: true }).trim().split("\n").filter(Boolean);
+    if (!id) return null;
+    const [estado, fin] = execFileSync("docker", ["inspect", "-f", "{{.State.Status}}|{{.State.FinishedAt}}", id],
+        { encoding: "utf8" }).trim().split("|");
+    return { id, estado, fin: new Date(fin) };
+}
+
+async function failover() {
+    const { api, claveAula } = require("../pruebas/comun");
+    const { promoverReplica } = require("../pruebas/fallos/failover");
+
+    exigirTopologiaOriginal();
+
+    const primario = estadoContenedor("mysql-primary");
+    if (primario?.estado === "running") {
+        console.log("El primario sigue en marcha: se detiene para que no queden dos primarios.");
+    }
+    // También si ya estaba caído: detenido a mano, Docker no lo reinicia.
+    compose(["stop", "mysql-primary"], { capturar: true });
+    const caida = estadoContenedor("mysql-primary").fin;
+
+    const inicio = Date.now();
+    await promoverReplica(texto => console.log(`OK: ${texto}`));
+
+    // Sonda: una escritura real por la API, con la clave del tenant de la demo.
+    const archivo = path.join(RAIZ, "seguridad/local/tenant-demo.key");
+    const clave = fs.existsSync(archivo) ? fs.readFileSync(archivo, "utf8").trim() : claveAula();
+    const cliente = api(clave);
+    for (;;) {
+        const r = await cliente("/v1/actividades", {
+            metodo: "POST", cuerpo: { nombre: "Sonda de failover", capacidad: 1 }, timeoutMs: 10000
+        }).catch(() => null);
+        if (r?.status === 201) break;
+        if (Date.now() - inicio > 120000) throw new Error("La API no volvió a aceptar escrituras en 2 minutos");
+        await esperar(250);
+    }
+
+    const segundos = ms => `${(ms / 1000).toFixed(1).replace(".", ",")} s`;
+    console.log(`OK: la API vuelve a escribir, ${segundos(Date.now() - inicio)} después de iniciar el failover` +
+        (caida.getTime() > 0 ? ` (${segundos(Date.now() - caida.getTime())} desde la caída del primario: RTO)` : ""));
+    console.log("El primario viejo queda detenido. La réplica promovida trabaja sin réplica.");
+    console.log("Para volver a primario + réplica: node scripts/sistema.js restaurar (borra los datos del entorno).");
+}
+
+// restaurar: vuelve a la topología original recreando el entorno. Borra
+// los volúmenes (reservas, materias de Aula, colas y métricas); los
+// certificados y credenciales de seguridad/local/ se conservan.
+async function restaurar(args) {
+    if (!args.includes("--confirmar")) {
+        const readline = require("node:readline/promises");
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+        const respuesta = await rl.question(
+            "Esto BORRA todos los datos del entorno (reservas, materias de Aula, colas y métricas).\n" +
+            "Escribí 'restaurar' para seguir: ");
+        rl.close();
+        if (respuesta.trim() !== "restaurar") return console.log("Cancelado: no se borró nada.");
+    }
+
+    compose(["-f", "docker-compose.yml", "-f", "docker-compose.particiones.yml", "down", "-v", "--remove-orphans"]);
+    await demo(args.filter(arg => arg !== "--confirmar"));
+}
+
 async function main() {
     const [accion = "estado", ...args] = process.argv.slice(2);
 
     switch (accion) {
+        case "demo":
+            return demo(args);
         case "preparar":
             return nodo("scripts/preparar-seguridad.js");
         case "levantar":
@@ -164,10 +402,14 @@ async function main() {
             return nodo("pruebas/seguridad/cifrado.js");
         case "fallos":
             return nodo("pruebas/fallos/matriz.js", args);
+        case "failover":
+            return failover();
+        case "restaurar":
+            return restaurar(args);
         case "detener":
             return compose(["stop"]);
         default:
-            throw new Error("Acciones: preparar, levantar, estado, tenant, seguridad, fallos, detener");
+            throw new Error("Acciones: demo, preparar, levantar, estado, tenant, seguridad, fallos, failover, restaurar, detener");
     }
 }
 

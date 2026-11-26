@@ -9,7 +9,11 @@ const OpenApiValidator = require("express-openapi-validator");
 const { pool, esErrorDeInfraestructura } = require("./db");
 const { Problema, enviarProblema, problemas } = require("./problemas");
 const { rutas, alObservarLoteAdmision } = require("./rutas");
-const { crearMetricas, crearMetricaLoteAdmision } = require("../../../compartido/src/metricas");
+const {
+    crearMetricas,
+    crearMetricaLoteAdmision,
+    crearMetricaSolicitudesTenant
+} = require("../../../compartido/src/metricas");
 const { rutasAdmin } = require("./admin");
 const { crearRedis } = require('./redis');
 const { crearLimitadorRedis } = require('./limite-redis');
@@ -40,6 +44,7 @@ const metricas = crearMetricas("api");
 
 // Cuántas admisiones comparte cada commit (ver compartido/src/metricas.js).
 const loteAdmision = crearMetricaLoteAdmision(metricas.registro);
+const solicitudesTenant = crearMetricaSolicitudesTenant(metricas.registro);
 alObservarLoteAdmision(tamano => loteAdmision.observe(tamano));
 
 const redis = crearRedis();
@@ -83,6 +88,11 @@ app.use((req, res, next) => {
 
         metricas.solicitudes.inc(etiquetas);
         metricas.duracion.observe(etiquetas, segundos);
+
+        // Solo las autenticadas: un 401 no tiene tenant.
+        if (req.tenantNombre) {
+            solicitudesTenant.inc({ tenant: req.tenantNombre, estado: etiquetas.estado });
+        }
     });
 
     next();

@@ -194,4 +194,12 @@ test("backend real de Aula: login, roles, CSRF y propiedad de las reservas", asy
     // Contingencia: sin PostgreSQL, el catálogo sale del feed (vacío acá).
     const catalogo = await pedir("/materias", { sesion: dos });
     assert.equal(catalogo.status, 200);
+
+    // Estado de las conexiones (el panel de la página): informa PostgreSQL
+    // caído y la API simulada sin /health, sin fallar.
+    const estado = await pedir("/estado", { sesion: admin });
+    assert.equal(estado.status, 200);
+    assert.equal(estado.datos.postgresql, "no disponible");
+    assert.equal(estado.datos.api, "no disponible");
+    assert.equal(estado.datos.aula, "ok");
 });

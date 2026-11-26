@@ -54,7 +54,7 @@ function levantar() {
     nodo('preparar', 'scripts/sistema.js', ['preparar']);
     nodo('topologia-original', 'scripts/sistema.js', ['comprobar-topologia']);
     ejecutar('levantar-cuatro-particiones', 'docker', ['compose', '-f', 'docker-compose.yml', '-f',
-        'docker-compose.particiones.yml', 'up', '-d', '--build', '--wait', '--wait-timeout', '300']);
+        'docker-compose.particiones.yml', 'up', '-d', '--build', '--wait', '--wait-timeout', '600']);
     nodo('replica', 'scripts/sistema.js', ['replica']);
     nodo('grafana', 'scripts/sistema.js', ['grafana']);
 }

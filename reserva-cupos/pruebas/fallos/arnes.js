@@ -119,7 +119,10 @@ async function reservarConReintentos(cliente, actividadId, participante, { plazo
 // Crea una actividad y lanza `solicitudes` reservas de participantes
 // distintos, con `concurrencia` clientes en paralelo. Si se indica
 // `durante`, ejecuta su acción una vez, cuando se admitieron `tras`
-// solicitudes, sin frenar a los demás clientes.
+// solicitudes, sin frenar a los demás clientes. Con `frenar: true`, los
+// clientes esperan a que la acción llame a `continuar()` antes de seguir:
+// así la falla ya está en curso cuando llegan las solicitudes restantes (si
+// no, una ráfaga rápida puede terminar antes de que `docker stop` termine).
 async function rafaga({ clave, capacidad = 10, solicitudes = 200, concurrencia = 50, durante, cliente = api(clave), crear }) {
     const actividad = crear
         ? await crear()
@@ -131,19 +134,25 @@ async function rafaga({ clave, capacidad = 10, solicitudes = 200, concurrencia =
     const registro = { latencias: [], reintentos: 0, errores: {}, admitidas: [] };
     let siguiente = 0;
     let accion = null;
+    let compuerta = null;
 
     async function clienteVirtual() {
         while (siguiente < solicitudes) {
+            if (compuerta) await compuerta;
+            if (siguiente >= solicitudes) break;
             const n = siguiente++;
             const reserva = await reservarConReintentos(cliente, actividad.id, `participante-${n}`, { registro });
             registro.admitidas.push(reserva.id);
 
             if (durante && !accion && registro.admitidas.length >= durante.tras) {
-                accion = Promise.resolve().then(durante.accion);
+                let abrir = () => {};
+                if (durante.frenar) compuerta = new Promise(resolver => { abrir = resolver; });
+                accion = Promise.resolve().then(() => durante.accion({ continuar: abrir }));
                 // Si la acción falla antes de que termine la ráfaga, el error
                 // se informa al final (await accion), no como un rechazo sin
-                // manejar que corta el proceso sin dejar la evidencia.
-                accion.catch(() => {});
+                // manejar que corta el proceso sin dejar la evidencia. Termine
+                // como termine, los clientes no quedan frenados.
+                accion.catch(() => {}).finally(abrir);
             }
         }
     }

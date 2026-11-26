@@ -47,7 +47,7 @@ La certificación, el informe de amenazas y las evidencias de la Entrega 5 está
 - Docker Desktop iniciado, utilizando contenedores Linux, con Docker Compose 2.17 o superior.
 - Node.js 22 o superior (scripts de preparación, operación y pruebas).
 - OpenSSL. En macOS y Linux viene instalado; en Windows sirve el que trae Git (el script lo busca solo) o se indica con `OPENSSL=<ruta>`.
-- Puertos locales 3000, 3001, 3002, 8080, 9090 y 15672 disponibles.
+- Puertos locales 3000, 3001, 3002, 3003, 3004, 8080, 9090 y 15672 disponibles.
 
 Los comandos son los mismos en bash, zsh, PowerShell y la terminal de IntelliJ: todo se opera con `node scripts/sistema.js <acción>`.
 
@@ -69,6 +69,7 @@ Los comandos son los mismos en bash, zsh, PowerShell y la terminal de IntelliJ: 
 | rabbitmq | Solo AMQPS (5671) y administración por HTTPS. |
 | aula | Cliente de referencia con login y roles, receptor de webhooks y reconciliación por feed. |
 | aula-db | Base propia de Aula (PostgreSQL), solo por TLS. |
+| canchas, eventos | Clientes de referencia livianos (`clientes/vitrina`, un mismo código con dos perfiles): turnos de fútbol 5 en `https://localhost:3003` y entradas a eventos en `https://localhost:3004`. Cada uno es un tenant propio, sin base: arma su vista con el feed y los webhooks. |
 | k6 | Pruebas de carga. Solo se ejecuta a pedido. |
 
 Redes: `publica`, `interna` y `tenant` como en la Entrega 4, más `docker` (interna, sin salida) entre Traefik y el proxy del socket.
@@ -83,6 +84,15 @@ cd final-pdc
 git checkout v6-escalabilidad
 cd reserva-cupos
 ```
+
+### Todo con un comando
+
+```shell
+node scripts/sistema.js demo                    # una partición de comandos
+node scripts/sistema.js demo --particiones 4    # cuatro, como las pruebas de la Entrega 6
+```
+
+Desde volúmenes vacíos o sobre una instalación existente: genera lo que falte en `seguridad/local/`, construye y levanta todo, configura la réplica y la contraseña de Grafana, crea un tenant para la demo (su clave queda en `seguridad/local/tenant-demo.key`) y los de Canchas y Eventos (ver [Tres clientes](#tres-clientes-a-la-vez)), y comprueba que la API, Aula, la replicación semisincrónica, las particiones y Prometheus respondan. No borra volúmenes. Es lo que corre el CI en cada PR. Los pasos por separado se describen a continuación.
 
 ### Volúmenes nuevos
 
@@ -123,6 +133,8 @@ Para volver a una partición basta con `node scripts/sistema.js levantar`: el re
 |---|---|
 | API v1 y administración (a través de Traefik) | https://localhost:3000 |
 | Aula | https://localhost:3001 (usuarios en `seguridad/local/accesos-locales.txt`) |
+| Canchas (turnos de fútbol 5) | https://localhost:3003 |
+| Eventos (entradas) | https://localhost:3004 |
 | Panel de Traefik: servicios descubiertos | https://localhost:8080/dashboard/ |
 | Administración de RabbitMQ | https://localhost:15672 (demo / demo_local_2026) |
 | Prometheus | https://localhost:9090 |
@@ -188,6 +200,27 @@ La sesión dura una hora, vive en memoria de Aula (reiniciarla obliga a volver a
 
 **Contingencia.** Si `aula-db` no responde, `/materias` responde con `X-Aula-Modo: contingencia` y un catálogo armado desde el feed; las inscripciones siguen yendo a la API y el login sigue funcionando. Un ciclo de reconciliación lee `/v1/cambios` desde `punto_control.ultima_secuencia_feed` (cada 30 s en modo normal, cada 5 s en degradado) y aplica cada instantánea si su versión es mayor, en la misma transacción que el punto de control.
 
+## Tres clientes a la vez
+
+Aula no es el único consumidor: **Canchas** (https://localhost:3003) y **Eventos** (https://localhost:3004) son dos organizaciones más, cada una con su tenant, para mostrar que el servicio es multi-tenant. Es un mismo cliente liviano ([`clientes/vitrina`](clientes/vitrina/src/server.js)) con dos perfiles (`VITRINA_PERFIL`): cambian el vocabulario (turnos y jugadores, eventos y asistentes), los colores y los datos de dominio, que van en `metadata` (cancha, lugar, fecha, hora) y el servicio guarda sin interpretar.
+
+- **Tenant propio**, creado por `node scripts/sistema.js demo` con la API de administración: su clave, su secreto de webhook y su límite de tasa (Canchas 500 por segundo; Eventos 20, para mostrar que un tenant saturado no frena a los otros). Las credenciales quedan en `seguridad/local/canchas/` y `seguridad/local/eventos/`, que cada contenedor monta en solo lectura; no están en el Compose.
+- **Sin base propia:** arma su vista en memoria con el feed `/v1/cambios` (cada 2 s, desde su punto de control) y la mantiene al día con los webhooks firmados, que verifica con el mismo código que Aula ([`compartido/src/firma-webhook.js`](compartido/src/firma-webhook.js)). Si se reinicia, la reconstruye desde el feed. La contingencia con base local la muestra Aula.
+- **Lo usa el organizador:** crea actividades, reserva (con una `Idempotency-Key` por intento, que se repite al reintentar), cancela, abre y cierra la inscripción, y ve los webhooks que recibe, incluidos los rechazados por firma inválida. No tiene cuentas de usuarios finales (eso lo muestra Aula); las escrituras exigen JSON y el mismo origen.
+- **Buscar por id** consulta la API: la actividad de otro tenant responde `404`.
+
+Ráfaga simultánea sobre los tres (200 solicitudes a una actividad de 10 cupos de cada uno), con el 429 solo para Eventos y el 404 cruzado:
+
+```shell
+docker compose run --rm k6 run \
+  -e CANCHAS="$(cat seguridad/local/canchas/clave-api)" \
+  -e EVENTOS="$(cat seguridad/local/eventos/clave-api)" \
+  -e AULA="$(grep -o 'rc_aula_[0-9a-f]*' docker-compose.yml | head -1)" \
+  /pruebas/carga/tres-clientes.js
+```
+
+En Grafana, los paneles **"Por tenant"** muestran las solicitudes por código y los webhooks por resultado de cada tenant, con su nombre (`pdc_tenant_solicitudes_total`, `pdc_webhook_tenant_total`).
+
 ## Descubrimiento de servicios
 
 Traefik encuentra cada instancia de la API por sus etiquetas, ahora a través del proxy del socket:
@@ -205,10 +238,10 @@ Cada respuesta trae `X-Instancia`, el contenedor que la atendió. Traefik le hab
 ### Pruebas de cada componente
 
 ```shell
-for c in compartido servicios/api servicios/worker servicios/relay servicios/notificador clientes/aula; do (cd $c && npm ci && npm test); done
+for c in compartido servicios/api servicios/worker servicios/relay servicios/notificador clientes/aula clientes/vitrina; do (cd $c && npm ci && npm test); done
 ```
 
-Incluyen el control de acceso de la API (permisos, límite, `/admin`), la admisión por lotes, la caché de autenticación y el límite con Redis (con un doble del transporte), las particiones, el circuit breaker y los reintentos del notificador, el login, las sesiones, el CSRF y los roles de Aula (también contra el backend real de Aula con la API simulada), la reconciliación y la configuración TLS común. Los reportes de carga se prueban con `node --test pruebas/final/test/*.test.js`.
+Incluyen el control de acceso de la API (permisos, límite, `/admin`), la admisión por lotes, la caché de autenticación y el límite con Redis (con un doble del transporte), las particiones, el circuit breaker y los reintentos del notificador, el login, las sesiones, el CSRF y los roles de Aula (también contra el backend real de Aula con la API simulada), la reconciliación, la configuración TLS común y el cliente liviano (proyección por versión, firma, aislamiento y origen de las escrituras). Los reportes de carga se prueban con `node --test pruebas/final/test/*.test.js`.
 
 ### Seguridad contra el entorno levantado
 
@@ -232,7 +265,16 @@ node pruebas/fallos/matriz.js --e6 redis tenant  # evidencias en docs/entrega-6/
 
 El arnés ([`pruebas/fallos/arnes.js`](pruebas/fallos/arnes.js)) lanza una ráfaga de reservas que reintenta como un cliente correcto, detiene el componente a mitad de la ráfaga, lo vuelve a iniciar y verifica por la API: exactamente tantas confirmadas como cupos, ninguna pendiente, ningún participante con dos reservas activas y `cupos_disponibles` coherente. Cada escenario deja `docs/entrega-5/evidencias/fallos/<escenario>.txt`, y la corrida completa, `resumen.md`.
 
-`mysql-primary` va último: termina el primario con SIGKILL, lo deja aislado, promueve la réplica, le pasa el alias de red `mysql-primary` (los clientes no cambian su configuración y el certificado de la réplica también vale para ese nombre) y mide el RTO y el RPO. Deja la réplica como primario y sin réplica; para volver a la topología inicial: `docker compose down -v` y `node scripts/sistema.js levantar`.
+`mysql-primary` va último: termina el primario con SIGKILL, lo deja aislado, promueve la réplica, le pasa el alias de red `mysql-primary` (los clientes no cambian su configuración y el certificado de la réplica también vale para ese nombre) y mide el RTO y el RPO. Deja la réplica como primario y sin réplica; para volver a la topología inicial: `node scripts/sistema.js restaurar`.
+
+### Si se cae el primario
+
+```shell
+node scripts/sistema.js failover      # promueve la réplica y mide cuándo vuelve la escritura
+node scripts/sistema.js restaurar     # vuelve a primario + réplica: BORRA los datos (pide confirmación)
+```
+
+`failover` detiene el primario si sigue en marcha (para que no haya dos), espera a que la réplica aplique todo lo que recibió, la promueve, le da el alias `mysql-primary` y prueba una escritura por la API hasta que responde 201: informa cuánto tardó desde el failover y desde la caída (RTO). Es el mismo procedimiento que el escenario `mysql-primary` de la matriz ([`pruebas/fallos/failover.js`](pruebas/fallos/failover.js)). Con la réplica promovida, `demo` y `levantar` se niegan a arrancar y avisan cómo volver. `restaurar` corre `docker compose down -v` y `demo`: conserva `seguridad/local/` (certificados y claves) y borra las bases. Con `--confirmar` no pregunta.
 
 ### Contrato, carga y límite de tasa
 
@@ -297,18 +339,21 @@ node scripts/sistema.js detener
 node scripts/sistema.js levantar
 ```
 
+`docker compose ps` muestra `healthy` en cada servicio. El worker, el relay y el notificador exponen `/health` en su puerto interno de métricas (9464), con el mismo formato que el de la API: informa MySQL y RabbitMQ sin bloquearse (`docker compose exec worker node -e "fetch('https://localhost:9464/health').then(r => r.text()).then(console.log)"`). Sin MySQL siguen vivos y lo informan; sin RabbitMQ, el relay reconecta solo y el worker y el notificador se reinician.
+
 `docker compose down` elimina contenedores y redes y conserva los volúmenes. `docker compose down -v` también elimina los datos.
 
 ## Problemas frecuentes
 
 - `bind source path does not exist: .../seguridad/local/...`: falta `node scripts/sistema.js preparar`.
+- `dependency failed to start: container ... is unhealthy` al levantar: con Docker recién abierto todo arranca lento. Cada servicio tiene 2 minutos de gracia (RabbitMQ, 5); si igual pasa, volver a correr el mismo comando: no borra nada y lo que ya está sano no se reinicia.
 - `unable to verify the first certificate` o advertencia del navegador: el cliente no confía en `seguridad/local/ca.crt`.
 - `401` en todas las rutas: la clave no corresponde a un tenant de esta instalación (por ejemplo, volúmenes de otra entrega o una clave rotada).
 - `403 permiso-insuficiente`: la clave no tiene el permiso de esa operación (ver la tabla de permisos).
 - `429 limite-de-tasa`: respetar `Retry-After` o pedir al operador un límite mayor para ese tenant.
 - Aula responde `503 Identidades no disponibles`: falta `seguridad/local/usuarios.json`.
 - Las escrituras tardan diez segundos: la réplica está detenida y el primario espera el tiempo límite semisíncrono.
-- `La réplica fue promovida a primario`: después de `fallos mysql-primary`, `levantar` se niega a arrancar el primario viejo, que sería un segundo primario. Recrear el entorno: `docker compose down -v` y `levantar`.
+- `La réplica fue promovida a primario`: después de `failover` o `fallos mysql-primary`, `demo` y `levantar` se niegan a arrancar el primario viejo, que sería un segundo primario. Volver a la topología inicial: `node scripts/sistema.js restaurar` (borra los datos del entorno).
 - `503 no-disponible` en todo `/v1` con MySQL sano: Redis no responde (`docker compose ps redis`). La API no sigue sin él: no limitaría por tenant de forma global.
 - Grafana rechaza la contraseña de `accesos-locales.txt`: el volumen es anterior; `node scripts/sistema.js grafana` la vuelve a fijar.
 - Alguno de los puertos 3000, 3001, 3002, 8080, 9090 o 15672 está en uso: detener el proceso que lo ocupa.
@@ -318,12 +363,14 @@ node scripts/sistema.js levantar
 Exclusivamente para desarrollo local.
 
 - Generadas por `preparar` en `seguridad/local/` (fuera de Git): CA y claves privadas de cada servicio, usuarios de Aula (`accesos-locales.txt`), clave del operador (`admin.key`; la API recibe solo su hash) y contraseña del admin de Grafana (`grafana-admin.txt`).
+- Generadas por `demo` en `seguridad/local/` al crear cada tenant: la clave del tenant de la demo (`tenant-demo.key`) y la clave y el secreto del webhook de Canchas y Eventos (`canchas/`, `eventos/`).
 - En el repositorio, como en entregas anteriores: la clave de API y el secreto del webhook de Aula (`docker-compose.yml`), y las contraseñas de MySQL (root, `api_app`, `worker_app`, `relay_app`, `notificador_app`, `admin_app`, `replicador`), RabbitMQ (`demo`), PostgreSQL (`aula_admin`, `aula_app`) y Redis (`Infraestructura/redis/redis.conf`), en `docker-compose.yml` y los scripts iniciales. Las conexiones van cifradas, pero estas contraseñas no son secretas: ver el informe de amenazas.
 
 ## Limitaciones
 
 - Redis es una sola instancia: si cae, `/v1` responde `503` hasta que vuelve (ver la matriz de fallos). Se eligió así, y no un límite por instancia, porque con N API ese límite se multiplicaría por N.
 - Las sesiones de Aula siguen en la memoria de su proceso: Aula es una sola instancia.
+- Canchas y Eventos no tienen cuentas: los usa el organizador desde el equipo (el puerto se publica solo en 127.0.0.1). Su vista vive en memoria y se reconstruye desde el feed al reiniciar.
 - El estado de los circuitos del notificador es de su proceso: con varios notificadores, cada uno tendría su propio circuito por tenant.
 - Cambiar la cantidad de particiones con tráfico en curso puede desordenar los comandos de una actividad mientras dura el cambio (los que ya estaban en la cola vieja y los nuevos). Hacerlo con la carga detenida.
 - Se autentica cada servidor con su certificado; los clientes se autentican con credenciales, no con certificados (sin mTLS). La CA es local y sin rotación automática.

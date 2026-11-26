@@ -29,7 +29,7 @@ function crearAutenticacion(pool, limitador, { cache, observarConsulta = () => {
         async function cargar() {
             observarConsulta();
             const [filas] = await pool.query(
-                `SELECT id, scopes, limite_por_segundo, limite_rafaga
+                `SELECT id, nombre, scopes, limite_por_segundo, limite_rafaga
                    FROM tenants WHERE api_key_hash = ? AND activo = TRUE`,
                 [hash]
             );
@@ -39,6 +39,9 @@ function crearAutenticacion(pool, limitador, { cache, observarConsulta = () => {
         if (!fila) throw problemas.noAutenticado();
 
         req.tenantId = fila.id;
+        // Para las métricas por tenant. Una entrada de la caché anterior a
+        // este campo usa el id hasta que vence.
+        req.tenantNombre = fila.nombre ?? fila.id;
         req.scopes = new Set(fila.scopes ? fila.scopes.split(",") : []);
         req.limite = fila.limite_por_segundo
             ? { porSegundo: fila.limite_por_segundo, rafaga: fila.limite_rafaga }

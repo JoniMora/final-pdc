@@ -10,7 +10,10 @@
 //   - la clave del operador de la plataforma (admin.key) y su hash
 //     (admin.sha256, lo único que recibe la API);
 //   - la contraseña del administrador de Grafana (grafana-admin.txt), para
-//     que no quede la de fábrica (admin/admin).
+//     que no quede la de fábrica (admin/admin);
+//   - una carpeta por cliente de referencia liviano (canchas/, eventos/),
+//     que cada contenedor monta en solo lectura. Las credenciales de su
+//     tenant las escribe `sistema.js demo` cuando lo crea.
 //
 // Es repetible: no reemplaza nada que ya exista. Para regenerar todo,
 // borrar seguridad/local/ y volver a ejecutarlo.
@@ -28,8 +31,9 @@ const DIRECTORIO = path.resolve(__dirname, "../seguridad/local");
 const DIAS = "365";
 
 // Servicio → nombres del certificado. La réplica también se presenta como
-// mysql-primary: al promoverla (pruebas/fallos/failover.js) recibe ese
-// alias de red y los clientes verifican la identidad contra ese nombre.
+// mysql-primary: al promoverla (pruebas/fallos/failover.js, que usa también
+// `sistema.js failover`) recibe ese alias de red y los clientes verifican
+// la identidad contra ese nombre.
 const CERTIFICADOS = {
     redis: ["redis", "localhost"],
     "receptor-pruebas": ["receptor-pruebas", "localhost"],
@@ -41,11 +45,16 @@ const CERTIFICADOS = {
     relay: ["relay", "localhost"],
     notificador: ["notificador", "localhost"],
     aula: ["aula", "localhost"],
+    canchas: ["canchas", "localhost"],
+    eventos: ["eventos", "localhost"],
     "mysql-primary": ["mysql-primary", "localhost"],
     "mysql-replica": ["mysql-replica", "mysql-primary", "localhost"],
     "aula-db": ["aula-db", "localhost"],
     rabbitmq: ["rabbitmq", "localhost"]
 };
+
+// Canchas y Eventos (clientes/vitrina), cada uno con su tenant.
+const CLIENTES_LIVIANOS = ["canchas", "eventos"];
 
 const USUARIOS_AULA = [
     { usuario: "admin", rol: "administrador", participante: null },
@@ -189,13 +198,26 @@ async function main() {
     if (await crearIdentidades()) creados.push("usuarios de Aula y clave del operador");
     if (crearCredencialGrafana()) creados.push("contraseña de Grafana");
 
+    for (const cliente of CLIENTES_LIVIANOS) {
+        const carpeta = path.join(DIRECTORIO, cliente);
+        if (!fs.existsSync(carpeta)) {
+            fs.mkdirSync(carpeta);
+            creados.push(`carpeta de ${cliente}`);
+        }
+    }
+
     // Los contenedores corren con usuarios sin privilegios (node, mysql,
     // rabbitmq, grafana) y necesitan leer los certificados y claves que se
     // les montan. La clave de la CA y las credenciales en texto no se montan
     // en ningún contenedor y quedan solo para el dueño.
     for (const nombre of fs.readdirSync(DIRECTORIO)) {
-        const privado = ["ca.key", "admin.key", "accesos-locales.txt"].includes(nombre);
-        fs.chmodSync(path.join(DIRECTORIO, nombre), privado ? 0o600 : 0o644);
+        const ruta = path.join(DIRECTORIO, nombre);
+        if (fs.statSync(ruta).isDirectory()) {
+            fs.chmodSync(ruta, 0o755);
+            continue;
+        }
+        const privado = ["ca.key", "admin.key", "accesos-locales.txt", "tenant-demo.key"].includes(nombre);
+        fs.chmodSync(ruta, privado ? 0o600 : 0o644);
     }
 
     console.log(creados.length
